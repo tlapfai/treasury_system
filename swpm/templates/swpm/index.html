@@ -1,0 +1,99 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>SWPM</title>
+        <link href="{% static 'swpm/styles.css' %}" rel="stylesheet">
+    </head>
+    <body>
+        Hello World!<br>
+        <section class="about-header container border-bottom text-center">
+            <h1>Black &amp; Scholes Option Pricing Formula</h1>
+          </section>
+        <section>
+        <div class="row between">
+        <div class="cares-sections">
+            <div class="mini-container v-align">
+                <form id="bl-calc-form">
+                    <div class="row between">
+                        <div class="four columns">
+                            <label for="input-spot" class="form-label">Spot</label>
+                            <input type="number" id="input-spot" placeholder="(Ex. 100.0)" value="8400" step="0.01"/>
+                        </div>
+                        <div class="four columns">
+                            <label for="input-strike" class="form-label">Strike</label>
+                            <input type="number" id="input-strike" placeholder="(Ex. 100.0)" value="8600" step="0.01"/>
+                        </div>
+                        <div class="four columns">
+                            <label for="datetimepicker" class="form-label">Expiry</label>
+                            <input type="text" id="datetimepicker" placeholder="(Ex. 2015-12-30 15:30:00)" />
+                        </div>
+                    </div>
+                    <div class="row between">
+                        <div class="four columns">
+                            <label for="input-volt" class="form-label">Volatility (%)</label>
+                            <input type="number" step="0.01" id="input-volt" placeholder="(Ex. 20)" value="18" />
+                        </div>
+                        <div class="four columns">
+                            <label for="input-intrate" class="form-label">Interest (%)</label>
+                            <input type="number" step="0.01" id="input-intrate" placeholder="(Ex. 7)" value="7" />
+                        </div>
+                        <div class="four columns">
+                            <label for="input-divyld" class="form-label">Dividend</label>
+                            <input type="number" id="input-divyld" placeholder="(Ex. 0.0)" value="0.0" />
+                        </div>
+                    </div>
+        
+                    <button type="submit" class="btn btn-default" id="calc-button">Calculate</button>
+                </form>        
+            </div>
+            <br>
+            <br>
+            <div id="results">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Call Option Premium</th>
+                            <th>Put Option Premium</th>
+                            <th>Call Option Delta</th>
+                            <th>Put Option Delta</th>
+                            <th>Option Gamma</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="results-value" id="call-option-prem-value">0</td>
+                            <td class="results-value" id="put-option-prem-value">0</td>
+                            <td class="results-value" id="call-option-delta-value">0</td>
+                            <td class="results-value" id="put-option-delta-value">0</td>
+                            <td class="results-value" id="option-gamma-value">0</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Call Option Theta</th>
+                            <th>Put Option Theta</th>
+                            <th>Call Option Rho</th>
+                            <th>Put Option Rho</th>
+                            <th>Option Vega</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="results-value" id="call-option-theta-value">0</td>
+                            <td class="results-value" id="put-option-theta-value">0</td>
+                            <td class="results-value" id="class-option-rho-value">0</td>
+                            <td class="results-value" id="put-option-rho-value">0</td>
+                            <td class="results-value" id="option-vega-value">0</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <br>
+        {{ mytime }}
+    </body>
+</html>
