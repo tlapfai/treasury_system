@@ -11,8 +11,11 @@ FXO_TYPE = [("EUR","European"),
     
 FXO_CP = [("C","Call"), ("P","Put")]
 
+DAY_COUNTER = {"A360": ql.Actual360()}
+
 class Ccy(models.Model):
     code = models.CharField(max_length=3, blank=False)
+    fixing_days = models.PositiveIntegerField()
     def __str__(self):
         return self.code
 
@@ -24,7 +27,22 @@ class CcyPair(models.Model):
         return True
     def __str__(self):
         return f"{self.base_ccy}/{self.quote_ccy}"
+    
+class RateIndex(models.Model):
+    pass
 
+class RateQuote(models.Model):
+    rate = models.FloatField()
+    tenor = models.CharField(max_length=5)
+    type = models.CharField(max_length=5)
+    ccy = models.ForeignKey(Ccy, CASCADE, related_name="rates")
+    day_counter = models.CharField(max_length=5)
+    def rate_helper(self):
+        if type == "DEP":
+            fixing_days = self.ccy.fixing_days
+            convention = ql.ModifiedFollowing
+            ccy = Ccy.objects.get(code=self.ccy)
+            return ql.DepositRateHelper(self.rate, ql.Period(self.tenor), ccy.fixing_days, ql.TARGET(), convention, False, DAY_COUNTER[self.day_counter])
 
 class FXOManager(models.Manager):
     def create_fxo(self, trade_date, maturity_date, ccypair, strike_price, type, cp, notional_1):
