@@ -66,7 +66,6 @@ class IRTermStructure(models.Model):
     rates = models.ManyToManyField(RateQuote, related_name="ts")
     def term_structure(self):
         helpers = [rate.helper() for rate in self.rates.all()]
-        print(helpers)
         return ql.PiecewiseLogLinearDiscount(ql.Date(self.ref_date.isoformat(),'%Y-%m-%d'), helpers, ql.Actual360())
     def ccy(self):
         return self.rates[0].ccy
