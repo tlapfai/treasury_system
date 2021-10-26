@@ -13,28 +13,33 @@ FXO_CP = [("C","Call"), ("P","Put")]
 
 DAY_COUNTER = {"A360": ql.Actual360()}
 
+CALENDAR_LIST = {'TARGET': ql.TARGET(), 'UnitedStates': ql.UnitedStates()}
+
 class Calendar(models.Model):
     name = models.CharField(max_length=16)
+    def __str__(self):
+        return self.name
     def calendar(self):
-        return ql.TARGET()
+        return CALENDAR_LIST[self.name]
 
 class Ccy(models.Model):
     code = models.CharField(max_length=3, blank=False)
-    fixing_days = models.PositiveIntegerField()
+    fixing_days = models.PositiveIntegerField(default=2)
+    cdr = models.ForeignKey(Calendar, DO_NOTHING, related_name="ccy", null=True)
     def __str__(self):
         return self.code
 
 class CcyPair(models.Model):
     base_ccy = models.ForeignKey(Ccy, CASCADE, related_name="as_base_ccy")
     quote_ccy = models.ForeignKey(Ccy, CASCADE, related_name="as_quote_ccy")
-    cdr = models.ForeignKey(Calendar, DO_NOTHING, related_name="ccy_pair")
+    cdr = models.ForeignKey(Calendar, DO_NOTHING, related_name="ccy_pair", null=True)
     def check_order():
         # check correct order
         return True
     def __str__(self):
         return f"{self.base_ccy}/{self.quote_ccy}"
     def calendar(self):
-        return cdr.calendar()
+        return self.cdr.calendar()
     
 class RateIndex(models.Model):
     name = models.CharField(max_length=16)
@@ -60,17 +65,17 @@ class IRTermStructure(models.Model):
     ref_date = models.DateField()
     rates = models.ManyToManyField(RateQuote, related_name="ts")
     def term_structure(self):
-        helpers = [rate.helper() for rate in rates]
+        helpers = [rate.helper() for rate in self.rates.all()]
         return ql.PiecewiseLogLinearDiscount(ql.Date(self.ref_date.isoformat(),'%Y-%m-%d'), helpers, ql.Actual360())
     def ccy(self):
-        return rates[0].ccy
+        return self.rates[0].ccy
 
 class FXVolatility(models.Model):
     ref_date = models.DateField()
-    ccy_pair = models.ForeignKey(CcyPair, related_name='vol')
+    ccy_pair = models.ForeignKey(CcyPair, CASCADE, related_name='vol')
     vol = models.FloatField()
     def black_vol(self):
-        return ql.BlackConstantVol(ql.Date(self.ref_date.isoformat(),'%Y-%m-%d'), ccy_pair.calendar(), vol, ql.Actual365Fixed)
+        return ql.BlackConstantVol(ql.Date(self.ref_date.isoformat(),'%Y-%m-%d'), self.ccy_pair.calendar(), self.vol, ql.Actual365Fixed)
     
 class FXOManager(models.Manager):
     def create_fxo(self, trade_date, maturity_date, ccypair, strike_price, type, cp, notional_1):
