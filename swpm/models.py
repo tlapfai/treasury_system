@@ -48,17 +48,17 @@ class RateQuote(models.Model):
     name = models.CharField(max_length=16)
     rate = models.FloatField()
     tenor = models.CharField(max_length=5)
-    type = models.CharField(max_length=5)
+    instrument = models.CharField(max_length=5)
     ccy = models.ForeignKey(Ccy, CASCADE, related_name="rates")
     day_counter = models.CharField(max_length=5)
     def helper(self):
-        if type == "DEP":
+        if self.instrument == "DEPO":
             fixing_days = self.ccy.fixing_days
             convention = ql.ModifiedFollowing
             ccy = Ccy.objects.get(code=self.ccy)
-            return ql.DepositRateHelper(self.rate, ql.Period(self.tenor), ccy.fixing_days, ql.TARGET(), convention, False, DAY_COUNTER[self.day_counter])
+            return ql.DepositRateHelper(self.rate, ql.Period(self.tenor), fixing_days, ql.TARGET(), convention, False, DAY_COUNTER[self.day_counter])
     def __str__(self):
-        return f"{self.name}: {self.ccy}: {self.rate}"
+        return f"{self.name}: ({self.ccy}): {self.rate}"
 
 class IRTermStructure(models.Model):
     name = models.CharField(max_length=16)
@@ -66,6 +66,7 @@ class IRTermStructure(models.Model):
     rates = models.ManyToManyField(RateQuote, related_name="ts")
     def term_structure(self):
         helpers = [rate.helper() for rate in self.rates.all()]
+        print(helpers)
         return ql.PiecewiseLogLinearDiscount(ql.Date(self.ref_date.isoformat(),'%Y-%m-%d'), helpers, ql.Actual360())
     def ccy(self):
         return self.rates[0].ccy
