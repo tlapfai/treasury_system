@@ -87,7 +87,7 @@ class FXVolatility(models.Model):
     vol = models.FloatField()
     def handle(self):
         return ql.BlackVolTermStructureHandle(
-            ql.BlackConstantVol(ql.Date(self.ref_date.isoformat(),'%Y-%m-%d'), self.ccy_pair.calendar(), self.vol, ql.Actual365Fixed))
+            ql.BlackConstantVol(ql.Date(self.ref_date.isoformat(),'%Y-%m-%d'), self.ccy_pair.calendar(), self.vol, ql.Actual365Fixed()))
     def __str__(self):
         return f"{self.ccy_pair} as of {self.ref_date}"
     
@@ -136,6 +136,4 @@ class FXO(models.Model):
         q = self.ccy_pair.base_ccy.fx_curve.all()[0].term_structure()
         r = self.ccy_pair.quote_ccy.fx_curve.all()[0].term_structure()
         process = ql.BlackScholesMertonProcess(spot_rate.handle(), q, r, v)
-        return process
-
-
+        return ql.AnalyticEuropeanEngine(process)
