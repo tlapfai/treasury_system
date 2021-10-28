@@ -9,6 +9,7 @@ admin.site.register(RateIndex)
 admin.site.register(RateQuote)
 admin.site.register(IRTermStructure)
 admin.site.register(FXVolatility)
+admin.site.register(FxSpotRateQuote)
 
 
 

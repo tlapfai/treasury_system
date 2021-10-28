@@ -40,6 +40,13 @@ class CcyPair(models.Model):
         return f"{self.base_ccy}/{self.quote_ccy}"
     def calendar(self):
         return self.cdr.calendar()
+
+class FxSpotRateQuote(models.Model):
+    ref_date = models.DateField()
+    rate = models.FloatField()
+    ccy_pair = models.ForeignKey(CcyPair, CASCADE, related_name="rate")
+    def handle(self):
+        return ql.QuoteHandle(ql.SimpleQuote(self.rate))
     
 class RateIndex(models.Model):
     name = models.CharField(max_length=16)
@@ -64,25 +71,32 @@ class IRTermStructure(models.Model):
     name = models.CharField(max_length=16)
     ref_date = models.DateField()
     rates = models.ManyToManyField(RateQuote, related_name="ts")
+    as_fx_curve = models.ForeignKey(Ccy, CASCADE, related_name="fx_curve", null=True)
+    as_rf_curve = models.ForeignKey(Ccy, CASCADE, related_name="rf_curve", null=True)
     def term_structure(self):
         helpers = [rate.helper() for rate in self.rates.all()]
-        return ql.PiecewiseLogLinearDiscount(ql.Date(self.ref_date.isoformat(),'%Y-%m-%d'), helpers, ql.Actual360())
+        return ql.YieldTermStructureHandle(ql.PiecewiseLogLinearDiscount(ql.Date(self.ref_date.isoformat(),'%Y-%m-%d'), helpers, ql.Actual360()))
     def ccy(self):
         return self.rates[0].ccy
+    def __str__(self):
+        return f"{self.name}"
 
 class FXVolatility(models.Model):
     ref_date = models.DateField()
     ccy_pair = models.ForeignKey(CcyPair, CASCADE, related_name='vol')
     vol = models.FloatField()
-    def black_vol(self):
-        return ql.BlackConstantVol(ql.Date(self.ref_date.isoformat(),'%Y-%m-%d'), self.ccy_pair.calendar(), self.vol, ql.Actual365Fixed)
+    def handle(self):
+        return ql.BlackVolTermStructureHandle(
+            ql.BlackConstantVol(ql.Date(self.ref_date.isoformat(),'%Y-%m-%d'), self.ccy_pair.calendar(), self.vol, ql.Actual365Fixed))
+    def __str__(self):
+        return f"{self.ccy_pair} as of {self.ref_date}"
     
 class FXOManager(models.Manager):
-    def create_fxo(self, trade_date, maturity_date, ccypair, strike_price, type, cp, notional_1):
+    def create_fxo(self, trade_date, maturity_date, ccy_pair, strike_price, type, cp, notional_1):
         fxo = self.create(
             trade_date = trade_date, 
             maturity_date = maturity_date, 
-            ccypair = ccypair, 
+            ccy_pair = ccy_pair, 
             strike_price = strike_price, 
             type = type, 
             cp = cp, 
@@ -97,7 +111,7 @@ class FXO(models.Model):
     create_time = models.DateTimeField(auto_now_add=True)
     trade_date = models.DateField(null=False)
     maturity_date = models.DateField(null=False)
-    ccypair = models.ForeignKey(CcyPair, models.DO_NOTHING, null=False, related_name='options')
+    ccy_pair = models.ForeignKey(CcyPair, models.DO_NOTHING, null=False, related_name='options')
     strike_price = models.FloatField()
     notional_1 = models.FloatField()
     notional_2 = models.FloatField()
@@ -106,7 +120,7 @@ class FXO(models.Model):
     objects = FXOManager()
 
     def __str__(self):
-        return f"FXO ID: {self.id}, {self.ccypair}, K={self.strike_price}"
+        return f"FXO ID: {self.id}, {self.ccy_pair}, K={self.strike_price}"
     
     def instrument(self):
         if self.active:
@@ -115,5 +129,13 @@ class FXO(models.Model):
             exercise = ql.EuropeanExercise(ql.Date(self.maturity_date.isoformat(), '%Y-%m-%d'))
             european_option = ql.VanillaOption(payoff, exercise)
             return european_option
+
+    def make_pricing_engine(self, as_of_date):
+        spot_rate = self.ccy_pair.rate.get(ref_date=as_of_date)
+        v = self.ccy_pair.vol.get(ref_date=as_of_date).handle()
+        q = self.ccy_pair.base_ccy.fx_curve.all()[0].term_structure()
+        r = self.ccy_pair.quote_ccy.fx_curve.all()[0].term_structure()
+        process = ql.BlackScholesMertonProcess(spot_rate.handle(), q, r, v)
+        return process
 
 
