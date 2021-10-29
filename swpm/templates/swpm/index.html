@@ -20,24 +20,35 @@
     </head>
     <body>
         <section class="about-header container border-bottom text-center"></section><h1>SWPM</h1></section><br>
-		<form method="post">
-			<fieldset>
-				<legend>Currency Pair</legend>
-				<table>{{ myform.as_table }}</table>
-				<input type="submit" class="btn btn-default">
-			</fieldset>
-		</form>
+		<div class='ccypair'>
+			<form action="{% url 'ccypair' %}" method="post">
+				<fieldset>
+					<legend>Currency Pair</legend>
+					<table>{{ myform.as_table }}</table>
+					<button type="submit" class="btn btn-default">Save</button>
+				</fieldset>
+			</form>
+			<span class='ccypair-msg'>{{ message }}<span>
+		</div>
 		<form action="{% url 'pricing' %}" method="post" >
 			<fieldset>
 				<legend>FX Option</legend>
 					<table>{{ myFXOform.as_table }}</table>
-					<input type="submit" class="btn btn-default">
+					<button type="submit" class="btn btn-default">Price</button>
+					<button type="submit" class="btn btn-default" formaction="{% url 'pricing-do' %}">Do</button>
 			</fieldset>
 		</form>
-        <div class='valuation'>
-            NPV = {{ results.npv }}
-        </div>
-        
+		{% if results.npv %}
+			<div class='valuation'>
+				<table class='valuation-table'>
+					<tr><td>Spot</td><td>{{ market_data.spot|floatformat:4 }}</td></tr>
+					<tr><td>NPV</td><td>{{ results.npv|floatformat:4 }}</td></tr>
+					<tr><td>Delta</td><td>{{ results.delta|floatformat:4 }}</td></tr>
+					<tr><td>Gamma</td><td>{{ results.gamma|floatformat:4 }}</td></tr>
+					<tr><td>Vega</td><td>{{ results.vega|floatformat:4 }} </td></tr>
+				</table>
+			</div>
+        {% endif %}
         <div class="row between">
         {{ mytime }}
     </body>
