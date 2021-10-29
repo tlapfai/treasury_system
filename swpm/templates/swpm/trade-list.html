@@ -1,0 +1,28 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>Trade List</title>
+        <link href="{% static 'swpm/styles.css' %}" rel="stylesheet">
+		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+	</head>
+	<body>
+		<div>
+			<table class='trade-list'>
+				<th>Trade ID</th>
+				<th>Currency Pair</th>
+				<th>Type</th>
+				<th>CP</th>
+				{% for t in trade_list %}
+					<tr>
+						<td class='tradeid'>{{ t.pk }}</td>
+						<td class='ccypair'>{{ t.ccypair }}</td>
+						<td class='type'>{{ t.type }}</td>
+						<td class='cp'>{{ t.cp }}</td>
+					</tr>
+				{% endfor %}
+			</table>
+		</div>
+	</body>
+</html>
