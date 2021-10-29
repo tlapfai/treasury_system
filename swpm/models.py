@@ -6,7 +6,7 @@ from django.forms import ModelForm, SelectDateWidget, DateInput
 from django import forms
 import QuantLib as ql
 
-FXO_TYPE = [("EUR","European"), 
+FXO_TYPE = [("EUR", "European"), 
         ("AME", "American"), 
         ("DIG", "Digital"), 
         ("BAR", "Barrier")]
@@ -27,28 +27,33 @@ class Calendar(models.Model):
 class Ccy(models.Model):
     code = models.CharField(max_length=3, blank=False)
     fixing_days = models.PositiveIntegerField(default=2)
-    cdr = models.ForeignKey(Calendar, DO_NOTHING, related_name="ccy", null=True)
+    cdr = models.ForeignKey(Calendar, DO_NOTHING, related_name="ccys", null=True)
     def __str__(self):
         return self.code
 
 class CcyPair(models.Model):
     base_ccy = models.ForeignKey(Ccy, CASCADE, related_name="as_base_ccy")
     quote_ccy = models.ForeignKey(Ccy, CASCADE, related_name="as_quote_ccy")
-    cdr = models.ForeignKey(Calendar, DO_NOTHING, related_name="ccy_pair", null=True)
+    cdr = models.ForeignKey(Calendar, DO_NOTHING, related_name="ccy_pairs", null=True)
+    fixing_days = models.PositiveIntegerField(default=2)
     def check_order():
         # check correct order
         return True
     def __str__(self):
         return f"{self.base_ccy}/{self.quote_ccy}"
+    def get_rate(self, date):
+        return self.rates.get(ref_date=date)
     def calendar(self):
         return self.cdr.calendar()
 
 class FxSpotRateQuote(models.Model):
     ref_date = models.DateField()
     rate = models.FloatField()
-    ccy_pair = models.ForeignKey(CcyPair, CASCADE, related_name="rate")
+    ccy_pair = models.ForeignKey(CcyPair, CASCADE, related_name="rates")
     def handle(self):
         return ql.QuoteHandle(ql.SimpleQuote(self.rate))
+    def __str__(self):
+        return f"{self.ccy_pair}: {self.rate} as of {self.ref_date}"
     
 class RateIndex(models.Model):
     name = models.CharField(max_length=16)
@@ -59,7 +64,7 @@ class RateQuote(models.Model):
     tenor = models.CharField(max_length=5)
     instrument = models.CharField(max_length=5)
     ccy = models.ForeignKey(Ccy, CASCADE, related_name="rates")
-    day_counter = models.CharField(max_length=5)
+    day_counter = models.CharField(max_length=16)
     def helper(self):
         if self.instrument == "DEPO":
             fixing_days = self.ccy.fixing_days
@@ -120,25 +125,35 @@ class FXO(models.Model):
     type = models.CharField(max_length=5, choices=FXO_TYPE)
     cp = models.CharField(max_length=1, choices=FXO_CP)
     objects = FXOManager()
+    
+    def serialize(self):
+        pass
 
     def __str__(self):
         return f"FXO ID: {self.id}, {self.ccy_pair}, K={self.strike_price}"
     
     def instrument(self):
         if self.active:
-            cp = ql.Option.Call if self.cp=="C" else ql.Option.Put 
-            payoff = ql.PlainVanillaPayoff(cp, self.strike_price)
+            cp = ql.Option.Call if self.cp=="C" else ql.Option.Put
+            print(self.type)
+            if self.type == 'EUR':
+                payoff = ql.PlainVanillaPayoff(cp, self.strike_price)
+            elif self.type == 'DIG':
+                payoff = ql.CashOrNothingPayoff(cp, self.strike_price, 1.0)
+            else:
+                payoff = ql.PlainVanillaPayoff(cp, self.strike_price)
             exercise = ql.EuropeanExercise(ql.Date(self.maturity_date.isoformat(), '%Y-%m-%d'))
-            european_option = ql.VanillaOption(payoff, exercise)
-            return european_option
+            inst = ql.VanillaOption(payoff, exercise)
+            return inst
 
     def make_pricing_engine(self, as_of_date):
-        spot_rate = self.ccy_pair.rate.get(ref_date=as_of_date)
-        v = self.ccy_pair.vol.get(ref_date=as_of_date).handle()
-        q = self.ccy_pair.base_ccy.fx_curve.all()[0].term_structure()
-        r = self.ccy_pair.quote_ccy.fx_curve.all()[0].term_structure()
-        process = ql.BlackScholesMertonProcess(spot_rate.handle(), q, r, v)
-        return ql.AnalyticEuropeanEngine(process)
+        if self.active:
+            spot_rate = self.ccy_pair.rates.get(ref_date=as_of_date)
+            v = self.ccy_pair.vol.get(ref_date=as_of_date).handle()
+            q = self.ccy_pair.base_ccy.fx_curve.term_structure()
+            r = self.ccy_pair.quote_ccy.fx_curve.term_structure()
+            process = ql.BlackScholesMertonProcess(spot_rate.handle(), q, r, v)
+            return ql.AnalyticEuropeanEngine(process)
 
 class CcyPairForm(ModelForm):
     class Meta:
