@@ -8,3 +8,15 @@
 .between {
     justify-content: space-between;
 }
+
+.valuation-table, .valuation-table td , .trade-list td{
+  border: 1px solid black;
+  border-collapse: collapse;
+  padding: 4px;
+  text-align: right;
+}
+
+.valuation-table td {
+	width: 120px;
+}
+
