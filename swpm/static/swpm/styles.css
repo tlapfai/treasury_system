@@ -9,7 +9,7 @@
     justify-content: space-between;
 }
 
-.valuation-table, .valuation-table td , .trade-list td{
+.valuation-table, .valuation-table td , .trade-list td, .trade-list th{
   border: 1px solid black;
   border-collapse: collapse;
   padding: 4px;

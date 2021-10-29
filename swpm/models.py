@@ -4,6 +4,7 @@ from django.db.models.fields.related import ForeignKey
 from django.utils import timezone
 from django.forms import ModelForm, SelectDateWidget, DateInput
 from django import forms
+import datetime
 import QuantLib as ql
 
 FXO_TYPE = [("EUR", "European"), 
@@ -177,3 +178,6 @@ class FXOForm(ModelForm):
     #def __init__(self, *args, **kwargs):
     #    super().__init__(*args, **kwargs)
     #    self.fields['trade_date'].widget.attrs.update({'type': 'date'})
+
+class AsOfForm(forms.Form):
+    as_of = forms.DateField(widget=DateInput(attrs={'type': 'date'}))

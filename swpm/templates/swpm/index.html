@@ -29,11 +29,14 @@
 				</fieldset>
 			</form>
 			<span class='ccypair-msg'>{{ message }}<span>
-		</div>
+		</div><br>
 		<form action="{% url 'pricing' %}" method="post" >
 			<fieldset>
 				<legend>FX Option</legend>
-					<table>{{ myFXOform.as_table }}</table>
+					<table>
+						{{ as_of_form.as_table }}
+						{{ myFXOform.as_table }}
+					</table>
 					<button type="submit" class="btn btn-default">Price</button>
 					<button type="submit" class="btn btn-default" formaction="{% url 'pricing-do' %}">Do</button>
 			</fieldset>
