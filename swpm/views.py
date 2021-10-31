@@ -38,15 +38,16 @@ def pricing(request, commit=False):
             opt = fxo_class.instrument()
             engine = fxo_class.make_pricing_engine(as_of)
             opt.setPricingEngine(engine)
+            side = 1.0 if fxo_class.buy_sell=="B" else -1.0
             return render(request, 'swpm/index.html', {
                 'myform': CcyPairForm(),
                 'myFXOform': fxo_form, 
                 'as_of_form': as_of_form, 
                 'market_data': {'spot': fxo_class.ccy_pair.get_rate(as_of).rate}, 
-                'results': {'npv': opt.NPV(), 
-                        'delta': opt.delta(),
-                        'gamma': opt.gamma(),
-                        'vega': opt.vega()
+                'results': {'npv': side*opt.NPV(), 
+                        'delta': side*opt.delta(),
+                        'gamma': side*opt.gamma(),
+                        'vega': side*opt.vega()
                         }
                     }
                 )
@@ -60,8 +61,30 @@ def save_ccypair(request):
             ccypair_form.save()
             return render(request, 'swpm/index.html', {"message": "saved successfully.", 'myform': ccypair_form})
     
-
+@csrf_exempt   
 def reval(request):
-    # ts = trades.all()
-    # for t in ts: reval -> save()
-    pass
+    if request.method == 'POST':
+        reval_date = request.POST.reval_date
+        books = request.POST.books
+        if books:
+            trades = TradeDetail.objects.none()
+            for book in books:
+                b = Book.objects.get(name=book)
+                trades_ = b.trades.all()
+            trades.union(trades_)
+        else:
+            trades = TradeDetail.objects.all()
+
+        for t in trades:
+            inst = t.trade.instrument()
+            engine = t.trade.make_pricing_engine(reval_date)
+            inst.setPricingEngine(engine)
+            side = 1.0 if t.trade.buy_sell=="B" else -1.0
+            TradeMarkToMarket.objects.get_or_create(
+                as_of = reval_date, 
+                trade_d = t, 
+                npv = side * t.trade.npv()
+                )
+        return "Good"
+    else:
+        return render(request, 'swpm/reval.html', {'reval_form': RevalForm()})

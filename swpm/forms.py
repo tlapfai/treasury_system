@@ -11,12 +11,13 @@ class CcyPairForm(ModelForm):
 class FXOForm(ModelForm):
     class Meta:
         model = FXO
-        fields = ['trade_date', 'maturity_date', 'ccy_pair', 'strike_price', 'notional_1', 'notional_2', 'type', 'cp']
+        fields = ['trade_date', 'maturity_date', 'ccy_pair', 'type', 'cp', 'buy_sell', 'strike_price', 'notional_1', 'notional_2']
         widgets = {
             'trade_date': DateInput(attrs={'type': 'date'}),
             'maturity_date': DateInput(attrs={'type': 'date'}),
             }
         labels = {
+            'buy_sell': 'Buy/Sell',
             'cp': 'Call or Put',
             }
         help_texts = {
@@ -28,4 +29,8 @@ class FXOForm(ModelForm):
 
 class AsOfForm(forms.Form):
     as_of = forms.DateField(widget=DateInput(attrs={'type': 'date'}))
+
+class RevalForm(forms.Form):
+    reval_date = forms.DateField(widget=DateInput(attrs={'type': 'date'}))
+    books = forms.ModelMultipleChoiceField(Book.objects.all())
     

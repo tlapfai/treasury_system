@@ -12,7 +12,8 @@
             "args": [
                 "runserver"
             ],
-            "django": true
+            "django": true, 
+            //"python": "D:\\djangoenv\\Scripts\\python" 
         }
     ]
 }

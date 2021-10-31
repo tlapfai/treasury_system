@@ -12,6 +12,8 @@ FXO_TYPE = [("EUR", "European"),
     
 FXO_CP = [("C","Call"), ("P","Put")]
 
+BUY_SELL = [("B", "Buy"), ("S", "Sell")]
+
 DAY_COUNTER = {"A360": ql.Actual360(), 'A365Fixed': ql.Actual365Fixed()}
 
 CALENDAR_LIST = {'TARGET': ql.TARGET(), 'UnitedStates': ql.UnitedStates(), 'HongKong': ql.HongKong(), 'UnitedKingdom': ql.UnitedKingdom()}
@@ -124,6 +126,7 @@ class FXOManager(models.Manager):
 class FXO(models.Model):
     id = models.BigAutoField(primary_key=True)
     active = models.BooleanField(default=True)
+    buy_sell = models.CharField(max_length=1, choices=BUY_SELL)
     create_time = models.DateTimeField(auto_now_add=True)
     trade_date = models.DateField(null=False)
     maturity_date = models.DateField(null=False)
@@ -139,22 +142,21 @@ class FXO(models.Model):
         return f"FXO ID: {self.id}, {self.ccy_pair}, K={self.strike_price}"
     
     def instrument(self):
-        if self.active:
-            cp = ql.Option.Call if self.cp=="C" else ql.Option.Put
-            if self.type == 'EUR':
-                payoff = ql.PlainVanillaPayoff(cp, self.strike_price)
-            elif self.type == 'DIG':
-                payoff = ql.CashOrNothingPayoff(cp, self.strike_price, 1.0)
-            else:
-                payoff = ql.PlainVanillaPayoff(cp, self.strike_price)
-            exercise = ql.EuropeanExercise(ql.Date(self.maturity_date.isoformat(), '%Y-%m-%d'))
-            inst = ql.VanillaOption(payoff, exercise)
-            return inst
+        cp = ql.Option.Call if self.cp=="C" else ql.Option.Put
+        if self.type == 'EUR':
+            payoff = ql.PlainVanillaPayoff(cp, self.strike_price)
+        elif self.type == 'DIG':
+            payoff = ql.CashOrNothingPayoff(cp, self.strike_price, 1.0)
+        else:
+            payoff = ql.PlainVanillaPayoff(cp, self.strike_price)
+        exercise = ql.EuropeanExercise(ql.Date(self.maturity_date.isoformat(), '%Y-%m-%d'))
+        inst = ql.VanillaOption(payoff, exercise)
+        return inst
 
-    def make_pricing_engine(self, as_of_date):
+    def make_pricing_engine(self, as_of):
         if self.active:
-            spot_rate = self.ccy_pair.rates.get(ref_date=as_of_date)
-            v = self.ccy_pair.vol.get(ref_date=as_of_date).handle()
+            spot_rate = self.ccy_pair.rates.get(ref_date=as_of)
+            v = self.ccy_pair.vol.get(ref_date=as_of).handle()
             q = self.ccy_pair.base_ccy.fx_curve.term_structure()
             r = self.ccy_pair.quote_ccy.fx_curve.term_structure()
             process = ql.BlackScholesMertonProcess(spot_rate.handle(), q, r, v)
@@ -162,16 +164,28 @@ class FXO(models.Model):
 
 class Portfolio(models.Model):
     name = models.CharField(max_length=16)
+    def __str__(self) -> str:
+        return self.name
 
 class Book(models.Model):
     name = models.CharField(max_length=16)
     portfolio = models.ForeignKey(Portfolio, DO_NOTHING, related_name="books")
+    def __str__(self) -> str:
+        return self.name
 
 class TradeDetail(models.Model):
     trade = models.ForeignKey(FXO, CASCADE, related_name="detail")
-    book = models.ForeignKey(Portfolio, DO_NOTHING, related_name="trades")
+    book = models.ForeignKey(Book, DO_NOTHING, related_name="trades")
     input_user = models.ForeignKey(User, SET_NULL, null=True, related_name='input_trades')
+    def __str__(self) -> str:
+        return f"ID: {self.trade.id} in book {self.book}"
 
 class TradeMarkToMarket(models.Model):
     as_of = models.DateField()
-    trade = models.ForeignKey(FXO, CASCADE, related_name="mtms")
+    trade_d = models.ForeignKey(TradeDetail, CASCADE, null=True, related_name="mtms")
+    npv = models.FloatField(null=True)
+    delta = models.FloatField(null=True)
+    gamma = models.FloatField(null=True)
+    vega = models.FloatField(null=True)
+    class Meta:
+        unique_together = ('as_of', 'trade_d')

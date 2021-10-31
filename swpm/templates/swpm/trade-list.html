@@ -27,6 +27,8 @@
 					<th>Currency Pair</th>
 					<th>Type</th>
 					<th>CP</th>
+					<th>Trade Date</th>
+					<th>Maturity</th>
 				</tr>
 				{% for t in data %}
 					<tr>
@@ -34,6 +36,8 @@
 						<td class='ccypair'>{{ t.fields.ccy_pair }}</td>
 						<td class='type'>{{ t.fields.type }}</td>
 						<td class='cp'>{{ t.fields.cp }}</td>
+						<td class='tradedate'>{{ t.fields.trade_date }}</td>
+						<td class='maturitydate'>{{ t.fields.maturity_date }}</td>
 					</tr>
 				{% endfor %}
 			</table>

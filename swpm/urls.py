@@ -7,4 +7,6 @@ urlpatterns = [
     path('pricing/do', views.pricing, {'commit': True}, name='pricing-do'),
     path('ccypair', views.save_ccypair, name='ccypair'), 
     path('trade_list', views.trade_list, name='trade_list'),
+    # API
+    path('reval', views.reval, name='reval'), 
 ]
