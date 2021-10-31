@@ -1,10 +1,8 @@
+from django.contrib.auth.models import AbstractUser
 from django.db import models
-from django.db.models.deletion import CASCADE, DO_NOTHING
+from django.db.models.deletion import CASCADE, DO_NOTHING, SET_NULL, SET_DEFAULT
 from django.db.models.fields.related import ForeignKey
 from django.utils import timezone
-from django.forms import ModelForm, SelectDateWidget, DateInput
-from django import forms
-import datetime
 import QuantLib as ql
 
 FXO_TYPE = [("EUR", "European"), 
@@ -17,6 +15,9 @@ FXO_CP = [("C","Call"), ("P","Put")]
 DAY_COUNTER = {"A360": ql.Actual360(), 'A365Fixed': ql.Actual365Fixed()}
 
 CALENDAR_LIST = {'TARGET': ql.TARGET(), 'UnitedStates': ql.UnitedStates(), 'HongKong': ql.HongKong(), 'UnitedKingdom': ql.UnitedKingdom()}
+
+class User(AbstractUser):
+    pass
 
 class Calendar(models.Model):
     name = models.CharField(max_length=16)
@@ -33,6 +34,7 @@ class Ccy(models.Model):
         return self.code
 
 class CcyPair(models.Model):
+    name = models.CharField(max_length=7, primary_key=True)
     base_ccy = models.ForeignKey(Ccy, CASCADE, related_name="as_base_ccy")
     quote_ccy = models.ForeignKey(Ccy, CASCADE, related_name="as_quote_ccy")
     cdr = models.ForeignKey(Calendar, DO_NOTHING, related_name="ccy_pairs", null=True)
@@ -51,6 +53,8 @@ class FxSpotRateQuote(models.Model):
     ref_date = models.DateField()
     rate = models.FloatField()
     ccy_pair = models.ForeignKey(CcyPair, CASCADE, related_name="rates")
+    class Meta:
+        unique_together = ('ref_date', 'ccy_pair')
     def handle(self):
         return ql.QuoteHandle(ql.SimpleQuote(self.rate))
     def __str__(self):
@@ -61,6 +65,7 @@ class RateIndex(models.Model):
 
 class RateQuote(models.Model):
     name = models.CharField(max_length=16)
+    ref_date = models.DateField()
     rate = models.FloatField()
     tenor = models.CharField(max_length=5)
     instrument = models.CharField(max_length=5)
@@ -93,6 +98,8 @@ class FXVolatility(models.Model):
     ref_date = models.DateField()
     ccy_pair = models.ForeignKey(CcyPair, CASCADE, related_name='vol')
     vol = models.FloatField()
+    class Meta:
+        verbose_name_plural = "FX volatilities"
     def handle(self):
         return ql.BlackVolTermStructureHandle(
             ql.BlackConstantVol(ql.Date(self.ref_date.isoformat(),'%Y-%m-%d'), self.ccy_pair.calendar(), self.vol, ql.Actual365Fixed()))
@@ -115,6 +122,7 @@ class FXOManager(models.Manager):
 
 
 class FXO(models.Model):
+    id = models.BigAutoField(primary_key=True)
     active = models.BooleanField(default=True)
     create_time = models.DateTimeField(auto_now_add=True)
     trade_date = models.DateField(null=False)
@@ -126,9 +134,6 @@ class FXO(models.Model):
     type = models.CharField(max_length=5, choices=FXO_TYPE)
     cp = models.CharField(max_length=1, choices=FXO_CP)
     objects = FXOManager()
-    
-    def serialize(self):
-        pass
 
     def __str__(self):
         return f"FXO ID: {self.id}, {self.ccy_pair}, K={self.strike_price}"
@@ -136,7 +141,6 @@ class FXO(models.Model):
     def instrument(self):
         if self.active:
             cp = ql.Option.Call if self.cp=="C" else ql.Option.Put
-            print(self.type)
             if self.type == 'EUR':
                 payoff = ql.PlainVanillaPayoff(cp, self.strike_price)
             elif self.type == 'DIG':
@@ -156,28 +160,18 @@ class FXO(models.Model):
             process = ql.BlackScholesMertonProcess(spot_rate.handle(), q, r, v)
             return ql.AnalyticEuropeanEngine(process)
 
-class CcyPairForm(ModelForm):
-    class Meta:
-        model = CcyPair
-        fields = '__all__'
-        
-class FXOForm(ModelForm):
-    class Meta:
-        model = FXO
-        fields = ['trade_date', 'maturity_date', 'ccy_pair', 'strike_price', 'notional_1', 'notional_2', 'type', 'cp']
-        widgets = {
-            'trade_date': DateInput(attrs={'type': 'date'}),
-            'maturity_date': DateInput(attrs={'type': 'date'}),
-            }
-        labels = {
-            'cp': 'Call or Put',
-            }
-        help_texts = {
-            'ccy_pair': 'Choose a pair'
-            }
-    #def __init__(self, *args, **kwargs):
-    #    super().__init__(*args, **kwargs)
-    #    self.fields['trade_date'].widget.attrs.update({'type': 'date'})
+class Portfolio(models.Model):
+    name = models.CharField(max_length=16)
 
-class AsOfForm(forms.Form):
-    as_of = forms.DateField(widget=DateInput(attrs={'type': 'date'}))
+class Book(models.Model):
+    name = models.CharField(max_length=16)
+    portfolio = models.ForeignKey(Portfolio, DO_NOTHING, related_name="books")
+
+class TradeDetail(models.Model):
+    trade = models.ForeignKey(FXO, CASCADE, related_name="detail")
+    book = models.ForeignKey(Portfolio, DO_NOTHING, related_name="trades")
+    input_user = models.ForeignKey(User, SET_NULL, null=True, related_name='input_trades')
+
+class TradeMarkToMarket(models.Model):
+    as_of = models.DateField()
+    trade = models.ForeignKey(FXO, CASCADE, related_name="mtms")
