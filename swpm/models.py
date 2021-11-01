@@ -139,7 +139,12 @@ class FXO(models.Model):
     objects = FXOManager()
 
     def __str__(self):
-        return f"FXO ID: {self.id}, {self.ccy_pair}, K={self.strike_price}"
+        return f"FXO ID: {self.id}, {self.ccy_pair}, Notional={self.notional_1:.0f}, K={self.strike_price}"
+    
+    def save(self, *args, **kwargs):
+        if self.notional_2 == None:
+            self.notional_2 = self.notional_1 * self.strike_price
+        super().save(*args, **kwargs)
     
     def instrument(self):
         cp = ql.Option.Call if self.cp=="C" else ql.Option.Put
@@ -178,7 +183,7 @@ class TradeDetail(models.Model):
     book = models.ForeignKey(Book, DO_NOTHING, related_name="trades")
     input_user = models.ForeignKey(User, SET_NULL, null=True, related_name='input_trades')
     def __str__(self) -> str:
-        return f"ID: {self.trade.id} in book {self.book}"
+        return f"ID: {self.trade.id} in book [{self.book}]"
 
 class TradeMarkToMarket(models.Model):
     as_of = models.DateField()
@@ -189,3 +194,5 @@ class TradeMarkToMarket(models.Model):
     vega = models.FloatField(null=True)
     class Meta:
         unique_together = ('as_of', 'trade_d')
+    def __str__(self):
+        return f"Trade {self.trade_d.trade.id} NPV={self.npv:.2f} as of {self.as_of}"
