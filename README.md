@@ -1,4 +1,4 @@
-# treasury_system
+# Treasury System
 
 * Abstract class
 * Cashflows
