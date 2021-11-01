@@ -1,61 +1,54 @@
+{% extends "swpm/layout.html" %}
 {% load static %}
+{% load humanize %}
 
-<!DOCTYPE html>
-<html lang="en">
-    <head>
-        <title>SWPM</title>
-        
-        <link href="{% static 'swpm/styles.css' %}" rel="stylesheet">
-		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
-		<style>
-		  body {
-			padding: 20px;
-		  }
-		  @media (max-width: 980px) {
-			body {
-			  padding: 0;
-			}
-		  }
-		</style>
-		<script src="{% static 'swpm/index.js' %}"></script>
-		<script src="{% static 'swpm/jquery-3.6.0.slim.min.js' %}"></script>
-    </head>
-    <body>
-        <section class="about-header container border-bottom text-center"></section><h1>SWPM</h1></section><br>
-		<div class="links"><a href="{% url 'trade_list' %}">Trade List</a></div>
-		<div class='ccypair'>
-			<form action="{% url 'ccypair' %}" method="post">
-				<fieldset>
-					<legend>Currency Pair</legend>
-					<table>{{ myform.as_table }}</table>
-					<button type="submit" class="btn btn-default">Save</button>
-				</fieldset>
-			</form>
-			<span class='ccypair-msg'>{{ message }}<span>
-		</div><br>
-		<form action="{% url 'pricing' %}" method="post" >
-			<fieldset>
-				<legend>FX Option</legend>
-					<table>
-						{{ as_of_form.as_table }}
-						{{ myFXOform.as_table }}
-					</table>
-					<button type="submit" class="btn btn-default">Price</button>
-					<button type="submit" class="btn btn-default" formaction="{% url 'pricing-do' %}">Do</button>
-			</fieldset>
-		</form>
-		{% if results.npv %}
-			<div class='valuation'>
-				<table class='valuation-table'>
-					<tr><td>Spot</td><td>{{ market_data.spot|floatformat:4 }}</td></tr>
-					<tr><td>NPV</td><td>{{ results.npv|floatformat:4 }}</td></tr>
-					<tr><td>Delta</td><td>{{ results.delta|floatformat:4 }}</td></tr>
-					<tr><td>Gamma</td><td>{{ results.gamma|floatformat:4 }}</td></tr>
-					<tr><td>Vega</td><td>{{ results.vega|floatformat:4 }} </td></tr>
+{% block body %}
+<section class="about-header container border-bottom text-center"><h1>SWPM</h1></section><br>
+
+<div class="trade-ticket">
+	<form action="{% url 'pricing' %}" method="post" >
+		<fieldset>
+			<legend>FX Option</legend>
+				<table>
+					{{ as_of_form.as_table }}
+					{{ myFXOform.as_table }}
+					{{ trade_detail_form.as_table }}
 				</table>
-			</div>
-        {% endif %}
-        <div class="row between">
-        {{ mytime }}
-    </body>
-</html>
+				<button type="submit" class="btn btn-default">Price</button>
+				<button type="submit" class="btn btn-default" formaction="{% url 'pricing-do' %}">Do</button>
+		</fieldset>
+	</form>
+</div><br>
+
+{% if results.npv %}
+	<div class='valuation'>
+		<table class='valuation-table'>
+			<tr><td>Spot</td><td>{{ market_data.spot|floatformat:4 }}</td></tr>
+			<tr><td>NPV</td><td>{{ results.npv|floatformat:2 | intcomma }}</td></tr>
+			<tr><td>Delta</td><td>{{ results.delta|floatformat:2 | intcomma }}</td></tr>
+			<tr><td>Gamma</td><td>{{ results.gamma|floatformat:2 | intcomma }}</td></tr>
+			<tr><td>Vega</td><td>{{ results.vega|floatformat:2 | intcomma }}</td></tr>
+		</table>
+	</div><br>
+{% endif %}
+
+<div class='ccypair'>
+	<form action="{% url 'ccypair' %}" method="post">
+		<fieldset>
+			<legend>Currency Pair</legend>
+			<table>{{ myform.as_table }}</table>
+			<button type="submit" class="btn btn-default">Save</button>
+		</fieldset>
+	</form>
+	<span class='ccypair-msg'>{{ message }}<span>
+</div><br>
+
+<span>Now time: {{ mytime }}</span>
+
+{% endblock %}
+
+
+{% block script %}
+	<script src="{% static 'swpm/index.js' %}"></script>
+	<script src="{% static 'swpm/jquery-3.6.0.slim.min.js' %}"></script>
+{% endblock %}
