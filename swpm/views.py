@@ -14,6 +14,7 @@ def index(request):
     mytime = timezone.now()
     myform = CcyPairForm()
     myFXOform = FXOForm(initial={'trade_date': datetime.date.today()})
+    trade_detail_form = TradeDetailForm()
     as_of_form = AsOfForm(initial={'as_of': datetime.date.today()})
     return render(request, "swpm/index.html", locals())
 
@@ -21,9 +22,13 @@ def index(request):
 def trade_list(request):
     trades = FXO.objects.all()
     temp = json.loads(serialize('json', trades))
+    #return render(request, 
+    #    'swpm/trade-list.html', 
+    #    {"data": json.loads(serialize('json', trades))}
+    #)
     return render(request, 
         'swpm/trade-list.html', 
-        {"data": json.loads(serialize('json', trades))}
+        {"data": FXO.objects.values()}
     )
 
 
@@ -31,23 +36,32 @@ def trade_list(request):
 def pricing(request, commit=False):
     if request.method == 'POST':
         as_of = request.POST['as_of']
-        as_of_form = AsOfForm(request.POST)
+        as_of_form = AsOfForm(request.POST) #for render back to page
         fxo_form = FXOForm(request.POST, instance=FXO())
         if fxo_form.is_valid():
-            fxo_class = fxo_form.save(commit=commit)
-            opt = fxo_class.instrument()
-            engine = fxo_class.make_pricing_engine(as_of)
-            opt.setPricingEngine(engine)
-            side = 1.0 if fxo_class.buy_sell=="B" else -1.0
+            fxo = fxo_form.save(commit=commit)
+            inst = fxo.instrument()
+            engine = fxo.make_pricing_engine(as_of)
+            inst.setPricingEngine(engine)
+            side = 1.0 if fxo.buy_sell=="B" else -1.0
+            if commit and request.POST['book']:
+                trade_detail_form = TradeDetailForm(request.POST)
+                trade_detail = trade_detail_form.save(commit=False)
+                trade_detail.input_user = request.user
+                trade_detail.trade = fxo
+                trade_detail.save()
+            else:
+                trade_detail_form = TradeDetailForm(request.POST)
             return render(request, 'swpm/index.html', {
                 'myform': CcyPairForm(),
                 'myFXOform': fxo_form, 
                 'as_of_form': as_of_form, 
-                'market_data': {'spot': fxo_class.ccy_pair.get_rate(as_of).rate}, 
-                'results': {'npv': side*opt.NPV(), 
-                        'delta': side*opt.delta(),
-                        'gamma': side*opt.gamma(),
-                        'vega': side*opt.vega()
+                'trade_detail_form': trade_detail_form, 
+                'market_data': {'spot': fxo.ccy_pair.get_rate(as_of).rate}, 
+                'results': {'npv': side*inst.NPV()*fxo.notional_1, 
+                        'delta': side*inst.delta()*fxo.notional_1,
+                        'gamma': side*inst.gamma()*fxo.notional_1,
+                        'vega': side*inst.vega()*fxo.notional_1
                         }
                     }
                 )
@@ -70,8 +84,7 @@ def reval(request):
             trades = TradeDetail.objects.none()
             for book in books:
                 b = Book.objects.get(pk=book)
-                trades_ = b.trades.all()
-            trades.union(trades_)
+                trades = trades.union(b.trades.all())
         else:
             trades = TradeDetail.objects.all()
 
@@ -80,11 +93,9 @@ def reval(request):
             engine = t.trade.make_pricing_engine(reval_date)
             inst.setPricingEngine(engine)
             side = 1.0 if t.trade.buy_sell=="B" else -1.0
-            TradeMarkToMarket.objects.get_or_create(
-                as_of = reval_date, 
-                trade_d = t, 
-                npv = side * t.trade.npv()
-                )
-        return render(request, 'swpm/reval.html', {'result': "Reval completed"})
+            mtm, _ = TradeMarkToMarket.objects.get_or_create(as_of = reval_date, trade_d = t)
+            mtm.npv = side * inst.NPV() * t.trade.notional_1
+            mtm.save()
+        return render(request, 'swpm/reval.html', {'result': "Reval completed: \n" + str(TradeMarkToMarket.objects.all())})
     else:
-        return render(request, 'swpm/reval.html', {'reval_form': RevalForm()})
+        return render(request, 'swpm/reval.html', {'reval_form': RevalForm(initial={'reval_date': datetime.date.today()})})
