@@ -1,19 +1,24 @@
-<!DOCTYPE html>
-<html lang="en">
-    <head>
+{% extends "swpm/layout.html" %}
+{% load static %}
 
-    </head>
-    <body>
-        <div>
-            <form action="reval" method="POST">
-                <table>
-                    {{ reval_form.as_table }}
-                </table>
-                <button type="submit">Run</button>
-            </form>
-        </div>
-        <div>
-            {{ result }}
-        </div>
-    </body>
-</html>
+{% block body %}
+<div>
+	<legend>Revaluation</legend>
+	<fieldset>
+		<form action="reval" method="POST">
+			<table>
+				{{ reval_form.as_table }}
+			</table>
+			<button type="submit">Run</button>
+		</form>
+	</fieldset>
+</div>
+<div>
+	{{ result }}
+</div>
+{% endblock %}
+
+{% block script %}
+<script src="{% static 'swpm/index.js' %}"></script>
+<script src="{% static 'swpm/jquery-3.6.0.slim.min.js' %}"></script>
+{% endblock %}
