@@ -4,8 +4,16 @@
 
     </head>
     <body>
-        <table>
-            {{ reval_form.as_table }}
-        </table>
+        <div>
+            <form action="reval" method="POST">
+                <table>
+                    {{ reval_form.as_table }}
+                </table>
+                <button type="submit">Run</button>
+            </form>
+        </div>
+        <div>
+            {{ result }}
+        </div>
     </body>
 </html>

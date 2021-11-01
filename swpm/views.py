@@ -64,12 +64,12 @@ def save_ccypair(request):
 @csrf_exempt   
 def reval(request):
     if request.method == 'POST':
-        reval_date = request.POST.reval_date
-        books = request.POST.books
+        reval_date = request.POST['reval_date']
+        books = request.POST['books']
         if books:
             trades = TradeDetail.objects.none()
             for book in books:
-                b = Book.objects.get(name=book)
+                b = Book.objects.get(pk=book)
                 trades_ = b.trades.all()
             trades.union(trades_)
         else:
@@ -85,6 +85,6 @@ def reval(request):
                 trade_d = t, 
                 npv = side * t.trade.npv()
                 )
-        return "Good"
+        return render(request, 'swpm/reval.html', {'result': "Reval completed"})
     else:
         return render(request, 'swpm/reval.html', {'reval_form': RevalForm()})
