@@ -21,11 +21,16 @@ class FXOForm(ModelForm):
             'cp': 'Call or Put',
             }
         help_texts = {
-            'ccy_pair': 'Choose a pair'
+            #'ccy_pair': 'Choose a pair'
             }
     #def __init__(self, *args, **kwargs):
     #    super().__init__(*args, **kwargs)
     #    self.fields['trade_date'].widget.attrs.update({'type': 'date'})
+
+class TradeDetailForm(ModelForm):
+    class Meta:
+        model = TradeDetail
+        fields = ['book']
 
 class AsOfForm(forms.Form):
     as_of = forms.DateField(widget=DateInput(attrs={'type': 'date'}))
