@@ -48,8 +48,9 @@ def pricing(request, commit=False):
                 trade_detail_form = TradeDetailForm(request.POST)
                 trade_detail = trade_detail_form.save(commit=False)
                 trade_detail.input_user = request.user
-                trade_detail.trade = fxo
                 trade_detail.save()
+                fxo.detail = trade_detail
+                fxo.save()
             else:
                 trade_detail_form = TradeDetailForm(request.POST)
             return render(request, 'swpm/index.html', {
@@ -89,12 +90,12 @@ def reval(request):
             trades = TradeDetail.objects.all()
 
         for t in trades:
-            inst = t.trade.instrument()
-            engine = t.trade.make_pricing_engine(reval_date)
+            inst = t.trade.first().instrument()
+            engine = t.trade.first().make_pricing_engine(reval_date)
             inst.setPricingEngine(engine)
-            side = 1.0 if t.trade.buy_sell=="B" else -1.0
+            side = 1.0 if t.trade.first().buy_sell=="B" else -1.0
             mtm, _ = TradeMarkToMarket.objects.get_or_create(as_of = reval_date, trade_d = t)
-            mtm.npv = side * inst.NPV() * t.trade.notional_1
+            mtm.npv = side * inst.NPV() * t.trade.first().notional_1
             mtm.save()
         return render(request, 'swpm/reval.html', {'result': "Reval completed: \n" + str(TradeMarkToMarket.objects.all())})
     else:

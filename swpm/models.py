@@ -122,14 +122,57 @@ class FXOManager(models.Manager):
         )
         return fxo
 
+class Portfolio(models.Model):
+    name = models.CharField(max_length=16)
+    def __str__(self) -> str:
+        return self.name
 
-class FXO(models.Model):
+class Book(models.Model):
+    name = models.CharField(max_length=16)
+    portfolio = models.ForeignKey(Portfolio, DO_NOTHING, related_name="books")
+    def __str__(self) -> str:
+        return self.name
+
+class TradeDetail(models.Model):
+    #trade = models.ForeignKey(FXO, CASCADE, related_name="detail")
+    book = models.ForeignKey(Book, DO_NOTHING, null=True, related_name="trades")
+    input_user = models.ForeignKey(User, SET_NULL, null=True, related_name='input_trades')
+    def __str__(self) -> str:
+        return f"ID: {self.trade.first().id} in book [{self.book}]"
+
+class TradeMarkToMarket(models.Model):
+    as_of = models.DateField()
+    trade_d = models.ForeignKey(TradeDetail, CASCADE, null=True, related_name="mtms")
+    npv = models.FloatField(null=True)
+    delta = models.FloatField(null=True)
+    gamma = models.FloatField(null=True)
+    vega = models.FloatField(null=True)
+    class Meta:
+        unique_together = ('as_of', 'trade_d')
+    def __str__(self):
+        return f"Trade {self.trade_d.trade.first().id} NPV={self.npv:.2f} as of {self.as_of}"
+
+class Trade(models.Model):
     id = models.BigAutoField(primary_key=True)
     active = models.BooleanField(default=True)
-    buy_sell = models.CharField(max_length=1, choices=BUY_SELL)
     create_time = models.DateTimeField(auto_now_add=True)
     trade_date = models.DateField(null=False)
     maturity_date = models.DateField(null=False)
+    detail = models.ForeignKey(TradeDetail, DO_NOTHING, unique=True, null=True, related_name="trade")
+    class Meta:
+        abstract = True
+        ordering = ['id']
+    # def save(self, *args, **kwargs):
+    #     if self.detail == None:
+    #         d = TradeDetail.objects.create()
+    #         d.save()
+    #         self.detail = d
+    #     super().save(*args, **kwargs)
+
+        
+
+class FXO(Trade):
+    buy_sell = models.CharField(max_length=1, choices=BUY_SELL)
     ccy_pair = models.ForeignKey(CcyPair, models.DO_NOTHING, null=False, related_name='options')
     strike_price = models.FloatField()
     notional_1 = models.FloatField()
@@ -166,33 +209,3 @@ class FXO(models.Model):
             r = self.ccy_pair.quote_ccy.fx_curve.term_structure()
             process = ql.BlackScholesMertonProcess(spot_rate.handle(), q, r, v)
             return ql.AnalyticEuropeanEngine(process)
-
-class Portfolio(models.Model):
-    name = models.CharField(max_length=16)
-    def __str__(self) -> str:
-        return self.name
-
-class Book(models.Model):
-    name = models.CharField(max_length=16)
-    portfolio = models.ForeignKey(Portfolio, DO_NOTHING, related_name="books")
-    def __str__(self) -> str:
-        return self.name
-
-class TradeDetail(models.Model):
-    trade = models.ForeignKey(FXO, CASCADE, related_name="detail")
-    book = models.ForeignKey(Book, DO_NOTHING, related_name="trades")
-    input_user = models.ForeignKey(User, SET_NULL, null=True, related_name='input_trades')
-    def __str__(self) -> str:
-        return f"ID: {self.trade.id} in book [{self.book}]"
-
-class TradeMarkToMarket(models.Model):
-    as_of = models.DateField()
-    trade_d = models.ForeignKey(TradeDetail, CASCADE, null=True, related_name="mtms")
-    npv = models.FloatField(null=True)
-    delta = models.FloatField(null=True)
-    gamma = models.FloatField(null=True)
-    vega = models.FloatField(null=True)
-    class Meta:
-        unique_together = ('as_of', 'trade_d')
-    def __str__(self):
-        return f"Trade {self.trade_d.trade.id} NPV={self.npv:.2f} as of {self.as_of}"
