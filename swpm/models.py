@@ -86,8 +86,8 @@ class IRTermStructure(models.Model):
     name = models.CharField(max_length=16)
     ref_date = models.DateField()
     rates = models.ManyToManyField(RateQuote, related_name="ts")
-    as_fx_curve = models.OneToOneField(Ccy, CASCADE, related_name="fx_curve", null=True)
-    as_rf_curve = models.OneToOneField(Ccy, CASCADE, related_name="rf_curve", null=True)
+    as_fx_curve = models.ForeignKey(Ccy, CASCADE, related_name="fx_curve", null=True)
+    as_rf_curve = models.ForeignKey(Ccy, CASCADE, related_name="rf_curve", null=True)
     def term_structure(self):
         helpers = [rate.helper() for rate in self.rates.all()]
         return ql.YieldTermStructureHandle(ql.PiecewiseLogLinearDiscount(ql.Date(self.ref_date.isoformat(),'%Y-%m-%d'), helpers, ql.Actual360()))

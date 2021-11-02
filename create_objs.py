@@ -2,65 +2,40 @@ from QuantLib.QuantLib import Cdor, Instrument
 from django.db.models import base
 from swpm.models import *
 import datetime
+from forex_python.converter import CurrencyRates
 
-Ccy.objects.all().delete()
-Calendar.objects.all().delete()
+#Ccy.objects.all().delete()
+#Calendar.objects.all().delete()
 
 d = datetime.date(2021, 10, 31)
 
-Calendar.objects.create(name="HongKong")
-Calendar.objects.create(name="UnitedStates")
-Calendar.objects.create(name="TARGET")
+hongkong, _ = Calendar.objects.get_or_create(name="HongKong")
+unitedstates, _ = Calendar.objects.get_or_create(name="UnitedStates")
+target, _ = Calendar.objects.get_or_create(name="TARGET")
 
-Ccy.objects.create(code="EUR", cdr=Calendar.objects.get(name="TARGET"))
-Ccy.objects.create(code="USD", cdr=Calendar.objects.get(name="UnitedStates"))
+hkd, _ = Ccy.objects.get_or_create(code="EUR", defaults={'cdr': hongkong})
+eur, _ = Ccy.objects.get_or_create(code="EUR", defaults={'cdr': target})
+usd, _ = Ccy.objects.get_or_create(code="USD", defaults={'cdr': unitedstates})
 
-CcyPair.objects.create(name="EUR/USD", 
-    base_ccy=Ccy.objects.get(code="EUR"),
-    quote_ccy=Ccy.objects.get(code="USD"),
-    cdr=Calendar.objects.get(name="TARGET")
-    )
+eurusd, _ = CcyPair.objects.get_or_create(name="EUR/USD", base_ccy=eur, quote_ccy=usd, defaults={'cdr': target})
+usdhkd, _ = CcyPair.objects.get_or_create(name="USD/HKD", base_ccy=usd, quote_ccy=hkd, defaults={'cdr': hongkong})
 print("CcyPair created")
 
-FxSpotRateQuote.objects.create(ref_date=d,
-    rate=1.1, 
-    ccy_pair=CcyPair.objects.get(name="EUR/USD")
-    )
+c = CurrencyRates()
+for i in range(20):
+    if d.weekday() < 5:
+        FxSpotRateQuote.objects.get_or_create( ref_date=d, ccy_pair=eurusd, defaults={'rate': float(c.get_rate('EUR', 'USD', d))} )
+        FXVolatility.objects.get_or_create( ref_date=d, ccy_pair=eurusd, defaults={'vol': 0.08} )
+        usdlibor6m = RateQuote.objects.create(name="USD LIBOR 6M", ref_date=d, rate=0.0024, tenor="6M", instrument="DEPO", ccy=usd, day_counter="A360")
+        usdlibor12m = RateQuote.objects.create(name="USD LIBOR 12M", ref_date=d, rate=0.0024, tenor="12M", instrument="DEPO", ccy=usd, day_counter="A360")
+        eurforex6m = RateQuote.objects.create(name="EUR FOREX 6M", ref_date=d, rate=-0.001, tenor="6M", instrument="DEPO", ccy=eur, day_counter="A365Fixed")
+        eurforex12m = RateQuote.objects.create(name="EUR FOREX 12M", ref_date=d, rate=-0.001, tenor="12M", instrument="DEPO", ccy=eur, day_counter="A365Fixed")
 
-RateQuote.objects.create(name="USD LIBOR 6M",
-    ref_date=d,
-    rate=0.0024, 
-    tenor="6M",
-    instrument="DEPO",
-    ccy=Ccy.objects.get(code="USD"),
-    day_counter="A360"
-    )
+        t = IRTermStructure.objects.create(name="USD LIBOR", ref_date=d, as_fx_curve=usd, as_rf_curve=usd)
+        t.rates.add(usdlibor6m)
+        t.rates.add(usdlibor12m)
+        t = IRTermStructure.objects.create(name="EUR FOREX", ref_date=d, as_fx_curve=eur, as_rf_curve=eur)
+        t.rates.add(eurforex6m)
+        t.rates.add(eurforex12m)
 
-RateQuote.objects.create(name="EUR FOREX 6M",
-    ref_date=d,
-    rate=-0.001, 
-    tenor="6M",
-    instrument="DEPO",
-    ccy=Ccy.objects.get(code="EUR"),
-    day_counter="A365Fixed"
-    )
-
-t = IRTermStructure.objects.create(name="USD LIBOR", 
-    ref_date=d,
-    as_fx_curve=Ccy.objects.get(code="USD"), 
-    as_rf_curve=Ccy.objects.get(code="USD")
-    )
-t.rates.add(RateQuote.objects.get(name="USD LIBOR 6M"))
-
-t2 = IRTermStructure.objects.create(name="EUR FOREX", 
-    ref_date=d,
-    as_fx_curve=Ccy.objects.get(code="EUR"), 
-    as_rf_curve=Ccy.objects.get(code="EUR")
-    )
-t2.rates.add(RateQuote.objects.get(name="EUR FOREX 6M"))
-
-FXVolatility.objects.create(
-    ref_date=d,
-    ccy_pair=CcyPair.objects.get(name="EUR/USD"), 
-    vol=0.08
-    )
+    d -= datetime.timedelta(days=1)
