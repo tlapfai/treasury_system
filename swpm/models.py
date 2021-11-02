@@ -205,7 +205,11 @@ class FXO(Trade):
         if self.active:
             spot_rate = self.ccy_pair.rates.get(ref_date=as_of)
             v = self.ccy_pair.vol.get(ref_date=as_of).handle()
-            q = self.ccy_pair.base_ccy.fx_curve.term_structure()
-            r = self.ccy_pair.quote_ccy.fx_curve.term_structure()
+            #q = self.ccy_pair.base_ccy.fx_curve.term_structure()
+            q = IRTermStructure.objects.get(ref_date=as_of, as_fx_curve=self.ccy_pair.base_ccy).term_structure()
+            print(q)
+            #r = self.ccy_pair.quote_ccy.fx_curve.term_structure()
+            r = IRTermStructure.objects.get(ref_date=as_of, as_fx_curve=self.ccy_pair.quote_ccy).term_structure()
+            print(r)
             process = ql.BlackScholesMertonProcess(spot_rate.handle(), q, r, v)
             return ql.AnalyticEuropeanEngine(process)

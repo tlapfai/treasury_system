@@ -97,6 +97,6 @@ def reval(request):
             mtm, _ = TradeMarkToMarket.objects.get_or_create(as_of = reval_date, trade_d = t)
             mtm.npv = side * inst.NPV() * t.trade.first().notional_1
             mtm.save()
-        return render(request, 'swpm/reval.html', {'result': "Reval completed: \n" + str(TradeMarkToMarket.objects.all())})
+        return render(request, 'swpm/reval.html', {'reval_form': RevalForm(request.POST), 'result': "Reval completed: \n" + str(TradeMarkToMarket.objects.get(as_of=reval_date))})
     else:
         return render(request, 'swpm/reval.html', {'reval_form': RevalForm(initial={'reval_date': datetime.date.today()})})
