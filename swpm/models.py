@@ -12,9 +12,13 @@ FXO_TYPE = [("EUR", "European"),
     
 FXO_CP = [("C","Call"), ("P","Put")]
 
+IRS_PAY_REC = [("Recive", 1), ("Pay", -1)]
+
 BUY_SELL = [("B", "Buy"), ("S", "Sell")]
 
-DAY_COUNTER = {"A360": ql.Actual360(), 'A365Fixed': ql.Actual365Fixed()}
+DAY_COUNTER = [("A360", "A360"), ('A365Fixed', 'A365Fixed')]
+QL_DAY_COUNTER = {"A360": ql.Actual360(), 'A365Fixed': ql.Actual365Fixed()}
+# https://docs.djangoproject.com/en/3.2/ref/models/fields/#enumeration-types
 
 CALENDAR_LIST = {'TARGET': ql.TARGET(), 'UnitedStates': ql.UnitedStates(), 'HongKong': ql.HongKong(), 'UnitedKingdom': ql.UnitedKingdom()}
 
@@ -78,7 +82,7 @@ class RateQuote(models.Model):
             fixing_days = self.ccy.fixing_days
             convention = ql.ModifiedFollowing
             ccy = Ccy.objects.get(code=self.ccy)
-            return ql.DepositRateHelper(self.rate, ql.Period(self.tenor), fixing_days, ql.TARGET(), convention, False, DAY_COUNTER[self.day_counter])
+            return ql.DepositRateHelper(self.rate, ql.Period(self.tenor), fixing_days, ql.TARGET(), convention, False, QL_DAY_COUNTER[self.day_counter])
     def __str__(self):
         return f"{self.name}: ({self.ccy}): {self.rate}"
 
@@ -135,10 +139,9 @@ class Book(models.Model):
 
 class TradeDetail(models.Model):
     #trade = models.ForeignKey(FXO, CASCADE, related_name="detail")
-    book = models.ForeignKey(Book, DO_NOTHING, null=True, related_name="trades")
-    input_user = models.ForeignKey(User, SET_NULL, null=True, related_name='input_trades')
-    def __str__(self) -> str:
-        return f"ID: {self.trade.first().id} in book [{self.book}]"
+    pass
+    #def __str__(self) -> str:
+    #    return f"ID: {self.trade.first().id} in book [{self.book}]"
 
 class TradeMarkToMarket(models.Model):
     as_of = models.DateField()
@@ -159,9 +162,16 @@ class Trade(models.Model):
     trade_date = models.DateField(null=False)
     maturity_date = models.DateField(null=False)
     detail = models.ForeignKey(TradeDetail, DO_NOTHING, unique=True, null=True, related_name="trade")
-    class Meta:
-        abstract = True
-        ordering = ['id']
+    
+    book = models.ForeignKey(Book, SET_NULL, null=True, related_name="trades")
+    input_user = models.ForeignKey(User, SET_NULL, null=True, related_name='input_trades')
+    def delete(self, *args, **kwargs):
+         if self.detail:
+             self.detail.delete()
+         super().delete(*args, **kwargs)
+    #class Meta:
+        #abstract = True
+        #ordering = ['id']
     # def save(self, *args, **kwargs):
     #     if self.detail == None:
     #         d = TradeDetail.objects.create()
@@ -205,11 +215,29 @@ class FXO(Trade):
         if self.active:
             spot_rate = self.ccy_pair.rates.get(ref_date=as_of)
             v = self.ccy_pair.vol.get(ref_date=as_of).handle()
-            #q = self.ccy_pair.base_ccy.fx_curve.term_structure()
             q = IRTermStructure.objects.get(ref_date=as_of, as_fx_curve=self.ccy_pair.base_ccy).term_structure()
-            print(q)
-            #r = self.ccy_pair.quote_ccy.fx_curve.term_structure()
             r = IRTermStructure.objects.get(ref_date=as_of, as_fx_curve=self.ccy_pair.quote_ccy).term_structure()
-            print(r)
             process = ql.BlackScholesMertonProcess(spot_rate.handle(), q, r, v)
             return ql.AnalyticEuropeanEngine(process)
+
+
+class IRSManager():
+    pass
+
+class IRS(Trade):
+    objects = IRSManager()
+
+
+class SwapLeg(models.Model):
+    trade = models.ForeignKey(IRS, SET_NULL, related_name="legs")
+    ccy = models.ForeignKey(Ccy, CASCADE, related_name="swap_legs")
+    effective_date = models.DateField()
+    notional = models.FloatField()
+    pay_rec = models.CharField(max_length=6, choices=IRS_PAY_REC)
+    index = models.ForeignKey(RateIndex, SET_NULL, null=True)
+    spread = models.FloatField(default=0, null=True)
+    reset_freq = models.CharField(max_length=10, null=True)
+    payment_freq = models.CharField(max_length=16)
+    day_counter = models.CharField(max_length=16, choices=DAY_COUNTER)
+    
+
