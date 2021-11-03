@@ -11,7 +11,7 @@ class CcyPairForm(ModelForm):
 class FXOForm(ModelForm):
     class Meta:
         model = FXO
-        fields = ['trade_date', 'maturity_date', 'ccy_pair', 'type', 'cp', 'buy_sell', 'strike_price', 'notional_1', 'notional_2']
+        fields = ['trade_date', 'maturity_date', 'ccy_pair', 'type', 'cp', 'buy_sell', 'strike_price', 'notional_1', 'notional_2', 'book']
         widgets = {
             'trade_date': DateInput(attrs={'type': 'date'}),
             'maturity_date': DateInput(attrs={'type': 'date'}),
@@ -28,9 +28,10 @@ class FXOForm(ModelForm):
     #    self.fields['trade_date'].widget.attrs.update({'type': 'date'})
 
 class TradeDetailForm(ModelForm):
-    class Meta:
-        model = TradeDetail
-        fields = ['book']
+    pass
+    #class Meta:
+    #    model = TradeDetail
+    #    fields = ['book']
 
 class AsOfForm(forms.Form):
     as_of = forms.DateField(widget=DateInput(attrs={'type': 'date'}))
