@@ -3,52 +3,66 @@
 {% load humanize %}
 
 {% block body %}
-<section class="about-header container border-bottom text-center"><h1>SWPM</h1></section><br>
+<div class="flex-container">
 
-<div class="trade-ticket">
-	<form action="{% url 'pricing' %}" method="post" >
-		<fieldset>
-			<legend>FX Option</legend>
-				<table>
-					{{ as_of_form.as_table }}
-					{{ myFXOform.as_table }}
-					{{ trade_detail_form.as_table }}
-				</table>
-				<button type="submit" class="btn btn-default">Price</button>
-				<button type="submit" class="btn btn-default" formaction="{% url 'pricing-do' %}">Do</button>
-		</fieldset>
-	</form>
-</div><br>
+	<div class="trade-ticket flex-item">
+		<form action="{% url 'pricing' %}" method="post" >
+			<fieldset>
+				<legend>FX Option</legend>
+					<table>
+						{{ as_of_form.as_table }}
+						{{ myFXOform.as_table }}
+					</table>
+					<button type="submit" class="btn btn-primary">Price</button>
+					<button type="submit" class="btn btn-primary" formaction="{% url 'pricing-do' %}">Do</button>
+			</fieldset>
+		</form>
+	</div>
+	
+	{% if results.npv %}
+		<div class='valuation flex-item'>
+			<table class='valuation-table'>
+			<legend>Valuation</legend>
+				<tr><th>Spot</th><td>{{ market_data.spot|floatformat:4 }}</td></tr>
+				<tr><th>NPV</th><td>{{ results.npv|floatformat:2 | intcomma }}</td></tr>
+				<tr><th>Delta</th><td>{{ results.delta|floatformat:2 | intcomma }}</td></tr>
+				<tr><th>Gamma</th><td>{{ results.gamma|floatformat:2 | intcomma }}</td></tr>
+				<tr><th>Vega</th><td>{{ results.vega|floatformat:2 | intcomma }}</td></tr>
+				<tr><th>Theta</th><td>{{ results.theta|floatformat:2 | intcomma }}</td></tr>
+				<tr><th>Ccy1 Rho</th><td>{{ results.rho|floatformat:2 | intcomma }}</td></tr>
+				<tr><th>Ccy2 Rho</th><td>{{ results.dividendRho|floatformat:2 | intcomma }}</td></tr>
+				<tr><th>ITM Prob.</th><td>{{ results.itmCashProbability |floatformat:2 | intcomma }}</td></tr>
+			</table>
+			{% if valuation_message %}
+				<span>{{ valuation_message }}</span>
+			{% endif %}
+		</div>
+	{% endif %}
 
-{% if results.npv %}
-	<div class='valuation'>
-		<table class='valuation-table'>
-			<tr><td>Spot</td><td>{{ market_data.spot|floatformat:4 }}</td></tr>
-			<tr><td>NPV</td><td>{{ results.npv|floatformat:2 | intcomma }}</td></tr>
-			<tr><td>Delta</td><td>{{ results.delta|floatformat:2 | intcomma }}</td></tr>
-			<tr><td>Gamma</td><td>{{ results.gamma|floatformat:2 | intcomma }}</td></tr>
-			<tr><td>Vega</td><td>{{ results.vega|floatformat:2 | intcomma }}</td></tr>
-		</table>
-	</div><br>
-{% endif %}
-
-<div class='ccypair'>
-	<form action="{% url 'ccypair' %}" method="post">
-		<fieldset>
-			<legend>Currency Pair</legend>
-			<table>{{ myform.as_table }}</table>
-			<button type="submit" class="btn btn-default">Save</button>
-		</fieldset>
-	</form>
-	<span class='ccypair-msg'>{{ message }}<span>
-</div><br>
-
-<span>Now time: {{ mytime }}</span>
+	<div class='ccypair flex-item'>
+		<form action="{% url 'ccypair' %}" method="post">
+			<fieldset>
+				<legend>Currency Pair</legend>
+				<table>{{ myform.as_table }}</table>
+				<button type="submit" class="btn btn-primary">Save</button>
+			</fieldset>
+		</form>
+		<span class='ccypair-msg'>{{ message }}<span>
+	</div>
+	
+</div>
 
 {% endblock %}
 
 
 {% block script %}
-	<script src="{% static 'swpm/index.js' %}"></script>
+	
 	<script src="{% static 'swpm/jquery-3.6.0.slim.min.js' %}"></script>
+	
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/2.4.4/cjs/popper.min.js"></script>
+	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/bootstrap-table@1.18.3/dist/bootstrap-table.min.js"></script>
+	
+	<script src="{% static 'swpm/index.js' %}"></script>
+	
 {% endblock %}
