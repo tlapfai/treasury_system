@@ -3,11 +3,10 @@ from django.db.models import base
 from swpm.models import *
 import datetime
 from forex_python.converter import CurrencyRates
+from random import random
+from math import exp, sqrt
 
-#Ccy.objects.all().delete()
-#Calendar.objects.all().delete()
-
-d = datetime.date(2021, 10, 31)
+d = datetime.date.today()
 
 hongkong, _ = Calendar.objects.get_or_create(name="HongKong")
 unitedstates, _ = Calendar.objects.get_or_create(name="UnitedStates")
@@ -24,6 +23,7 @@ print("CcyPair created")
 c = CurrencyRates()
 for i in range(20):
     if d.weekday() < 5:
+        xr = 1.12 * exp((random()-0.5)/sqrt(365))
         FxSpotRateQuote.objects.get_or_create( ref_date=d, ccy_pair=eurusd, defaults={'rate': float(c.get_rate('EUR', 'USD', d))} )
         FXVolatility.objects.get_or_create( ref_date=d, ccy_pair=eurusd, defaults={'vol': 0.08} )
         usdlibor6m = RateQuote.objects.create(name="USD LIBOR 6M", ref_date=d, rate=0.0024, tenor="6M", instrument="DEPO", ccy=usd, day_counter="A360")
