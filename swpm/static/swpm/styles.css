@@ -5,10 +5,6 @@
     flex-flow: row wrap;
 }
 
-.between {
-    justify-content: space-between;
-}
-
 .valuation-table, .valuation-table td , .trade-list td, .trade-list th{
   border: 1px solid black;
   border-collapse: collapse;
@@ -20,3 +16,28 @@
 	width: 120px;
 }
 
+.flex-container {
+	display: flex;
+	flex-flow: row wrap;
+	column-gap: 20px;
+	justify-content: space-evenly
+}
+
+.flex-item {
+  padding: 10px;
+  width: 360px;
+  margin-top: 10px;
+  border: solid black;
+}
+
+.valuation-table th {
+	text-align: left;
+	width: 100px;
+	border: solid gray;
+}
+
+.valuation-table td {
+	text-align: right;
+	width: 160px;
+	border: solid gray;
+}
