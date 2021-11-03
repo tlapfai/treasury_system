@@ -1,8 +1,10 @@
+from QuantLib.QuantLib import PiecewiseLogLinearDiscount
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.db.models.deletion import CASCADE, DO_NOTHING, SET_NULL, SET_DEFAULT
 from django.db.models.fields.related import ForeignKey
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 import QuantLib as ql
 
 FXO_TYPE = [("EUR", "European"), 
@@ -21,6 +23,10 @@ QL_DAY_COUNTER = {"A360": ql.Actual360(), 'A365Fixed': ql.Actual365Fixed()}
 # https://docs.djangoproject.com/en/3.2/ref/models/fields/#enumeration-types
 
 CALENDAR_LIST = {'TARGET': ql.TARGET(), 'UnitedStates': ql.UnitedStates(), 'HongKong': ql.HongKong(), 'UnitedKingdom': ql.UnitedKingdom()}
+
+def validate_positive(value):
+    if value <= 0:
+        raise ValidationError()
 
 class User(AbstractUser):
     pass
@@ -131,12 +137,23 @@ class Portfolio(models.Model):
     def __str__(self) -> str:
         return self.name
 
+
 class Book(models.Model):
-    name = models.CharField(max_length=16)
+    name = models.CharField(max_length=16, primary_key=True)
     portfolio = models.ForeignKey(Portfolio, DO_NOTHING, related_name="books")
+    owner = models.ForeignKey(User, DO_NOTHING, null=True, related_name="books")
     def __str__(self) -> str:
         return self.name
 
+class Counterparty(models.Model):
+    code = models.CharField(max_length=16, primary_key=True)
+    name = models.CharField(max_length=64)
+    is_internal = models.OneToOneField(Book, DO_NOTHING, null=True, blank=True, related_name="internal_cpty")
+    class Meta:
+        verbose_name_plural = "Counterparties"
+    def __str__(self) -> str:
+        return self.name
+    
 class TradeDetail(models.Model):
     #trade = models.ForeignKey(FXO, CASCADE, related_name="detail")
     pass
@@ -161,10 +178,11 @@ class Trade(models.Model):
     create_time = models.DateTimeField(auto_now_add=True)
     trade_date = models.DateField(null=False)
     maturity_date = models.DateField(null=False)
-    detail = models.ForeignKey(TradeDetail, DO_NOTHING, unique=True, null=True, related_name="trade")
+    detail = models.OneToOneField(TradeDetail, CASCADE, null=True, related_name="trade")
     
     book = models.ForeignKey(Book, SET_NULL, null=True, related_name="trades")
     input_user = models.ForeignKey(User, SET_NULL, null=True, related_name='input_trades')
+    counterparty = models.ForeignKey(Counterparty, DO_NOTHING, related_name="trade_set", null=True)
     def delete(self, *args, **kwargs):
          if self.detail:
              self.detail.delete()
@@ -184,9 +202,9 @@ class Trade(models.Model):
 class FXO(Trade):
     buy_sell = models.CharField(max_length=1, choices=BUY_SELL)
     ccy_pair = models.ForeignKey(CcyPair, models.DO_NOTHING, null=False, related_name='options')
-    strike_price = models.FloatField()
-    notional_1 = models.FloatField()
-    notional_2 = models.FloatField()
+    strike_price = models.FloatField(validators=[validate_positive])
+    notional_1 = models.FloatField(validators=[validate_positive])
+    notional_2 = models.FloatField(validators=[validate_positive])
     type = models.CharField(max_length=5, choices=FXO_TYPE)
     cp = models.CharField(max_length=1, choices=FXO_CP)
     objects = FXOManager()
@@ -229,7 +247,7 @@ class IRS(Trade):
 
 
 class SwapLeg(models.Model):
-    trade = models.ForeignKey(IRS, SET_NULL, related_name="legs")
+    trade = models.ForeignKey(IRS, DO_NOTHING, related_name="legs")
     ccy = models.ForeignKey(Ccy, CASCADE, related_name="swap_legs")
     effective_date = models.DateField()
     notional = models.FloatField()

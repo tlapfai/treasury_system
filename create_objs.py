@@ -1,12 +1,12 @@
-from QuantLib.QuantLib import Cdor, Instrument
-from django.db.models import base
+#from QuantLib.QuantLib import Cdor, Instrument
+#from django.db.models import base
 from swpm.models import *
 import datetime
 from forex_python.converter import CurrencyRates
 from random import random
 from math import exp, sqrt
 
-d = datetime.date.today()
+d = datetime.date.today() - datetime.timedelta(days=1)
 
 hongkong, _ = Calendar.objects.get_or_create(name="HongKong")
 unitedstates, _ = Calendar.objects.get_or_create(name="UnitedStates")
@@ -19,6 +19,10 @@ usd, _ = Ccy.objects.get_or_create(code="USD", defaults={'cdr': unitedstates})
 eurusd, _ = CcyPair.objects.get_or_create(name="EUR/USD", base_ccy=eur, quote_ccy=usd, defaults={'cdr': target})
 usdhkd, _ = CcyPair.objects.get_or_create(name="USD/HKD", base_ccy=usd, quote_ccy=hkd, defaults={'cdr': hongkong})
 print("CcyPair created")
+
+admin = User.objects.get(pk=1)
+hkfx, _ = Portfolio.objects.get_or_create(name="HKFX")
+fxo1, _ = Book.objects.get_or_create(name="FXO1", portfolio=hkfx, owner=admin)
 
 c = CurrencyRates()
 for i in range(20):

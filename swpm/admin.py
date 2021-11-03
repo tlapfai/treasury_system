@@ -15,6 +15,7 @@ admin.site.register(FxSpotRateQuote)
 
 admin.site.register(Portfolio)
 admin.site.register(Book)
+admin.site.register(Counterparty)
 admin.site.register(TradeDetail)
 admin.site.register(TradeMarkToMarket)
 

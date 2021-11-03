@@ -38,22 +38,25 @@ def pricing(request, commit=False):
         as_of = request.POST['as_of']
         as_of_form = AsOfForm(request.POST) #for render back to page
         fxo_form = FXOForm(request.POST, instance=FXO())
+
         if request.POST['book']==None and commit:
             render(request, 'swpm/index.html', {'myform': CcyPairForm(), 'myFXOform': fxo_form, 'as_of_form': as_of_form, 'valuation_message': "Book is a must for doing trade."})
         elif fxo_form.is_valid():
-            fxo = fxo_form.save(commit=commit)
-            inst = fxo.instrument()
-            engine = fxo.make_pricing_engine(as_of)
-            inst.setPricingEngine(engine)
-            side = 1.0 if fxo.buy_sell=="B" else -1.0
             if commit and request.POST['book']:
+                fxo = fxo_form.save(commit=False)
                 fxo.input_user = request.user
                 fxo.detail = TradeDetail.objects.create()
                 fxo.save()
                 valuation_message = f"Trade done, ID is {fxo.id}."
             else:
-                #trade_detail_form = TradeDetailForm(request.POST)
+                fxo = fxo_form.save(commit=False)
                 valuation_message = None
+
+            inst = fxo.instrument()
+            engine = fxo.make_pricing_engine(as_of)
+            inst.setPricingEngine(engine)
+            side = 1.0 if fxo.buy_sell=="B" else -1.0
+ 
             return render(request, 'swpm/index.html', {
                 'myform': CcyPairForm(),
                 'myFXOform': fxo_form, 
