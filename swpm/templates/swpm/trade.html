@@ -1,0 +1,63 @@
+{% extends "swpm/layout.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block body %}
+<div class="flex-container">
+
+	<div class="trade-ticket flex-item">
+		<form action="{% url 'pricing' %}" method="post" >
+			<fieldset>
+				<legend>{{ trade_type }}</legend>
+					<table>
+						{{ as_of_form.as_table }}
+						{% if trade_forms %}
+							{{ swap_form }}
+							<table class="swap-leg"><tbody><tr><th>Leg1</th><th>Leg2</th></tr><tr>
+							{% for f in trade_forms %}
+								<td><table>{{ f.as_table }}</table></td>
+							{% endfor %}
+							{{ trade_forms.management_form }}
+							</tr></tbody></table>
+						{% else %}
+							{{ trade_form.as_table }}
+						{% endif %}
+					</table>
+					<input type="hidden" name="trade_type" value="{{ trade_type }}">
+					<input type="hidden" name="origin_page" value="{{ request.path }}">
+					<button type="submit" class="btn btn-primary">Price</button>
+					{% if user.is_authenticated %}
+						<button type="submit" class="btn btn-primary" formaction="{% url 'pricing-do' %}">Do</button>
+					{% endif %}
+			</fieldset>
+		</form>
+		{% if valuation_message %}
+			<span>{{ valuation_message }}</span>
+		{% endif %}
+	</div>
+	
+	<div class='valuation flex-item'>
+			<table class='valuation-table'>
+			<fieldset>
+				<legend>Valuation</legend>
+				{{ val_form.as_table }}
+			</fieldset>
+			</table>
+	</div>
+
+</div>
+
+{% endblock %}
+
+
+{% block script %}
+	
+	<script src="{% static 'swpm/jquery-3.6.0.slim.min.js' %}"></script>
+	
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/2.4.4/cjs/popper.min.js"></script>
+	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/bootstrap-table@1.18.3/dist/bootstrap-table.min.js"></script>
+	
+	<script src="{% static 'swpm/index.js' %}"></script>
+	
+{% endblock %}

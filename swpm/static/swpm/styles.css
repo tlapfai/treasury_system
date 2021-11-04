@@ -5,16 +5,12 @@
     flex-flow: row wrap;
 }
 
-.valuation-table, .valuation-table td , .trade-list td, .trade-list th{
+/* .valuation-table, .valuation-table td , .trade-list td, .trade-list th{
   border: 1px solid black;
   border-collapse: collapse;
   padding: 4px;
   text-align: right;
-}
-
-.valuation-table td {
-	width: 120px;
-}
+} */
 
 .flex-container {
 	display: flex;
@@ -25,19 +21,25 @@
 
 .flex-item {
   padding: 10px;
-  width: 360px;
+  max-width: 1280px;
   margin-top: 10px;
   border: solid black;
 }
 
-.valuation-table th {
+.valuation-table + th {
 	text-align: left;
-	width: 100px;
+	max-width: 400px;
 	border: solid gray;
 }
 
-.valuation-table td {
+.valuation-table + td {
 	text-align: right;
-	width: 160px;
+	max-width: 400px;
 	border: solid gray;
+}
+
+input {
+  text-align: right;
+  number-pattern: "[0-9]+([\.,][0-9]+)?";
+  step: "0.01"
 }

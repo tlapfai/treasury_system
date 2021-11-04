@@ -1,3 +1,4 @@
+import datetime
 from QuantLib.QuantLib import PiecewiseLogLinearDiscount
 from django.contrib.auth.models import AbstractUser
 from django.db import models
@@ -14,7 +15,7 @@ FXO_TYPE = [("EUR", "European"),
     
 FXO_CP = [("C","Call"), ("P","Put")]
 
-IRS_PAY_REC = [("Recive", 1), ("Pay", -1)]
+SWAP_PAY_REC = [(1, "Receive"), (-1, "Pay")]
 
 BUY_SELL = [("B", "Buy"), ("S", "Sell")]
 
@@ -39,7 +40,7 @@ class Calendar(models.Model):
         return CALENDAR_LIST[self.name]
 
 class Ccy(models.Model):
-    code = models.CharField(max_length=3, blank=False)
+    code = models.CharField(max_length=3, blank=False, primary_key=True)
     fixing_days = models.PositiveIntegerField(default=2)
     cdr = models.ForeignKey(Calendar, DO_NOTHING, related_name="ccys", null=True)
     def __str__(self):
@@ -73,7 +74,10 @@ class FxSpotRateQuote(models.Model):
         return f"{self.ccy_pair}: {self.rate} as of {self.ref_date}"
     
 class RateIndex(models.Model):
-    name = models.CharField(max_length=16)
+    name = models.CharField(max_length=16, primary_key=True)
+    ccy = models.ForeignKey(Ccy, CASCADE, related_name="rate_indexs")
+    def __str__(self):
+        return self.name
 
 class RateQuote(models.Model):
     name = models.CharField(max_length=16)
@@ -133,7 +137,7 @@ class FXOManager(models.Manager):
         return fxo
 
 class Portfolio(models.Model):
-    name = models.CharField(max_length=16)
+    name = models.CharField(max_length=16, primary_key=True)
     def __str__(self) -> str:
         return self.name
 
@@ -177,12 +181,11 @@ class Trade(models.Model):
     active = models.BooleanField(default=True)
     create_time = models.DateTimeField(auto_now_add=True)
     trade_date = models.DateField(null=False)
-    maturity_date = models.DateField(null=False)
     detail = models.OneToOneField(TradeDetail, CASCADE, null=True, related_name="trade")
     
-    book = models.ForeignKey(Book, SET_NULL, null=True, related_name="trades")
+    book = models.ForeignKey(Book, SET_NULL, null=True, blank=True, related_name="trades")
     input_user = models.ForeignKey(User, SET_NULL, null=True, related_name='input_trades')
-    counterparty = models.ForeignKey(Counterparty, DO_NOTHING, related_name="trade_set", null=True)
+    counterparty = models.ForeignKey(Counterparty, DO_NOTHING, related_name="trade_set", null=True, blank=True)
     def delete(self, *args, **kwargs):
          if self.detail:
              self.detail.delete()
@@ -200,6 +203,7 @@ class Trade(models.Model):
         
 
 class FXO(Trade):
+    maturity_date = models.DateField(null=False, default=datetime.date.today())
     buy_sell = models.CharField(max_length=1, choices=BUY_SELL)
     ccy_pair = models.ForeignKey(CcyPair, models.DO_NOTHING, null=False, related_name='options')
     strike_price = models.FloatField(validators=[validate_positive])
@@ -239,23 +243,27 @@ class FXO(Trade):
             return ql.AnalyticEuropeanEngine(process)
 
 
-class IRSManager():
+class SwapManager():
     pass
 
-class IRS(Trade):
-    objects = IRSManager()
+class Swap(Trade):
+    objects = SwapManager()
 
 
 class SwapLeg(models.Model):
-    trade = models.ForeignKey(IRS, DO_NOTHING, related_name="legs")
+    trade = models.ForeignKey(Swap, DO_NOTHING, related_name="legs")
     ccy = models.ForeignKey(Ccy, CASCADE, related_name="swap_legs")
-    effective_date = models.DateField()
+    effective_date = models.DateField(default=datetime.date.today())
+    maturity_date = models.DateField(default=datetime.date.today())
     notional = models.FloatField()
-    pay_rec = models.CharField(max_length=6, choices=IRS_PAY_REC)
-    index = models.ForeignKey(RateIndex, SET_NULL, null=True)
+    pay_rec = models.IntegerField(choices=SWAP_PAY_REC)
+    fixed_rate = models.FloatField(default=0, null=True, blank=True)
+    index = models.ForeignKey(RateIndex, SET_NULL, null=True, blank=True)
     spread = models.FloatField(default=0, null=True)
-    reset_freq = models.CharField(max_length=10, null=True)
+    reset_freq = models.CharField(max_length=10, null=True, blank=True)
     payment_freq = models.CharField(max_length=16)
     day_counter = models.CharField(max_length=16, choices=DAY_COUNTER)
+    def instrument(self):
+        pass
     
 

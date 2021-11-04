@@ -1,9 +1,13 @@
-from django.shortcuts import render
+from django.contrib.auth import authenticate, login, logout
+from django.shortcuts import redirect, render
+from django.db import IntegrityError
 from django.http import *
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.core.serializers import serialize
 from django.template import Context
+from django.forms import modelformset_factory
 
 from .models import *
 from .forms import *
@@ -17,6 +21,77 @@ def index(request):
     #trade_detail_form = TradeDetailForm()
     as_of_form = AsOfForm(initial={'as_of': datetime.date.today()})
     return render(request, "swpm/index.html", locals())
+
+
+def login_view(request):
+    if request.method == "POST":
+
+        # Attempt to sign user in
+        username = request.POST["username"]
+        password = request.POST["password"]
+        user = authenticate(request, username=username, password=password)
+
+        # Check if authentication successful
+        if user is not None:
+            login(request, user)
+            return HttpResponseRedirect(reverse("index"))
+        else:
+            return render(request, "swpm/login.html", {
+                "message": "Invalid username and/or password."
+            })
+    else:
+        return render(request, "swpm/login.html")
+
+
+def logout_view(request):
+    logout(request)
+    return HttpResponseRedirect(reverse("index"))
+
+
+def register(request):
+    if request.method == "POST":
+        username = request.POST["username"]
+        email = request.POST["email"]
+
+        # Ensure password matches confirmation
+        password = request.POST["password"]
+        confirmation = request.POST["confirmation"]
+        if password != confirmation:
+            return render(request, "swpm/register.html", {"message": "Passwords must match."})
+
+        # Attempt to create new user
+        try:
+            user = User.objects.create_user(username, email, password)
+            user.save()
+        except IntegrityError:
+            return render(request, "swpm/register.html", {
+                "message": "Username already taken."
+            })
+        login(request, user)
+        return HttpResponseRedirect(reverse("index"))
+    else:
+        return render(request, "swpm/register.html")
+
+
+def trade(request, **kwargs):
+    as_of_form = AsOfForm(initial={'as_of': datetime.date.today()})
+    if kwargs['inst'] == "fxo":
+        trade_type = "FX Option"
+        val_form = FXOValuationForm()
+        if kwargs.get('trade_form'):
+            trade_form = kwargs['trade_form']
+            as_of_form = kwargs['as_of_form']
+            val_form = kwargs.get('val_form')
+        else:
+            trade_form = FXOForm(initial={'trade_date': datetime.date.today()})
+    elif kwargs['inst'] == 'swap':
+        trade_type = "Swap"
+        SwapLegFormSet = modelformset_factory(SwapLeg, SwapLegForm, extra=2)
+        trade_forms = SwapLegFormSet(initial=[{'maturity_date': datetime.date.today()+datetime.timedelta(days=365)}])
+        swap_form = SwapForm(initial={'trade_date': datetime.date.today()})
+
+    return render(request, "swpm/trade.html", locals())
+
 
 @csrf_exempt
 def trade_list(request):
@@ -37,44 +112,58 @@ def pricing(request, commit=False):
     if request.method == 'POST':
         as_of = request.POST['as_of']
         as_of_form = AsOfForm(request.POST) #for render back to page
-        fxo_form = FXOForm(request.POST, instance=FXO())
 
-        if request.POST['book']==None and commit:
-            render(request, 'swpm/index.html', {'myform': CcyPairForm(), 'myFXOform': fxo_form, 'as_of_form': as_of_form, 'valuation_message': "Book is a must for doing trade."})
-        elif fxo_form.is_valid():
-            if commit and request.POST['book']:
+        if request.POST['trade_type'] == 'FX Option':
+            fxo_form = FXOForm(request.POST, instance=FXO())
+            if fxo_form.is_valid():
                 fxo = fxo_form.save(commit=False)
-                fxo.input_user = request.user
-                fxo.detail = TradeDetail.objects.create()
-                fxo.save()
-                valuation_message = f"Trade done, ID is {fxo.id}."
+                if commit and request.POST.get('book') and request.POST.get('counterparty'):
+                    fxo.input_user = request.user
+                    fxo.detail = TradeDetail.objects.create()
+                    fxo.save()
+                    valuation_message = f"Trade is done, ID is {fxo.id}."
+                else:
+                    valuation_message = None
+
+                inst = fxo.instrument()
+                engine = fxo.make_pricing_engine(as_of)
+                inst.setPricingEngine(engine)
+                side = 1.0 if fxo.buy_sell=="B" else -1.0
+                spot = fxo.ccy_pair.rates.get(as_of)
+    
+                result = {'npv': inst.NPV(), 
+                            'delta': inst.delta(),
+                            'gamma': inst.gamma()*0.01/spot,
+                            'vega': inst.vega()*0.01, 
+                            'theta': inst.thetaPerDay(), 
+                            'rho': inst.rho()*0.01,
+                            'dividendRho': inst.dividendRho()*0.01,
+                            'itmCashProbability': inst.itmCashProbability(),
+                            }
+                result = dict([(x, round(y*side*fxo.notional_1,2)) for x, y in result.items()])
+                valuation_form = FXOValuationForm(initial=result)
+            return trade(request, inst='fxo', trade_form=fxo_form, as_of_form=as_of_form, val_form=valuation_form)
+        elif request.POST.get('trade_type') == 'Swap':
+            SwapLegFormSet = modelformset_factory(SwapLeg, SwapLegForm, extra=2)
+            swap_leg_form_set = SwapLegFormSet(request.POST)
+            swap_form = SwapForm(request.POST, instance=Swap())
+            if swap_form.is_valid() and swap_leg_form_set.is_valid():
+                tr = swap_form.save(commit=False)
+                if commit and request.POST.get('book') and request.POST.get('counterparty'):
+                    tr.input_user = request.user
+                    tr.detail = TradeDetail.objects.create()
+                    tr.save()
+                    legs = swap_leg_form_set.save(commit=False)
+                    for leg in legs:
+                        leg.trade = tr
+                        leg.save(commit=False)
+                        # get pricing engine and calculate npv etc...
+                    valuation_message = f"Trade is done, ID is {tr.id}."
+                    return trade(request, inst='swap', trade_forms=swap_leg_form_set)
+                else:
+                    return HttpResponseNotAllowed()
             else:
-                fxo = fxo_form.save(commit=False)
-                valuation_message = None
-
-            inst = fxo.instrument()
-            engine = fxo.make_pricing_engine(as_of)
-            inst.setPricingEngine(engine)
-            side = 1.0 if fxo.buy_sell=="B" else -1.0
- 
-            return render(request, 'swpm/index.html', {
-                'myform': CcyPairForm(),
-                'myFXOform': fxo_form, 
-                'as_of_form': as_of_form, 
-                #'trade_detail_form': trade_detail_form, 
-                'market_data': {'spot': fxo.ccy_pair.get_rate(as_of).rate}, 
-                'results': {'npv': side*inst.NPV()*fxo.notional_1, 
-                        'delta': side*inst.delta()*fxo.notional_1,
-                        'gamma': side*inst.gamma()*fxo.notional_1,
-                        'vega': side*inst.vega()*fxo.notional_1, 
-                        'theta': side*inst.thetaPerDay()*fxo.notional_1, 
-                        'rho': side*inst.rho()*fxo.notional_1, 
-                        'dividendRho': side*inst.dividendRho()*fxo.notional_1, 
-                        'itmCashProbability': side*inst.itmCashProbability()*fxo.notional_1
-                        }, 
-                'valuation_message': valuation_message
-                }
-                )
+                return HttpResponseNotAllowed()
 
 @csrf_exempt                    
 def save_ccypair(request):

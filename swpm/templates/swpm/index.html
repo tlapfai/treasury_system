@@ -6,16 +6,13 @@
 <div class="app">
 	<table class='app-list'  data-toggle="table">
 		<thead><tr>
-			<th data-field="tradeid" data-sortable="true">Application</th>
+			<th data-field="application" data-sortable="true">Application</th>
 			<th data-field="category" data-sortable="true">Category</th>
 			<th data-field="user" data-sortable="true">User</th>
 		</tr></thead>
 		<tbody>
-			<tr>
-				<td><a href="">FX Option</a></td>
-				<td>Trade</td>
-				<td>---</td>
-			</tr>
+			<tr><td><a href="{% url 'trade' inst='fxo' %}">FX Option</a></td><td>Trade</td><td>---</td></tr>
+			<tr><td><a href="{% url 'trade' inst='swap' %}">Swap</a></td><td>Trade</td><td>---</td></tr>
 		</tbody>
 	</table>
 </div><br>
@@ -31,7 +28,9 @@
 						{{ myFXOform.as_table }}
 					</table>
 					<button type="submit" class="btn btn-primary">Price</button>
-					<button type="submit" class="btn btn-primary" formaction="{% url 'pricing-do' %}">Do</button>
+					{% if user.is_authenticated %}
+						<button type="submit" class="btn btn-primary" formaction="{% url 'pricing-do' %}">Do</button>
+					{% endif %}
 			</fieldset>
 		</form>
 	</div>

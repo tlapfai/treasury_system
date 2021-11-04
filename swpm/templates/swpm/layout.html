@@ -48,24 +48,52 @@
 					Instruments
 				</a>
 				<div class="dropdown-menu" aria-labelledby="navbarDropdown">
-				  <a class="dropdown-item" href="#">FX Option</a>
-				  <a class="dropdown-item" href="#">Interest Rate Swap</a>
+				  <a class="dropdown-item" href="{% url 'trade' inst='fxo' %}">FX Option</a>
+				  <a class="dropdown-item" href="{% url 'trade' inst='swap' %}">Swap</a>
 				  <div class="dropdown-divider"></div>
 				  <a class="dropdown-item" href="#">Something else here</a>
 				</div>
 			  </li>
-			  
+
 			  <li class="nav-item dropdown">
 				<a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-					Utilities
+				Market Data
 				</a>
 				<div class="dropdown-menu" aria-labelledby="navbarDropdown">
-					<a class="dropdown-item" href="{% url 'reval' %}">Revaluation</a>
-					<div class="dropdown-divider"></div>
-				  	<a class="dropdown-item" href="#">Risk Analysis</a>
+				  	<a class="dropdown-item" href="#">FX Rate</a>
+				  	<a class="dropdown-item" href="#">Interest Rate</a>
+				  	<div class="dropdown-divider"></div> 
+				  	<a class="dropdown-item" href="#">FX Volatility</a>
+				  	<a class="dropdown-item" href="#">Interest Rate Volatility</a>
+				</div>
+			  </li>
+
+			  <li class="nav-item dropdown">
+				<a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+				Static Data
+				</a>
+				<div class="dropdown-menu" aria-labelledby="navbarDropdown">
+				  	<a class="dropdown-item" href="#">Currency</a>
+				  	<a class="dropdown-item" href="#">Currency Pair</a>
+				  	<div class="dropdown-divider"></div> 
+				  	<a class="dropdown-item" href="#">Book</a>
+				  	<a class="dropdown-item" href="#">Counterparty</a>
+					  <div class="dropdown-divider"></div> 
+					  <a class="dropdown-item" href="#">Scenario</a>
+				</div>
+			  </li>
+
+			  <li class="nav-item dropdown">
+				<a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+				Utilities
+				</a>
+				<div class="dropdown-menu" aria-labelledby="navbarDropdown">
+					<a class="dropdown-item" href="#">Risk Analysis</a>
 				  	<a class="dropdown-item" href="#">VaR Computation</a>
 				  	<div class="dropdown-divider"></div>
-				  	<a class="dropdown-item" href="#">FRTB</a>
+				  	<a class="dropdown-item" href="#">Stress Testing</a>
+					<div class="dropdown-divider"></div>
+					<a class="dropdown-item" href="{% url 'reval' %}">Revaluation</a>
 				</div>
 			  </li>
 
@@ -76,14 +104,24 @@
 				<div class="dropdown-menu" aria-labelledby="navbarDropdown">
 				  <a class="dropdown-item" href="#">PL Report</a>
 				  <a class="dropdown-item" href="#">VaR Report</a>
+				  <a class="dropdown-item" href="#">Counterparty Credit Risk Report</a>
 				  <div class="dropdown-divider"></div>
 				  <a class="dropdown-item" href="#">Something else here</a>
 				</div>
 			  </li>
+				{% if user.is_authenticated %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="#"><strong>{{ user.username }}</strong></a>
+                    </li>
+					<li class="nav-item">
+						<a class="nav-link" href="{% url 'logout' %}">Log Out</a>
+					</li>
+				{% else %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'login' %}">Log In</a>
+                    </li>
+            	{% endif %}
 			  
-			  <li class="nav-item">
-				<a class="nav-link" href="{% url 'reval' %}">Revaluation</a>
-			  </li>
 			  <!--<li class="nav-item">
 			  	  <a class="nav-link disabled" href="#">Disabled</a>
 			  </li> -->
