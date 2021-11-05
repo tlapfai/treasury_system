@@ -43,7 +43,7 @@ class SwapLegForm(ModelForm):
     class Meta:
         model = SwapLeg
         fields = ['ccy', 'effective_date', 'maturity_date', 'notional', 'pay_rec', 'fixed_rate', 
-            'index', 'spread', 'reset_freq', 'payment_freq', 'day_counter']
+            'index', 'spread', 'reset_freq', 'payment_freq', 'calendar', 'day_counter']
         widgets = {
             'effective_date': DateInput(attrs={'type': 'date'}),
             'maturity_date': DateInput(attrs={'type': 'date'}),
