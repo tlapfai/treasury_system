@@ -75,6 +75,7 @@ def register(request):
 
 def trade(request, **kwargs):
     as_of_form = AsOfForm(initial={'as_of': datetime.date.today()})
+    valuation_message = kwargs.get('valuation_message')
     if kwargs['inst'] == "fxo":
         trade_type = "FX Option"
         val_form = FXOValuationForm()
@@ -129,7 +130,8 @@ def pricing(request, commit=False):
                 engine = fxo.make_pricing_engine(as_of)
                 inst.setPricingEngine(engine)
                 side = 1.0 if fxo.buy_sell=="B" else -1.0
-                spot = fxo.ccy_pair.rates.get(as_of)
+                # will get full market data
+                spot = fxo.ccy_pair.rates.get(ref_date=as_of).rate
     
                 result = {'npv': inst.NPV(), 
                             'delta': inst.delta(),
@@ -138,11 +140,11 @@ def pricing(request, commit=False):
                             'theta': inst.thetaPerDay(), 
                             'rho': inst.rho()*0.01,
                             'dividendRho': inst.dividendRho()*0.01,
-                            'itmCashProbability': inst.itmCashProbability(),
+                            'itmCashProbability': inst.itmCashProbability()/side/fxo.notional_1,
                             }
                 result = dict([(x, round(y*side*fxo.notional_1,2)) for x, y in result.items()])
                 valuation_form = FXOValuationForm(initial=result)
-            return trade(request, inst='fxo', trade_form=fxo_form, as_of_form=as_of_form, val_form=valuation_form)
+            return trade(request, inst='fxo', trade_form=fxo_form, as_of_form=as_of_form, val_form=valuation_form, valuation_message=valuation_message)
         elif request.POST.get('trade_type') == 'Swap':
             SwapLegFormSet = modelformset_factory(SwapLeg, SwapLegForm, extra=2)
             swap_leg_form_set = SwapLegFormSet(request.POST)
@@ -161,9 +163,9 @@ def pricing(request, commit=False):
                     valuation_message = f"Trade is done, ID is {tr.id}."
                     return trade(request, inst='swap', trade_forms=swap_leg_form_set)
                 else:
-                    return HttpResponseNotAllowed()
+                    return trade(request, inst='swap', trade_forms=swap_leg_form_set, as_of_form=as_of_form)
             else:
-                return HttpResponseNotAllowed()
+                return trade(request, inst='swap', trade_forms=swap_leg_form_set, as_of_form=as_of_form)
 
 @csrf_exempt                    
 def save_ccypair(request):
