@@ -15,12 +15,14 @@ FXO_TYPE = [("EUR", "European"),
     
 FXO_CP = [("C","Call"), ("P","Put")]
 
-SWAP_PAY_REC = [(1, "Receive"), (-1, "Pay")]
+SWAP_PAY_REC = [(-1, "Receive"), (1, "Pay")]
 
 BUY_SELL = [("B", "Buy"), ("S", "Sell")]
 
-DAY_COUNTER = [("A360", "A360"), ('A365Fixed', 'A365Fixed')]
-QL_DAY_COUNTER = {"A360": ql.Actual360(), 'A365Fixed': ql.Actual365Fixed()}
+#DAY_COUNTER = [("A360", "A360"), ('A365Fixed', 'A365Fixed')]
+DAY_COUNTER = models.TextChoices('DAY_COUNTER', ['Actual360', 'Actual365Fixed', 'ActualActual', 'Thirty360'])
+QL_DAY_COUNTER = {"Actual360": ql.Actual360(), 'Actual365Fixed': ql.Actual365Fixed(), 'ActualActual': ql.ActualActual(), 'Thirty360': ql.Thirty360()}
+
 # https://docs.djangoproject.com/en/3.2/ref/models/fields/#enumeration-types
 
 CALENDAR_LIST = {'TARGET': ql.TARGET(), 'UnitedStates': ql.UnitedStates(), 'HongKong': ql.HongKong(), 'UnitedKingdom': ql.UnitedKingdom()}
@@ -28,6 +30,9 @@ CALENDAR_LIST = {'TARGET': ql.TARGET(), 'UnitedStates': ql.UnitedStates(), 'Hong
 def validate_positive(value):
     if value <= 0:
         raise ValidationError()
+        
+def to_qlDate(d: datetime.date) -> ql.Date:
+    return ql.Date(d.isoformat(),'%Y-%m-%d')
 
 class User(AbstractUser):
     pass
@@ -75,10 +80,29 @@ class FxSpotRateQuote(models.Model):
     
 class RateIndex(models.Model):
     name = models.CharField(max_length=16, primary_key=True)
-    ccy = models.ForeignKey(Ccy, CASCADE, related_name="rate_indexs")
-    index = ql.USDLibor
+    ccy = models.ForeignKey(Ccy, CASCADE, related_name="rate_indexes")
+    index = models.CharField(max_length=16)
+    tenor = models.CharField(max_length=16)
+    day_counter = models.CharField(max_length=16, null=True, blank=True)
     def __str__(self):
         return self.name
+    def get_index(self, fixing_since=None):
+        index_dict = {'USD LIBOR': ql.USDLibor}
+        idx_cls = index_dict[self.ccy.code+" "+self.index]
+        idx_obj = idx_cls(ql.Period(self.tenor))
+        if fixing_since:
+            for f in self.fixings.filter(ref_date__gte=fixing_since):
+                idx_obj.addFixings(ql.Date(f.ref_date.isoformat(),'%Y-%m-%d'), f.value)
+        return idx_obj
+
+class RateIndexFixing(models.Model):
+    value = models.FloatField()
+    index = models.ForeignKey(RateIndex, CASCADE, related_name="fixings")
+    ref_date = models.DateField()
+    class Meta:
+        unique_together = ('ref_date', 'index')
+    def __str__(self):
+        return f'{self.index} on {self.ref_date}'
 
 class RateQuote(models.Model):
     name = models.CharField(max_length=16)
@@ -87,7 +111,7 @@ class RateQuote(models.Model):
     tenor = models.CharField(max_length=5)
     instrument = models.CharField(max_length=5)
     ccy = models.ForeignKey(Ccy, CASCADE, related_name="rates")
-    day_counter = models.CharField(max_length=16)
+    day_counter = models.CharField(max_length=16, choices=DAY_COUNTER.choices)
     def helper(self):
         if self.instrument == "DEPO":
             fixing_days = self.ccy.fixing_days
@@ -109,7 +133,7 @@ class IRTermStructure(models.Model):
     def ccy(self):
         return self.rates[0].ccy
     def __str__(self):
-        return f"{self.name}"
+        return f"{self.name} as of {self.ref_date}"
 
 class FXVolatility(models.Model):
     ref_date = models.DateField()
@@ -249,6 +273,8 @@ class SwapManager():
 
 class Swap(Trade):
     objects = SwapManager()
+    def instrument(self):
+        return ql.Swap(self.legs.get(pay_rec=-1), self.legs.get(pay_rec=1))
 
 
 class SwapLeg(models.Model):
@@ -256,16 +282,25 @@ class SwapLeg(models.Model):
     ccy = models.ForeignKey(Ccy, CASCADE, related_name="swap_legs")
     effective_date = models.DateField(default=datetime.date.today())
     maturity_date = models.DateField(default=datetime.date.today())
-    notional = models.FloatField()
+    notional = models.FloatField(default=0)
     pay_rec = models.IntegerField(choices=SWAP_PAY_REC)
     fixed_rate = models.FloatField(default=0, null=True, blank=True)
     index = models.ForeignKey(RateIndex, SET_NULL, null=True, blank=True)
     spread = models.FloatField(default=0, null=True)
     reset_freq = models.CharField(max_length=10, null=True, blank=True)
     payment_freq = models.CharField(max_length=16)
-    day_counter = models.CharField(max_length=16, choices=DAY_COUNTER)
-    def instrument(self):
-        leg_index = self.index.index(ql.Period())
+    calendar = models.ForeignKey(Calendar, SET_NULL, null=True, blank=True)
+    day_counter = models.CharField(max_length=16, choices=DAY_COUNTER.choices)
+    def leg(self):
+        sch = ql.MakeSchedule(to_qlDate(self.effective_date), to_qlDate(self.maturity_date), ql.Period(self.payment_freq), calendar=ql.UnitedStates())
+        # to be genalize cdr
+        if index:
+            leg_idx = self.index.get_index()
+            leg = ql.IborLeg(self.notional, sch, leg_idx, DAY_COUNTER[self.day_counter], fixingDays=leg_idx.fixingDays, spread=self.spread)
+        else:
+            leg = ql.FixedRateLeg(sch, DAY_COUNTER[self.day_counter], self.notional, self.fixed_rate)
+            
+        return inst
     def make_pricing_engine(self, as_of):
         discount_curve = self.ccy.rf_curve.get(ref_date=as_of).term_structure()
         return ql.DiscountingSwapEngine(discount_curve)
