@@ -76,6 +76,7 @@ class FxSpotRateQuote(models.Model):
 class RateIndex(models.Model):
     name = models.CharField(max_length=16, primary_key=True)
     ccy = models.ForeignKey(Ccy, CASCADE, related_name="rate_indexs")
+    index = ql.USDLibor
     def __str__(self):
         return self.name
 
@@ -264,6 +265,9 @@ class SwapLeg(models.Model):
     payment_freq = models.CharField(max_length=16)
     day_counter = models.CharField(max_length=16, choices=DAY_COUNTER)
     def instrument(self):
-        pass
+        leg_index = self.index.index(ql.Period())
+    def make_pricing_engine(self, as_of):
+        discount_curve = self.ccy.rf_curve.get(ref_date=as_of).term_structure()
+        return ql.DiscountingSwapEngine(discount_curve)
     
 
