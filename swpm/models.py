@@ -5,7 +5,11 @@ from django.db import models
 from django.db.models.deletion import CASCADE, DO_NOTHING, SET_NULL, SET_DEFAULT
 from django.db.models.fields.related import ForeignKey
 from django.utils import timezone
+from django.utils.translation import gettext as _
 from django.core.exceptions import ValidationError
+from django.core import validators
+from django.core.validators import RegexValidator, MinValueValidator, DecimalValidator
+
 import QuantLib as ql
 
 FXO_TYPE = [("EUR", "European"), 
@@ -29,8 +33,13 @@ CALENDAR_LIST = {'TARGET': ql.TARGET(), 'UnitedStates': ql.UnitedStates(), 'Hong
 
 def validate_positive(value):
     if value <= 0:
-        raise ValidationError()
+        raise ValidationError(_('Amount must be positive'), code='non_positive')
         
+# class PositiveFloatField(models.Field):
+#     default_validators = [validate_positive]
+#     def validate(self, value):
+#         super().validate(value)
+
 def to_qlDate(d: datetime.date) -> ql.Date:
     return ql.Date(d.isoformat(),'%Y-%m-%d')
 
@@ -275,6 +284,11 @@ class Swap(Trade):
     objects = SwapManager()
     def instrument(self):
         return ql.Swap(self.legs.get(pay_rec=-1), self.legs.get(pay_rec=1))
+    def make_pricing_engine(self, as_of):
+        leg = self.legs.get(pay_rec=-1)
+        yts1 = leg.ccy.rf_curve.get(ref_date=as_of).term_structure()
+        return ql.DiscountingSwapEngine(yts1)
+
 
 
 class SwapLeg(models.Model):
@@ -282,25 +296,24 @@ class SwapLeg(models.Model):
     ccy = models.ForeignKey(Ccy, CASCADE, related_name="swap_legs")
     effective_date = models.DateField(default=datetime.date.today())
     maturity_date = models.DateField(default=datetime.date.today())
-    notional = models.FloatField(default=0)
+    notional = models.FloatField(default=1000000, validators=[validate_positive])
     pay_rec = models.IntegerField(choices=SWAP_PAY_REC)
     fixed_rate = models.FloatField(default=0, null=True, blank=True)
     index = models.ForeignKey(RateIndex, SET_NULL, null=True, blank=True)
     spread = models.FloatField(default=0, null=True)
-    reset_freq = models.CharField(max_length=10, null=True, blank=True)
-    payment_freq = models.CharField(max_length=16)
+    reset_freq = models.CharField(max_length=16, validators=[RegexValidator], null=True, blank=True)
+    payment_freq = models.CharField(max_length=16, validators=[RegexValidator])
     calendar = models.ForeignKey(Calendar, SET_NULL, null=True, blank=True)
     day_counter = models.CharField(max_length=16, choices=DAY_COUNTER.choices)
     def leg(self):
         sch = ql.MakeSchedule(to_qlDate(self.effective_date), to_qlDate(self.maturity_date), ql.Period(self.payment_freq), calendar=ql.UnitedStates())
         # to be genalize cdr
-        if index:
+        if self.index:
             leg_idx = self.index.get_index()
             leg = ql.IborLeg(self.notional, sch, leg_idx, DAY_COUNTER[self.day_counter], fixingDays=leg_idx.fixingDays, spread=self.spread)
         else:
             leg = ql.FixedRateLeg(sch, DAY_COUNTER[self.day_counter], self.notional, self.fixed_rate)
-            
-        return inst
+        return leg
     def make_pricing_engine(self, as_of):
         discount_curve = self.ccy.rf_curve.get(ref_date=as_of).term_structure()
         return ql.DiscountingSwapEngine(discount_curve)

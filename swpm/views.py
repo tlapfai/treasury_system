@@ -113,25 +113,23 @@ def pricing(request, commit=False):
     if request.method == 'POST':
         as_of = request.POST['as_of']
         as_of_form = AsOfForm(request.POST) #for render back to page
-
+        valuation_message = None
         if request.POST['trade_type'] == 'FX Option':
             fxo_form = FXOForm(request.POST, instance=FXO())
             if fxo_form.is_valid():
-                fxo = fxo_form.save(commit=False)
+                tr = fxo_form.save(commit=False)
                 if commit and request.POST.get('book') and request.POST.get('counterparty'):
-                    fxo.input_user = request.user
-                    fxo.detail = TradeDetail.objects.create()
-                    fxo.save()
-                    valuation_message = f"Trade is done, ID is {fxo.id}."
-                else:
-                    valuation_message = None
+                    tr.input_user = request.user
+                    tr.detail = TradeDetail.objects.create()
+                    tr.save()
+                    valuation_message = f"Trade is done, ID is {tr.id}."
 
-                inst = fxo.instrument()
-                engine = fxo.make_pricing_engine(as_of)
+                inst = tr.instrument()
+                engine = tr.make_pricing_engine(as_of)
                 inst.setPricingEngine(engine)
-                side = 1.0 if fxo.buy_sell=="B" else -1.0
+                side = 1.0 if tr.buy_sell=="B" else -1.0
                 # will get full market data
-                spot = fxo.ccy_pair.rates.get(ref_date=as_of).rate
+                spot = tr.ccy_pair.rates.get(ref_date=as_of).rate
     
                 result = {'npv': inst.NPV(), 
                             'delta': inst.delta(),
@@ -140,10 +138,13 @@ def pricing(request, commit=False):
                             'theta': inst.thetaPerDay(), 
                             'rho': inst.rho()*0.01,
                             'dividendRho': inst.dividendRho()*0.01,
-                            'itmCashProbability': inst.itmCashProbability()/side/fxo.notional_1,
+                            'itmCashProbability': inst.itmCashProbability()/side/tr.notional_1,
                             }
-                result = dict([(x, round(y*side*fxo.notional_1,2)) for x, y in result.items()])
+                result = dict([(x, round(y*side*tr.notional_1, 2)) for x, y in result.items()])
                 valuation_form = FXOValuationForm(initial=result)
+            else:
+                valuation_form = FXOValuationForm()
+            
             return trade(request, inst='fxo', trade_form=fxo_form, as_of_form=as_of_form, val_form=valuation_form, valuation_message=valuation_message)
         elif request.POST.get('trade_type') == 'Swap':
             SwapLegFormSet = modelformset_factory(SwapLeg, SwapLegForm, extra=2)
@@ -151,21 +152,27 @@ def pricing(request, commit=False):
             swap_form = SwapForm(request.POST, instance=Swap())
             if swap_form.is_valid() and swap_leg_form_set.is_valid():
                 tr = swap_form.save(commit=False)
+                legs = swap_leg_form_set.save(commit=False)
+                for leg in legs:
+                        leg.trade = tr
+                        leg.save(commit=False)
                 if commit and request.POST.get('book') and request.POST.get('counterparty'):
                     tr.input_user = request.user
                     tr.detail = TradeDetail.objects.create()
                     tr.save()
-                    legs = swap_leg_form_set.save(commit=False)
                     for leg in legs:
-                        leg.trade = tr
-                        leg.save(commit=False)
-                        # get pricing engine and calculate npv etc...
+                        leg.save()
                     valuation_message = f"Trade is done, ID is {tr.id}."
-                    return trade(request, inst='swap', trade_forms=swap_leg_form_set)
                 else:
-                    return trade(request, inst='swap', trade_forms=swap_leg_form_set, as_of_form=as_of_form)
+                    valuation_message = None
+                inst = tr.instrument()
+                engine = tr.make_pricing_engine(as_of)
+                inst.setPricingEngine(engine)
+                result = {'npv': inst.NPV(), 'leg1bpv': inst.legBPS(0), 'leg2bpv': inst.legBPS(1)}
+                valuation_form = SwapValuationForm(initial=result)
             else:
                 return trade(request, inst='swap', trade_forms=swap_leg_form_set, as_of_form=as_of_form)
+            return trade(request, inst='swap', trade_form=swap_form, trade_forms=swap_leg_form_set, as_of_form=as_of_form, val_form=valuation_form, valuation_message=valuation_message)
 
 @csrf_exempt                    
 def save_ccypair(request):

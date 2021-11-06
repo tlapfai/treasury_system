@@ -5,6 +5,10 @@
     flex-flow: row wrap;
 }
 
+.alert-danger {
+  color: red;
+}
+
 /* .valuation-table, .valuation-table td , .trade-list td, .trade-list th{
   border: 1px solid black;
   border-collapse: collapse;

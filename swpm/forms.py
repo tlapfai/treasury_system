@@ -1,5 +1,6 @@
 from django.forms import ModelForm, modelformset_factory, SelectDateWidget, DateInput, NumberInput
 from django import forms
+from django.utils.translation import gettext as _
 import datetime
 from .models import *
 
@@ -25,6 +26,15 @@ class FXOForm(ModelForm):
         help_texts = {
             #'ccy_pair': 'Choose a pair'
             }
+    def clean(self):
+        cleaned_data = super().clean()
+        strike_price = cleaned_data.get('strike_price')
+        notional_1 = cleaned_data.get('notional_1')
+        notional_2 = cleaned_data.get('notional_2')
+        option_type = cleaned_data.get('type')
+        if option_type=="EUR" and abs(strike_price*notional_1 - notional_2)>1.0 :
+            raise ValidationError(_('Strike and notionals do not match.'), code='unmatch1')
+
     #def __init__(self, *args, **kwargs):
     #    super().__init__(*args, **kwargs)
     #    self.fields['trade_date'].widget.attrs.update({'type': 'date'})
@@ -51,7 +61,23 @@ class SwapLegForm(ModelForm):
         labels = {
             'pay_rec': 'Pay/Receive', 
         }
-
+    def clean(self):
+        cleaned_data = super().clean()
+        effective_date = cleaned_data.get('effective_date')
+        maturity_date = cleaned_data.get('maturity_date')
+        fixed_rate = cleaned_data.get('fixed_rate')
+        spread = cleaned_data.get('spread')
+        index = cleaned_data.get('index')
+        reset_freq = cleaned_data.get('reset_freq')
+        if fixed_rate and reset_freq:
+            raise ValidationError(_('Fixed leg has no Reset Freq.'), code='term_unmatch1')
+        elif fixed_rate and spread:
+            raise ValidationError(_('Fixed leg has no Spread'), code='term_unmatch1')
+        elif fixed_rate and index:
+            raise ValidationError(_('Fixed Rate and Index cannot coexist'), code='term_unmatch1')
+        elif maturity_date <= effective_date:
+            raise ValidationError(_('Maturity must later than Effective Date'), code='term_unmatch1')
+    
 class SwapForm(ModelForm):
     class Meta:
         model = Swap
@@ -59,6 +85,11 @@ class SwapForm(ModelForm):
         widgets = {
             'trade_date': DateInput(attrs={'type': 'date'}),
         }
+        
+class SwapValuationForm(forms.Form):
+    npv = forms.FloatField(label="NPV", disabled=True)
+    leg1bpv = forms.FloatField(label="Leg 1 BPV", disabled=True)
+    leg2bpv = forms.FloatField(label="Leg 2 BPV", disabled=True)
 
 class TradeDetailForm(ModelForm):
     pass
@@ -72,4 +103,5 @@ class AsOfForm(forms.Form):
 class RevalForm(forms.Form):
     reval_date = forms.DateField(widget=DateInput(attrs={'type': 'date'}))
     books = forms.ModelMultipleChoiceField(Book.objects.all())
+    portfolios = forms.ModelMultipleChoiceField(Portfolio.objects.all())
     
