@@ -1,5 +1,6 @@
 from django.forms import ModelForm, modelformset_factory, SelectDateWidget, DateInput, NumberInput
 from django import forms
+from django.forms.models import BaseModelFormSet
 from django.utils.translation import gettext as _
 import datetime
 from .models import *
@@ -85,6 +86,18 @@ class SwapForm(ModelForm):
         widgets = {
             'trade_date': DateInput(attrs={'type': 'date'}),
         }
+
+#class SwapLegFormSet(BaseModelFormSet):
+    # def clean(self):
+    #     cleaned_data = super().clean()
+    #     forms_to_delete = self.deleted_forms
+    #     valid_forms = [form for form in self.forms if form.is_valid() and form not in forms_to_delete]
+
+    #     for form in valid_forms:
+    #         exclude = form._get_validation_exclusions()
+    #         unique_checks, date_checks = form.instance._get_unique_checks(exclude=exclude)
+    #         all_unique_checks.update(unique_checks)
+    #         all_date_checks.update(date_checks)
         
 class SwapValuationForm(forms.Form):
     npv = forms.FloatField(label="NPV", disabled=True)

@@ -11,10 +11,12 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('[id*="effective_date"]').forEach( d => {d.value = '2021-11-02';} );
         document.querySelectorAll('[id*="maturity_date"]').forEach( d => {d.value = '2022-11-02';} );
         document.querySelectorAll('[id*="notional"]').forEach( d => {d.value = '1000000';} );
-        document.querySelectorAll('[id*="rate"]').forEach( d => {d.value = '0.03';} );
+        document.querySelectorAll('#id_form-0-fixed_rate').forEach( d => {d.value = '0.03';} );
         document.querySelectorAll('[id*="freq"]').forEach( d => {d.value = '3M';} );
-        document.querySelectorAll('[id*="counter"]').forEach( d => {d.value = 'Actual360';} );
-        document.querySelectorAll('[id*="index"]').forEach( d => {d.value = 'USD LIBOR 3M';} );
+        document.getElementById('id_form-0-reset_freq').value = '';
+        document.querySelectorAll('[id*="day_counter"]').forEach( d => {d.value = 'Actual360';} );
+        document.querySelectorAll('[id*="index"]')[0].value = '';
+        document.querySelectorAll('[id*="index"]')[1].value = 'USD LIBOR 3M';
         document.querySelectorAll('[id*="pay_rec"]')[0].value = '1';
         document.querySelectorAll('[id*="pay_rec"]')[1].value = '-1';
         document.querySelectorAll('[id*="ccy"]')[0].value = 'USD';

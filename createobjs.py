@@ -7,7 +7,7 @@ from random import random
 from math import exp, sqrt
 import pandas as pd
 
-d = datetime.date.today() - datetime.timedelta(days=1)
+d = datetime.date.today()
 
 hongkong, _ = Calendar.objects.get_or_create(name="HongKong")
 unitedstates, _ = Calendar.objects.get_or_create(name="UnitedStates")
@@ -56,15 +56,15 @@ usdlibor6m, _ = RateIndex.objects.get_or_create(name="USD LIBOR 6M", ccy=usd)
 
 c = CurrencyRates()
 for i in range(50):
-    if d.weekday() < 5:
+    if d.weekday() < 500:
         xr = 1.12 * exp((random()-0.5)*0.5/sqrt(365))
         #FxSpotRateQuote.objects.get_or_create( ref_date=d, ccy_pair=eurusd, defaults={'rate': float(c.get_rate('EUR', 'USD', d))} )
         FxSpotRateQuote.objects.get_or_create( ref_date=d, ccy_pair=eurusd, defaults={'rate': float(xr)} )
         FXVolatility.objects.get_or_create( ref_date=d, ccy_pair=eurusd, defaults={'vol': 0.08*xr} )
-        usdlibor6m, _ = RateQuote.objects.get_or_create(name="USD LIBOR 6M", ref_date=d, rate=0.0024, tenor="6M", instrument="DEPO", ccy=usd, day_counter="Actual360")
-        usdlibor12m, _ = RateQuote.objects.get_or_create(name="USD LIBOR 12M", ref_date=d, rate=0.0024, tenor="12M", instrument="DEPO", ccy=usd, day_counter="Actual360")
-        eurforex6m, _ = RateQuote.objects.get_or_create(name="EUR FOREX 6M", ref_date=d, rate=-0.001, tenor="6M", instrument="DEPO", ccy=eur, day_counter="Actual365Fixed")
-        eurforex12m, _ = RateQuote.objects.get_or_create(name="EUR FOREX 12M", ref_date=d, rate=-0.001, tenor="12M", instrument="DEPO", ccy=eur, day_counter="Actual365Fixed")
+        usdlibor6m, _ = RateQuote.objects.get_or_create(name="USD LIBOR 6M", ref_date=d, tenor="6M", instrument="DEPO", ccy=usd, day_counter="Actual360", defaults={'rate': 0.0024*xr})
+        usdlibor12m, _ = RateQuote.objects.get_or_create(name="USD LIBOR 12M", ref_date=d, tenor="12M", instrument="DEPO", ccy=usd, day_counter="Actual360", defaults={'rate': 0.0024*xr})
+        eurforex6m, _ = RateQuote.objects.get_or_create(name="EUR FOREX 6M", ref_date=d, tenor="6M", instrument="DEPO", ccy=eur, day_counter="Actual365Fixed", defaults={'rate': -0.001*xr})
+        eurforex12m, _ = RateQuote.objects.get_or_create(name="EUR FOREX 12M", ref_date=d, tenor="12M", instrument="DEPO", ccy=eur, day_counter="Actual365Fixed", defaults={'rate': -0.0012*xr})
 
         t, _ = IRTermStructure.objects.get_or_create(name="USD LIBOR", ref_date=d, as_fx_curve=usd, as_rf_curve=usd)
         t.rates.add(usdlibor6m)

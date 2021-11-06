@@ -283,16 +283,16 @@ class SwapManager():
 class Swap(Trade):
     objects = SwapManager()
     def instrument(self):
-        return ql.Swap(self.legs.get(pay_rec=-1), self.legs.get(pay_rec=1))
+        legs = [x.leg() for x in self.legs.all()]
+        is_pay = [leg.pay_rec>0 for leg in self.legs.all()]
+        return ql.Swap(legs, is_pay)
     def make_pricing_engine(self, as_of):
         leg = self.legs.get(pay_rec=-1)
         yts1 = leg.ccy.rf_curve.get(ref_date=as_of).term_structure()
         return ql.DiscountingSwapEngine(yts1)
 
-
-
 class SwapLeg(models.Model):
-    trade = models.ForeignKey(Swap, DO_NOTHING, related_name="legs")
+    trade = models.ForeignKey(Swap, DO_NOTHING, null=True, blank=True, related_name="legs")
     ccy = models.ForeignKey(Ccy, CASCADE, related_name="swap_legs")
     effective_date = models.DateField(default=datetime.date.today())
     maturity_date = models.DateField(default=datetime.date.today())
@@ -300,7 +300,7 @@ class SwapLeg(models.Model):
     pay_rec = models.IntegerField(choices=SWAP_PAY_REC)
     fixed_rate = models.FloatField(default=0, null=True, blank=True)
     index = models.ForeignKey(RateIndex, SET_NULL, null=True, blank=True)
-    spread = models.FloatField(default=0, null=True)
+    spread = models.FloatField(null=True, blank=True)
     reset_freq = models.CharField(max_length=16, validators=[RegexValidator], null=True, blank=True)
     payment_freq = models.CharField(max_length=16, validators=[RegexValidator])
     calendar = models.ForeignKey(Calendar, SET_NULL, null=True, blank=True)
@@ -310,9 +310,9 @@ class SwapLeg(models.Model):
         # to be genalize cdr
         if self.index:
             leg_idx = self.index.get_index()
-            leg = ql.IborLeg(self.notional, sch, leg_idx, DAY_COUNTER[self.day_counter], fixingDays=leg_idx.fixingDays, spread=self.spread)
+            leg = ql.IborLeg([self.notional], sch, leg_idx, QL_DAY_COUNTER[self.day_counter], fixingDays=[leg_idx.fixingDays()], spreads=[self.spread])
         else:
-            leg = ql.FixedRateLeg(sch, DAY_COUNTER[self.day_counter], self.notional, self.fixed_rate)
+            leg = ql.FixedRateLeg(sch, QL_DAY_COUNTER[self.day_counter], [self.notional], [self.fixed_rate])
         return leg
     def make_pricing_engine(self, as_of):
         discount_curve = self.ccy.rf_curve.get(ref_date=as_of).term_structure()

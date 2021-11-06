@@ -87,9 +87,16 @@ def trade(request, **kwargs):
             trade_form = FXOForm(initial={'trade_date': datetime.date.today()})
     elif kwargs['inst'] == 'swap':
         trade_type = "Swap"
-        SwapLegFormSet = modelformset_factory(SwapLeg, SwapLegForm, extra=2)
-        trade_forms = SwapLegFormSet(initial=[{'maturity_date': datetime.date.today()+datetime.timedelta(days=365)}])
-        swap_form = SwapForm(initial={'trade_date': datetime.date.today()})
+        if kwargs.get('trade_form'):
+            swap_form = kwargs.get('trade_form')
+            as_of_form = kwargs.get('as_of_form')
+            trade_forms= kwargs.get('trade_forms')
+            val_form = kwargs.get('val_form')
+        else:
+            SwapLegFormSet = modelformset_factory(SwapLeg, SwapLegForm, extra=2)
+            trade_forms = SwapLegFormSet(queryset=SwapLeg.objects.none(), initial=[{'maturity_date': datetime.date.today()+datetime.timedelta(days=365)}])
+            swap_form = SwapForm(initial={'trade_date': datetime.date.today()})
+            val_form = SwapValuationForm()
 
     return render(request, "swpm/trade.html", locals())
 
@@ -153,26 +160,27 @@ def pricing(request, commit=False):
             if swap_form.is_valid() and swap_leg_form_set.is_valid():
                 tr = swap_form.save(commit=False)
                 legs = swap_leg_form_set.save(commit=False)
-                for leg in legs:
-                        leg.trade = tr
-                        leg.save(commit=False)
                 if commit and request.POST.get('book') and request.POST.get('counterparty'):
                     tr.input_user = request.user
                     tr.detail = TradeDetail.objects.create()
                     tr.save()
                     for leg in legs:
+                        leg.trade = tr
                         leg.save()
                     valuation_message = f"Trade is done, ID is {tr.id}."
                 else:
                     valuation_message = None
+
                 inst = tr.instrument()
                 engine = tr.make_pricing_engine(as_of)
                 inst.setPricingEngine(engine)
                 result = {'npv': inst.NPV(), 'leg1bpv': inst.legBPS(0), 'leg2bpv': inst.legBPS(1)}
+                result = dict([(x, round(y, 2)) for x, y in result.items()])
                 valuation_form = SwapValuationForm(initial=result)
             else:
-                return trade(request, inst='swap', trade_forms=swap_leg_form_set, as_of_form=as_of_form)
-            return trade(request, inst='swap', trade_form=swap_form, trade_forms=swap_leg_form_set, as_of_form=as_of_form, val_form=valuation_form, valuation_message=valuation_message)
+                return trade(request, inst='swap', trade_form=swap_form, as_of_form=as_of_form, trade_forms=swap_leg_form_set)
+            return trade(request, inst='swap', trade_form=swap_form, as_of_form=as_of_form, trade_forms=swap_leg_form_set, 
+                val_form=valuation_form, valuation_message=valuation_message)
 
 @csrf_exempt                    
 def save_ccypair(request):
