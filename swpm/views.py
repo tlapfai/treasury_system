@@ -120,6 +120,7 @@ def pricing(request, commit=False):
     if request.method == 'POST':
         as_of = request.POST['as_of']
         as_of_form = AsOfForm(request.POST) #for render back to page
+        ql.Settings.instance().evaluationDate = ql.Date(as_of,'%Y-%m-%d')
         valuation_message = None
         if request.POST['trade_type'] == 'FX Option':
             fxo_form = FXOForm(request.POST, instance=FXO())
@@ -171,7 +172,7 @@ def pricing(request, commit=False):
                 else:
                     valuation_message = None
 
-                inst = tr.instrument()
+                inst = tr.instrument(as_of)
                 engine = tr.make_pricing_engine(as_of)
                 inst.setPricingEngine(engine)
                 result = {'npv': inst.NPV(), 'leg1bpv': inst.legBPS(0), 'leg2bpv': inst.legBPS(1)}

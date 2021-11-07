@@ -11,6 +11,7 @@ from django.core import validators
 from django.core.validators import RegexValidator, MinValueValidator, DecimalValidator
 
 import QuantLib as ql
+import pandas as pd
 
 FXO_TYPE = [("EUR", "European"), 
         ("AME", "American"), 
@@ -87,32 +88,6 @@ class FxSpotRateQuote(models.Model):
     def __str__(self):
         return f"{self.ccy_pair}: {self.rate} as of {self.ref_date}"
     
-class RateIndex(models.Model):
-    name = models.CharField(max_length=16, primary_key=True)
-    ccy = models.ForeignKey(Ccy, CASCADE, related_name="rate_indexes")
-    index = models.CharField(max_length=16)
-    tenor = models.CharField(max_length=16)
-    day_counter = models.CharField(max_length=16, null=True, blank=True)
-    def __str__(self):
-        return self.name
-    def get_index(self, fixing_since=None):
-        index_dict = {'USD LIBOR': ql.USDLibor}
-        idx_cls = index_dict[self.ccy.code+" "+self.index]
-        idx_obj = idx_cls(ql.Period(self.tenor))
-        if fixing_since:
-            for f in self.fixings.filter(ref_date__gte=fixing_since):
-                idx_obj.addFixings(ql.Date(f.ref_date.isoformat(),'%Y-%m-%d'), f.value)
-        return idx_obj
-
-class RateIndexFixing(models.Model):
-    value = models.FloatField()
-    index = models.ForeignKey(RateIndex, CASCADE, related_name="fixings")
-    ref_date = models.DateField()
-    class Meta:
-        unique_together = ('ref_date', 'index')
-    def __str__(self):
-        return f'{self.index} on {self.ref_date}'
-
 class RateQuote(models.Model):
     name = models.CharField(max_length=16)
     ref_date = models.DateField()
@@ -136,13 +111,49 @@ class IRTermStructure(models.Model):
     rates = models.ManyToManyField(RateQuote, related_name="ts")
     as_fx_curve = models.ForeignKey(Ccy, CASCADE, related_name="fx_curve", null=True)
     as_rf_curve = models.ForeignKey(Ccy, CASCADE, related_name="rf_curve", null=True)
+    class Meta:
+        unique_together = ('name', 'ref_date')
     def term_structure(self):
         helpers = [rate.helper() for rate in self.rates.all()]
-        return ql.YieldTermStructureHandle(ql.PiecewiseLogLinearDiscount(ql.Date(self.ref_date.isoformat(),'%Y-%m-%d'), helpers, ql.Actual360()))
+        return ql.YieldTermStructureHandle(ql.PiecewiseLogLinearDiscount(to_qlDate(self.ref_date), helpers, ql.Actual360()))
     def ccy(self):
         return self.rates[0].ccy
     def __str__(self):
         return f"{self.name} as of {self.ref_date}"
+
+class RateIndex(models.Model):
+    name = models.CharField(max_length=16, primary_key=True)
+    ccy = models.ForeignKey(Ccy, CASCADE, related_name="rate_indexes")
+    index = models.CharField(max_length=16)
+    tenor = models.CharField(max_length=16)
+    day_counter = models.CharField(max_length=16, null=True, blank=True)
+    yts = models.CharField(max_length=16, null=True, blank=True)
+    def __str__(self):
+        return self.name
+    def get_index(self, ref_date=None, fixing_since=None):
+        index_dict = {'USD LIBOR': ql.USDLibor}
+        idx_cls = index_dict[self.ccy.code+" "+self.index]
+        if ref_date:
+            yts = IRTermStructure.objects.get(name=self.yts, ref_date=ref_date).term_structure()
+            if yts:
+                idx_obj = idx_cls(ql.Period(self.tenor), yts)
+            else:
+                idx_obj = idx_cls(ql.Period(self.tenor))
+        else:
+            idx_obj = idx_cls(ql.Period(self.tenor))
+        if fixing_since:
+            for f in self.fixings.filter(ref_date__gte=fixing_since):
+                idx_obj.addFixings(to_qlDate(f.ref_date), f.value)
+        return idx_obj
+
+class RateIndexFixing(models.Model):
+    value = models.FloatField()
+    index = models.ForeignKey(RateIndex, CASCADE, related_name="fixings")
+    ref_date = models.DateField()
+    class Meta:
+        unique_together = ('ref_date', 'index')
+    def __str__(self):
+        return f'{self.index} on {self.ref_date}'
 
 class FXVolatility(models.Model):
     ref_date = models.DateField()
@@ -152,7 +163,7 @@ class FXVolatility(models.Model):
         verbose_name_plural = "FX volatilities"
     def handle(self):
         return ql.BlackVolTermStructureHandle(
-            ql.BlackConstantVol(ql.Date(self.ref_date.isoformat(),'%Y-%m-%d'), self.ccy_pair.calendar(), self.vol, ql.Actual365Fixed()))
+            ql.BlackConstantVol(to_qlDate(self.ref_date), self.ccy_pair.calendar(), self.vol, ql.Actual365Fixed()))
     def __str__(self):
         return f"{self.ccy_pair} as of {self.ref_date}"
     
@@ -282,8 +293,8 @@ class SwapManager():
 
 class Swap(Trade):
     objects = SwapManager()
-    def instrument(self):
-        legs = [x.leg() for x in self.legs.all()]
+    def instrument(self, as_of):
+        legs = [x.leg(as_of=as_of) for x in self.legs.all()] #maybe need to use x.leg(as_of=xxxxx)
         is_pay = [leg.pay_rec>0 for leg in self.legs.all()]
         return ql.Swap(legs, is_pay)
     def make_pricing_engine(self, as_of):
@@ -296,7 +307,7 @@ class SwapLeg(models.Model):
     ccy = models.ForeignKey(Ccy, CASCADE, related_name="swap_legs")
     effective_date = models.DateField(default=datetime.date.today())
     maturity_date = models.DateField(default=datetime.date.today())
-    notional = models.FloatField(default=1000000, validators=[validate_positive])
+    notional = models.FloatField(default=1e6, validators=[validate_positive])
     pay_rec = models.IntegerField(choices=SWAP_PAY_REC)
     fixed_rate = models.FloatField(default=0, null=True, blank=True)
     index = models.ForeignKey(RateIndex, SET_NULL, null=True, blank=True)
@@ -305,14 +316,26 @@ class SwapLeg(models.Model):
     payment_freq = models.CharField(max_length=16, validators=[RegexValidator])
     calendar = models.ForeignKey(Calendar, SET_NULL, null=True, blank=True)
     day_counter = models.CharField(max_length=16, choices=DAY_COUNTER.choices)
-    def leg(self):
+    def leg(self, as_of):
         sch = ql.MakeSchedule(to_qlDate(self.effective_date), to_qlDate(self.maturity_date), ql.Period(self.payment_freq), calendar=ql.UnitedStates())
         # to be genalize cdr
         if self.index:
-            leg_idx = self.index.get_index()
-            leg = ql.IborLeg([self.notional], sch, leg_idx, QL_DAY_COUNTER[self.day_counter], fixingDays=[leg_idx.fixingDays()], spreads=[self.spread])
+            leg_idx = self.index.get_index(ref_date=as_of, fixing_since=(datetime.datetime.strptime('2021-11-04', '%Y-%m-%d'))) # need to fix
+            leg = ql.IborLeg([self.notional], sch, leg_idx, QL_DAY_COUNTER[self.day_counter], fixingDays=[leg_idx.fixingDays()], spreads=[float(self.spread or 0.0)])
+            # temp=pd.DataFrame([{
+            # 'fixingDate': cf.fixingDate().ISO(),
+            # 'accrualStart': cf.accrualStartDate().ISO(),
+            # 'accrualEnd': cf.accrualEndDate().ISO(),
+            # "paymentDate": cf.date().ISO(),
+            # 'gearing': cf.gearing(),
+            # 'forward': cf.indexFixing(),
+            # 'rate': cf.rate(),
+            # "amount": cf.amount()
+            # } for cf in leg])
+            # temp.to_csv('temp.csv')
         else:
             leg = ql.FixedRateLeg(sch, QL_DAY_COUNTER[self.day_counter], [self.notional], [self.fixed_rate])
+
         return leg
     def make_pricing_engine(self, as_of):
         discount_curve = self.ccy.rf_curve.get(ref_date=as_of).term_structure()
