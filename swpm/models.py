@@ -143,7 +143,7 @@ class RateIndex(models.Model):
             idx_obj = idx_cls(ql.Period(self.tenor))
         if fixing_since:
             for f in self.fixings.filter(ref_date__gte=fixing_since):
-                idx_obj.addFixings(to_qlDate(f.ref_date), f.value)
+                idx_obj.addFixings([to_qlDate(f.ref_date)], [f.value])
         return idx_obj
 
 class RateIndexFixing(models.Model):
