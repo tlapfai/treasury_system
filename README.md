@@ -5,6 +5,10 @@
 * PL report
 * VaR
 
+IRTermStructure
+add ccy
+limit its attr. rates
+
 https://www.w3schools.com/css/css3_flexbox.asp
 
 <!DOCTYPE html>
