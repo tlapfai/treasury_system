@@ -117,4 +117,6 @@ class RevalForm(forms.Form):
     reval_date = forms.DateField(widget=DateInput(attrs={'type': 'date'}))
     books = forms.ModelMultipleChoiceField(Book.objects.all())
     portfolios = forms.ModelMultipleChoiceField(Portfolio.objects.all())
-    
+
+class UploadFileForm(forms.Form):
+    file = forms.FileField()
