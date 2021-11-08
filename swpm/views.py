@@ -14,6 +14,9 @@ from .forms import *
 import datetime
 import json
 
+def str2date(s):
+    return datetime.datetime.strptime(s, '%Y-%m-%d')
+
 def index(request):
     mytime = timezone.now()
     myform = CcyPairForm()
@@ -217,3 +220,34 @@ def reval(request):
                     )
     else:
         return render(request, 'swpm/reval.html', {'reval_form': RevalForm(initial={'reval_date': datetime.date.today()})})
+
+def handle_uploaded_file(f):
+    #assume all dates are same
+    iter = 1
+    with f as openfileobject:
+        for line in openfileobject:
+            if iter > 1 :
+                temp = line.decode('ASCII').split(',')
+                if iter == 2:
+                    yts, _ = IRTermStructure.objects.get_or_create(name=temp[2], ref_date=str2date(temp[0]))
+                #'2021-11-08,USD,USD LIBOR,3M,DEPO,Actual360,0.12275'
+                # 0          1   2         3  4    5         6
+                r, _ = RateQuote.objects.update_or_create(name=temp[2]+' '+temp[3], 
+                                                        ref_date=str2date(temp[0]), 
+                                                        defaults={ 'tenor': temp[3], 'instrument': temp[4], 
+                                                        'ccy': Ccy.objects.get(code=temp[1]), 
+                                                        'day_counter': temp[5], 'rate': float(temp[6])*0.01 })
+                yts.rates.add(r)
+            iter += 1
+        
+
+@csrf_exempt
+def market_data_import(request):
+    if request.method == 'POST':
+        form = UploadFileForm(request.POST, request.FILES)
+        handle_uploaded_file(request.FILES['file'])
+        message = 'Success'
+        return render(request, 'swpm/market_data_import.html', {'upload_file_form': form, 'message': message})
+    else:
+        form = UploadFileForm()
+    return render(request, 'swpm/market_data_import.html', {'upload_file_form': form})
