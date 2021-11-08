@@ -15,4 +15,5 @@ urlpatterns = [
     path('trade/<str:inst>', views.trade, name='trade'),
     # API
     path('reval', views.reval, name='reval'), 
+    path('market_data_import', views.market_data_import, name='market_data_import'), 
 ]
