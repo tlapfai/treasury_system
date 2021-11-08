@@ -29,8 +29,9 @@ fxo2, _ = Book.objects.get_or_create(name="FXO2", portfolio=hkfx, owner=admin)
 hsbc, _ = Counterparty.objects.get_or_create(name="HSBC", code="HSBC")
 print("Book created")
 
-usdlibor3m, _ = RateIndex.objects.get_or_create(name="USD LIBOR 3M", ccy=usd)
-usdlibor6m, _ = RateIndex.objects.get_or_create(name="USD LIBOR 6M", ccy=usd)
+usdlibor3m, _ = RateIndex.objects.get_or_create(name="USD LIBOR 3M", ccy=usd, defaults={'index': 'LIBOR', 'tenor': '3M', 'day_counter': 'Actual360', 'yts': 'USD LIBOR'})
+usdlibor6m, _ = RateIndex.objects.get_or_create(name="USD LIBOR 6M", ccy=usd, defaults={'index': 'LIBOR', 'tenor': '6M', 'day_counter': 'Actual360', 'yts': 'USD LIBOR'})
+print('Rate index created')
 
 #-------------------------------------------------------------------------------------
 # cv_df = pd.read_csv('curve.csv' ,index_col = 'Term')
@@ -61,10 +62,10 @@ for i in range(50):
         #FxSpotRateQuote.objects.get_or_create( ref_date=d, ccy_pair=eurusd, defaults={'rate': float(c.get_rate('EUR', 'USD', d))} )
         FxSpotRateQuote.objects.get_or_create( ref_date=d, ccy_pair=eurusd, defaults={'rate': float(xr)} )
         FXVolatility.objects.get_or_create( ref_date=d, ccy_pair=eurusd, defaults={'vol': 0.08*xr} )
-        usdlibor6m, _ = RateQuote.objects.get_or_create(name="USD LIBOR 6M", ref_date=d, tenor="6M", instrument="DEPO", ccy=usd, day_counter="Actual360", defaults={'rate': 0.0024*xr})
-        usdlibor12m, _ = RateQuote.objects.get_or_create(name="USD LIBOR 12M", ref_date=d, tenor="12M", instrument="DEPO", ccy=usd, day_counter="Actual360", defaults={'rate': 0.0024*xr})
-        eurforex6m, _ = RateQuote.objects.get_or_create(name="EUR FOREX 6M", ref_date=d, tenor="6M", instrument="DEPO", ccy=eur, day_counter="Actual365Fixed", defaults={'rate': -0.001*xr})
-        eurforex12m, _ = RateQuote.objects.get_or_create(name="EUR FOREX 12M", ref_date=d, tenor="12M", instrument="DEPO", ccy=eur, day_counter="Actual365Fixed", defaults={'rate': -0.0012*xr})
+        usdlibor6m, _ = RateQuote.objects.update_or_create(name="USD LIBOR 6M", ref_date=d, tenor="6M", instrument="DEPO", ccy=usd, day_counter="Actual360", defaults={'rate': round(0.0024*xr, 4)})
+        usdlibor12m, _ = RateQuote.objects.update_or_create(name="USD LIBOR 12M", ref_date=d, tenor="12M", instrument="DEPO", ccy=usd, day_counter="Actual360", defaults={'rate': round(0.00241*xr, 4)})
+        eurforex6m, _ = RateQuote.objects.update_or_create(name="EUR FOREX 6M", ref_date=d, tenor="6M", instrument="DEPO", ccy=eur, day_counter="Actual365Fixed", defaults={'rate': round(-0.001*xr, 4)})
+        eurforex12m, _ = RateQuote.objects.update_or_create(name="EUR FOREX 12M", ref_date=d, tenor="12M", instrument="DEPO", ccy=eur, day_counter="Actual365Fixed", defaults={'rate': round(-0.0024*xr, 4)})
 
         t, _ = IRTermStructure.objects.get_or_create(name="USD LIBOR", ref_date=d, as_fx_curve=usd, as_rf_curve=usd)
         t.rates.add(usdlibor6m)
