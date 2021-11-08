@@ -6,12 +6,14 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     document.querySelectorAll('legend')[0].addEventListener('click', () =>{
-        var today = new Date()
-        var oneyear = new Date()
+        const effective_date = new Date();
+		effective_date.setDate(effective_date.getDate()+2);
+        var oneyear = new Date();
         oneyear.setFullYear(oneyear.getFullYear()+1);
+		oneyear.setDate(oneyear.getDate()+2);
         document.getElementById('id_book').value = "FXO1"
         document.getElementById('id_counterparty').value = "HSBC";
-        document.querySelectorAll('[id*="effective_date"]').forEach( d => {d.value = today.toISOString().split('T')[0];} );
+        document.querySelectorAll('[id*="effective_date"]').forEach( d => {d.value = effective_date.toISOString().split('T')[0];} );
         document.querySelectorAll('[id*="maturity_date"]').forEach( d => {d.value = oneyear.toISOString().split('T')[0];} );
         document.querySelectorAll('[id*="notional"]').forEach( d => {d.value = '1000000';} );
         document.querySelectorAll('#id_form-0-fixed_rate').forEach( d => {d.value = '0.03';} );
