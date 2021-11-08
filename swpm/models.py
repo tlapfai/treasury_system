@@ -274,7 +274,7 @@ class FXO(Trade):
             payoff = ql.CashOrNothingPayoff(cp, self.strike_price, 1.0)
         else:
             payoff = ql.PlainVanillaPayoff(cp, self.strike_price)
-        exercise = ql.EuropeanExercise(ql.Date(self.maturity_date.isoformat(), '%Y-%m-%d'))
+        exercise = ql.EuropeanExercise(to_qlDate(self.maturity_date))
         inst = ql.VanillaOption(payoff, exercise)
         return inst
 
@@ -334,11 +334,10 @@ class SwapLeg(models.Model):
             # } for cf in leg])
             # temp.to_csv('temp.csv')
         else:
-            leg = ql.FixedRateLeg(sch, QL_DAY_COUNTER[self.day_counter], [self.notional], [self.fixed_rate])
+            leg = ql.FixedRateLeg(sch, QL_DAY_COUNTER[self.day_counter], [self.notional], [self.fixed_rate*0.01])
 
         return leg
     def make_pricing_engine(self, as_of):
         discount_curve = self.ccy.rf_curve.get(ref_date=as_of).term_structure()
         return ql.DiscountingSwapEngine(discount_curve)
-    
 
