@@ -1,4 +1,4 @@
-from django.forms import ModelForm, modelformset_factory, SelectDateWidget, DateInput, NumberInput
+from django.forms import ModelForm, modelformset_factory, SelectDateWidget, DateInput, NumberInput, ModelMultipleChoiceField
 from django import forms
 from django.forms.models import BaseModelFormSet
 from django.utils.translation import gettext as _
@@ -9,6 +9,14 @@ class CcyPairForm(ModelForm):
     class Meta:
         model = CcyPair
         fields = '__all__'
+        
+class IRTermStructureForm(ModelForm):
+    class Meta:
+        model = IRTermStructure
+        fields = '__all__'
+    #rates = ModelMultipleChoiceField(widget = forms.CheckboxSelectMultiple, queryset = RateQuote.objects.filter(XXXXXXX=ref_date))
+    #https://medium.com/@alfarhanzahedi/customizing-modelmultiplechoicefield-in-a-django-form-96e3ae7e1a07
+    #curve should be setup day-by-day, the page should hv some variable storing the date
         
 class FXOForm(ModelForm):
     class Meta:
