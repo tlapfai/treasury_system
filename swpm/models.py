@@ -126,7 +126,7 @@ class RateIndex(models.Model):
     ccy = models.ForeignKey(Ccy, CASCADE, related_name="rate_indexes")
     index = models.CharField(max_length=16)
     tenor = models.CharField(max_length=16)
-    day_counter = models.CharField(max_length=16, null=True, blank=True)
+    day_counter = models.CharField(max_length=16, choices=DAY_COUNTER.choices, null=True, blank=True)
     yts = models.CharField(max_length=16, null=True, blank=True)
     def __str__(self):
         return self.name
