@@ -106,7 +106,9 @@ def trade(request, **kwargs):
 
 @csrf_exempt
 def trade_list(request):
-    trades = FXO.objects.all()
+    trades1 = list(FXO.objects.all())
+    trades2 = list(Swap.objects.all())
+    c = trades1 + trades2
     #temp = json.loads(serialize('json', trades))
     #return render(request, 
     #    'swpm/trade-list.html', 
@@ -114,7 +116,7 @@ def trade_list(request):
     #)
     return render(request, 
         'swpm/trade-list.html', 
-        {"data": FXO.objects.values()}
+        {"data": c}
     )
 
 
@@ -167,6 +169,7 @@ def pricing(request, commit=False):
                 if commit and request.POST.get('book') and request.POST.get('counterparty'):
                     tr.input_user = request.user
                     tr.detail = TradeDetail.objects.create()
+                    tr.maturity_date = max([leg.maturity_date for leg in legs])
                     tr.save()
                     for leg in legs:
                         leg.trade = tr
@@ -180,6 +183,7 @@ def pricing(request, commit=False):
                 inst.setPricingEngine(engine)
                 result = {'npv': inst.NPV(), 'leg1bpv': inst.legBPS(0), 'leg2bpv': inst.legBPS(1)}
                 result = dict([(x, round(y, 2)) for x, y in result.items()])
+                #for leg
                 valuation_form = SwapValuationForm(initial=result)
             else:
                 return trade(request, inst='swap', trade_form=swap_form, as_of_form=as_of_form, trade_forms=swap_leg_form_set)
@@ -223,6 +227,7 @@ def reval(request):
 
 def handle_uploaded_file(f):
     #assume all dates are same
+    msg = []
     iter = 1
     with f as openfileobject:
         for line in openfileobject:
@@ -232,22 +237,25 @@ def handle_uploaded_file(f):
                     yts, _t = IRTermStructure.objects.get_or_create(name=temp[2], ref_date=str2date(temp[0]))
                 #'2021-11-08,USD,USD LIBOR,3M,DEPO,Actual360,0.12275'
                 # 0          1   2         3  4    5         6
+                if temp[3][:2] == 'ED':
+                    temp[3] = temp[3][:4]
+                    temp[6] = float(temp[6])*100
                 r, _t = RateQuote.objects.update_or_create(name=temp[2]+' '+temp[3], 
                                                         ref_date=str2date(temp[0]), 
                                                         defaults={ 'tenor': temp[3], 'instrument': temp[4], 
                                                         'ccy': Ccy.objects.get(code=temp[1]), 
                                                         'day_counter': temp[5], 'rate': float(temp[6])*0.01 })
                 yts.rates.add(r)
+                msg.append(str(r))
             iter += 1
-        
+    return msg
 
 @csrf_exempt
 def market_data_import(request):
     if request.method == 'POST':
-        form = UploadFileForm(request.POST, request.FILES)
-        handle_uploaded_file(request.FILES['file'])
-        message = 'Success'
-        return render(request, 'swpm/market_data_import.html', {'upload_file_form': form, 'message': message})
+        #form = UploadFileForm(request.POST, request.FILES)
+        message = handle_uploaded_file(request.FILES['file'])
+        return render(request, 'swpm/market_data_import.html', {'upload_file_form': UploadFileForm(), 'message': message})
     else:
         form = UploadFileForm()
     return render(request, 'swpm/market_data_import.html', {'upload_file_form': form})
