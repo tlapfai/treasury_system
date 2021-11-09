@@ -58,6 +58,8 @@ class Ccy(models.Model):
     code = models.CharField(max_length=3, blank=False, primary_key=True)
     fixing_days = models.PositiveIntegerField(default=2)
     cdr = models.ForeignKey(Calendar, DO_NOTHING, related_name="ccys", null=True)
+    risk_free_curve = models.CharField(max_length=16, blank=True, null=True) #free text
+    foreign_exchange_curve = models.CharField(max_length=16, blank=True, null=True) #free text
     def __str__(self):
         return self.code
 
@@ -108,6 +110,7 @@ class RateQuote(models.Model):
 class IRTermStructure(models.Model):
     name = models.CharField(max_length=16)
     ref_date = models.DateField()
+    ccy = models.ForeignKey(Ccy, CASCADE)
     rates = models.ManyToManyField(RateQuote, related_name="ts")
     as_fx_curve = models.ForeignKey(Ccy, CASCADE, related_name="fx_curve", null=True)
     as_rf_curve = models.ForeignKey(Ccy, CASCADE, related_name="rf_curve", null=True)
@@ -306,7 +309,7 @@ class SwapLeg(models.Model):
     trade = models.ForeignKey(Swap, DO_NOTHING, null=True, blank=True, related_name="legs")
     ccy = models.ForeignKey(Ccy, CASCADE, related_name="swap_legs")
     effective_date = models.DateField(default=datetime.date.today())
-    maturity_date = models.DateField(default=datetime.date.today())
+    maturity_date = models.DateField()
     notional = models.FloatField(default=1e6, validators=[validate_positive])
     pay_rec = models.IntegerField(choices=SWAP_PAY_REC)
     fixed_rate = models.FloatField(default=0, null=True, blank=True)
@@ -320,7 +323,8 @@ class SwapLeg(models.Model):
         sch = ql.MakeSchedule(to_qlDate(self.effective_date), to_qlDate(self.maturity_date), ql.Period(self.payment_freq), calendar=ql.UnitedStates())
         # to be genalize cdr
         if self.index:
-            leg_idx = self.index.get_index(ref_date=as_of, fixing_since=(datetime.datetime.strptime('2021-11-04', '%Y-%m-%d'))) # need to fix
+            #leg_idx = self.index.get_index(ref_date=as_of, fixing_since=(datetime.datetime.strptime('2021-11-04', '%Y-%m-%d'))) # need to fix
+            leg_idx = self.index.get_index(ref_date=as_of, fixing_since=self.trade.trade_date) # need to fix
             leg = ql.IborLeg([self.notional], sch, leg_idx, QL_DAY_COUNTER[self.day_counter], fixingDays=[leg_idx.fixingDays()], spreads=[float(self.spread or 0.0)])
             # temp=pd.DataFrame([{
             # 'fixingDate': cf.fixingDate().ISO(),

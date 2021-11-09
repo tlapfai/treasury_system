@@ -45,7 +45,7 @@
 			  
 			  <li class="nav-item dropdown">
 				<a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-					Instruments
+					Trades
 				</a>
 				<div class="dropdown-menu" aria-labelledby="navbarDropdown">
 				  <a class="dropdown-item" href="{% url 'trade' inst='fxo' %}">FX Option</a>
@@ -61,7 +61,7 @@
 				</a>
 				<div class="dropdown-menu" aria-labelledby="navbarDropdown">
 				  	<a class="dropdown-item" href="#">FX Rate</a>
-				  	<a class="dropdown-item" href="#">Interest Rate</a>
+				  	<a class="dropdown-item" href="{% url 'market_data_import' %}">Interest Rate</a>
 				  	<div class="dropdown-divider"></div> 
 				  	<a class="dropdown-item" href="#">FX Volatility</a>
 				  	<a class="dropdown-item" href="#">Interest Rate Volatility</a>

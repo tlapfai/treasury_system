@@ -16,58 +16,6 @@
 		</tbody>
 	</table>
 </div><br>
-
-<div class="flex-container">
-
-	<div class="trade-ticket flex-item">
-		<form action="{% url 'pricing' %}" method="post" >
-			<fieldset>
-				<legend>FX Option</legend>
-					<table>
-						{{ as_of_form.as_table }}
-						{{ myFXOform.as_table }}
-					</table>
-					<button type="submit" class="btn btn-primary">Price</button>
-					{% if user.is_authenticated %}
-						<button type="submit" class="btn btn-primary" formaction="{% url 'pricing-do' %}">Do</button>
-					{% endif %}
-			</fieldset>
-		</form>
-	</div>
-	
-	{% if results.npv %}
-		<div class='valuation flex-item'>
-			<table class='valuation-table'>
-			<legend>Valuation</legend>
-				<tr><th>Spot</th><td>{{ market_data.spot|floatformat:4 }}</td></tr>
-				<tr><th>NPV</th><td>{{ results.npv|floatformat:2 | intcomma }}</td></tr>
-				<tr><th>Delta</th><td>{{ results.delta|floatformat:2 | intcomma }}</td></tr>
-				<tr><th>Gamma</th><td>{{ results.gamma|floatformat:2 | intcomma }}</td></tr>
-				<tr><th>Vega</th><td>{{ results.vega|floatformat:2 | intcomma }}</td></tr>
-				<tr><th>Theta</th><td>{{ results.theta|floatformat:2 | intcomma }}</td></tr>
-				<tr><th>Ccy1 Rho</th><td>{{ results.rho|floatformat:2 | intcomma }}</td></tr>
-				<tr><th>Ccy2 Rho</th><td>{{ results.dividendRho|floatformat:2 | intcomma }}</td></tr>
-				<tr><th>ITM Prob.</th><td>{{ results.itmCashProbability |floatformat:2 | intcomma }}</td></tr>
-			</table>
-			{% if valuation_message %}
-				<span>{{ valuation_message }}</span>
-			{% endif %}
-		</div>
-	{% endif %}
-
-	<div class='ccypair flex-item'>
-		<form action="{% url 'ccypair' %}" method="post">
-			<fieldset>
-				<legend>Currency Pair</legend>
-				<table>{{ myform.as_table }}</table>
-				<button type="submit" class="btn btn-primary">Save</button>
-			</fieldset>
-		</form>
-		<span class='ccypair-msg'>{{ message }}<span>
-	</div>
-	
-</div>
-
 {% endblock %}
 
 

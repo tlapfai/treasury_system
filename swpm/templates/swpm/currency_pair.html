@@ -1,0 +1,14 @@
+<div class="flex-container">
+
+	<div class='ccypair flex-item'>
+		<form action="{% url 'ccypair' %}" method="post">
+			<fieldset>
+				<legend>Currency Pair</legend>
+				<table>{{ myform.as_table }}</table>
+				<button type="submit" class="btn btn-primary">Save</button>
+			</fieldset>
+		</form>
+		<span class='ccypair-msg'>{{ message }}<span>
+	</div>
+	
+</div>

@@ -229,10 +229,10 @@ def handle_uploaded_file(f):
             if iter > 1 :
                 temp = line.decode('ASCII').split(',')
                 if iter == 2:
-                    yts, _ = IRTermStructure.objects.get_or_create(name=temp[2], ref_date=str2date(temp[0]))
+                    yts, _t = IRTermStructure.objects.get_or_create(name=temp[2], ref_date=str2date(temp[0]))
                 #'2021-11-08,USD,USD LIBOR,3M,DEPO,Actual360,0.12275'
                 # 0          1   2         3  4    5         6
-                r, _ = RateQuote.objects.update_or_create(name=temp[2]+' '+temp[3], 
+                r, _t = RateQuote.objects.update_or_create(name=temp[2]+' '+temp[3], 
                                                         ref_date=str2date(temp[0]), 
                                                         defaults={ 'tenor': temp[3], 'instrument': temp[4], 
                                                         'ccy': Ccy.objects.get(code=temp[1]), 
