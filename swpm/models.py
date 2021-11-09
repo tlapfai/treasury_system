@@ -24,7 +24,6 @@ SWAP_PAY_REC = [(-1, "Receive"), (1, "Pay")]
 
 BUY_SELL = [("B", "Buy"), ("S", "Sell")]
 
-#DAY_COUNTER = [("A360", "A360"), ('A365Fixed', 'A365Fixed')]
 DAY_COUNTER = models.TextChoices('DAY_COUNTER', ['Actual360', 'Actual365Fixed', 'ActualActual', 'Thirty360'])
 QL_DAY_COUNTER = {"Actual360": ql.Actual360(), 'Actual365Fixed': ql.Actual365Fixed(), 'ActualActual': ql.ActualActual(), 'Thirty360': ql.Thirty360()}
 
@@ -102,8 +101,19 @@ class RateQuote(models.Model):
         if self.instrument == "DEPO":
             fixing_days = self.ccy.fixing_days
             convention = ql.ModifiedFollowing
-            ccy = Ccy.objects.get(code=self.ccy)
+            ccy = Ccy.objects.get(code=self.ccy) #not used yet
             return ql.DepositRateHelper(self.rate, ql.Period(self.tenor), fixing_days, ql.TARGET(), convention, False, QL_DAY_COUNTER[self.day_counter])
+        elif self.instrument == "FUT":
+            if self.tenor[:2] == 'ED':
+                return ql.FuturesRateHelper(ql.QuoteHandle(ql.SimpleQuote(self.rate)), ql.IMM.date(self.tenor[2:4]), ql.USDLibor(ql.Period('3M')))
+        elif self.instrument == "SWAP":
+            if self.ccy.code == "USD":
+                swapIndex = ql.UsdLiborSwapIsdaFixAm(ql.Period(self.tenor))
+                return ql.SwapRateHelper(ql.QuoteHandle(ql.SimpleQuote(self.rate)), swapIndex)
+        #elif self.instrument == "OIS":
+        #    if self.ccy.code == "USD":
+        #        index = OvernightIndex(...)
+        #        swapIndex = ql.OvernightIndexedSwapIndex("EFFR", ql.Period(self.tenor), 2, "USD", index)
     def __str__(self):
         return f"{self.name}: ({self.ccy}): {self.rate}"
 
@@ -208,9 +218,8 @@ class Counterparty(models.Model):
     
 class TradeDetail(models.Model):
     #trade = models.ForeignKey(FXO, CASCADE, related_name="detail")
-    pass
-    #def __str__(self) -> str:
-    #    return f"ID: {self.trade.first().id} in book [{self.book}]"
+    def __str__(self) -> str:
+        return f"ID: {self.trade.id}"
 
 class TradeMarkToMarket(models.Model):
     as_of = models.DateField()
@@ -291,11 +300,12 @@ class FXO(Trade):
             return ql.AnalyticEuropeanEngine(process)
 
 
-class SwapManager():
-    pass
+#class SwapManager():
+#    pass
 
 class Swap(Trade):
-    objects = SwapManager()
+    #objects = SwapManager()
+    maturity_date = models.DateField(null=True, blank=True)
     def instrument(self, as_of):
         legs = [x.leg(as_of=as_of) for x in self.legs.all()] #maybe need to use x.leg(as_of=xxxxx)
         is_pay = [leg.pay_rec>0 for leg in self.legs.all()]
@@ -304,6 +314,8 @@ class Swap(Trade):
         leg = self.legs.get(pay_rec=-1)
         yts1 = leg.ccy.rf_curve.get(ref_date=as_of).term_structure()
         return ql.DiscountingSwapEngine(yts1)
+    def __str__(self):
+        return f"Swap ID: {self.id}, Notional={self.legs.first().notional:.0f} & {self.legs.last().notional:.0f}"
 
 class SwapLeg(models.Model):
     trade = models.ForeignKey(Swap, DO_NOTHING, null=True, blank=True, related_name="legs")
