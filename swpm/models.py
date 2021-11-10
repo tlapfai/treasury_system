@@ -120,7 +120,7 @@ class RateQuote(models.Model):
 class IRTermStructure(models.Model):
     name = models.CharField(max_length=16)
     ref_date = models.DateField()
-    ccy = models.ForeignKey(Ccy, CASCADE)
+    ccy = models.ForeignKey(Ccy, CASCADE, related_name="all_curves")
     rates = models.ManyToManyField(RateQuote, related_name="ts")
     as_fx_curve = models.ForeignKey(Ccy, CASCADE, related_name="fx_curve", null=True)
     as_rf_curve = models.ForeignKey(Ccy, CASCADE, related_name="rf_curve", null=True)
@@ -129,8 +129,6 @@ class IRTermStructure(models.Model):
     def term_structure(self):
         helpers = [rate.helper() for rate in self.rates.all()]
         return ql.YieldTermStructureHandle(ql.PiecewiseLogLinearDiscount(to_qlDate(self.ref_date), helpers, ql.Actual360()))
-    def ccy(self):
-        return self.rates[0].ccy
     def __str__(self):
         return f"{self.name} as of {self.ref_date}"
 
