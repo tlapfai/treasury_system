@@ -65,6 +65,7 @@
 				  	<div class="dropdown-divider"></div> 
 				  	<a class="dropdown-item" href="#">FX Volatility</a>
 				  	<a class="dropdown-item" href="#">Interest Rate Volatility</a>
+					<div class="dropdown-divider"></div> 
 					<a class="dropdown-item" href="{% url 'market_data_import' %}">Import</a>
 				</div>
 			  </li>
@@ -140,6 +141,9 @@
             {% block body %}
             {% endblock %}
         </div>
+		<div class="full-screen" style="display: none">
+			<div class="loader"></div>
+		</div>
 		<!-- end of container main-body -->
     </body>
 </html>
