@@ -13,6 +13,7 @@ from .models import *
 from .forms import *
 import datetime
 import json
+import pandas as pd
 
 def str2date(s):
     return datetime.datetime.strptime(s, '%Y-%m-%d')
@@ -264,7 +265,8 @@ def market_data_import(request):
 def yield_curve_search(request):
     if request.method == 'POST':
         form = YieldCurveSearchForm(request.POST)
-        print(form)
-        return render(request, 'swpm/yield_curve.html', {'form': form})
+        print(form.data.dict())
+        search_result = pd.DataFrame(IRTermStructure.objects.filter(**form.data.dict()).values())
+        return render(request, 'swpm/yield_curve.html', {'form': form, 'search_result': search_result.to_html(classes=['app-list'])})
     else:
         return render(request, 'swpm/yield_curve.html', {'form': YieldCurveSearchForm()})
