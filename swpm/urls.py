@@ -13,6 +13,8 @@ urlpatterns = [
     path('ccypair', views.save_ccypair, name='ccypair'), 
     path('trade_list', views.trade_list, name='trade_list'),
     path('trade/<str:inst>', views.trade, name='trade'),
+
+    path('yield_curve_search', views.yield_curve_search, name='yield_curve_search'), 
     # API
     path('reval', views.reval, name='reval'), 
     path('market_data_import', views.market_data_import, name='market_data_import'), 

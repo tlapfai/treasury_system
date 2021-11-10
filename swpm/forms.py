@@ -128,3 +128,8 @@ class RevalForm(forms.Form):
 
 class UploadFileForm(forms.Form):
     file = forms.FileField()
+
+class YieldCurveSearchForm(forms.Form):
+    name = forms.CharField(max_length=16)
+    ref_date = forms.DateField(widget=DateInput(attrs={'type': 'date'}))
+    ccy = forms.CharField(max_length=3)

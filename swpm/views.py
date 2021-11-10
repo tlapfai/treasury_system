@@ -259,3 +259,12 @@ def market_data_import(request):
     else:
         form = UploadFileForm()
     return render(request, 'swpm/market_data_import.html', {'upload_file_form': form})
+
+@csrf_exempt
+def yield_curve_search(request):
+    if request.method == 'POST':
+        form = YieldCurveSearchForm(request.POST)
+        print(form)
+        return render(request, 'swpm/yield_curve.html', {'form': form})
+    else:
+        return render(request, 'swpm/yield_curve.html', {'form': YieldCurveSearchForm()})
