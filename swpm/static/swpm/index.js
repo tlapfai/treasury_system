@@ -26,7 +26,11 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('[id*="pay_rec"]')[1].value = '-1';
         document.querySelectorAll('[id*="ccy"]')[0].value = 'USD';
         document.querySelectorAll('[id*="ccy"]')[1].value = 'USD';
-    })
+    });
+	
+	$('.btn-primary').click( () => {
+        $('.full-screen').show();
+	});
 
     // function updateTextView(_obj){
         // var num = getNumber(_obj.val());
