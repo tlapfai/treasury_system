@@ -120,7 +120,7 @@ class RateQuote(models.Model):
 class IRTermStructure(models.Model):
     name = models.CharField(max_length=16)
     ref_date = models.DateField()
-    ccy = models.ForeignKey(Ccy, CASCADE, related_name="all_curves")
+    ccy = models.ForeignKey(Ccy, CASCADE, related_name="all_curves", null=True, blank=True)
     rates = models.ManyToManyField(RateQuote, related_name="ts")
     as_fx_curve = models.ForeignKey(Ccy, CASCADE, related_name="fx_curve", null=True)
     as_rf_curve = models.ForeignKey(Ccy, CASCADE, related_name="rf_curve", null=True)
@@ -334,7 +334,7 @@ class SwapLeg(models.Model):
         # to be genalize cdr
         if self.index:
             #leg_idx = self.index.get_index(ref_date=as_of, fixing_since=(datetime.datetime.strptime('2021-11-04', '%Y-%m-%d'))) # need to fix
-            leg_idx = self.index.get_index(ref_date=as_of, fixing_since=self.trade.trade_date) # need to fix
+            leg_idx = self.index.get_index(ref_date=as_of, fixing_since=self.trade.trade_date if self.trade else datetime.date.today()) # need to fix
             leg = ql.IborLeg([self.notional], sch, leg_idx, QL_DAY_COUNTER[self.day_counter], fixingDays=[leg_idx.fixingDays()], spreads=[float(self.spread or 0.0)])
             # temp=pd.DataFrame([{
             # 'fixingDate': cf.fixingDate().ISO(),

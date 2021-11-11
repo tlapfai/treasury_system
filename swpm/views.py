@@ -176,12 +176,16 @@ def pricing(request, commit=False):
                         leg.trade = tr
                         leg.save()
                     valuation_message = f"Trade is done, ID is {tr.id}."
+                    inst = tr.instrument(as_of)
+                    engine = tr.make_pricing_engine(as_of)
+                    inst.setPricingEngine(engine)
                 else:
+                    leg_inst = [x.leg(as_of=as_of) for x in legs]
+                    is_pay = [leg.pay_rec>0 for leg in legs]
+                    inst = ql.Swap(leg_inst, is_pay)
+                    yts1 = legs[0].ccy.rf_curve.get(ref_date=as_of).term_structure()
+                    inst.setPricingEngine(ql.DiscountingSwapEngine(yts1))
                     valuation_message = None
-
-                inst = tr.instrument(as_of)
-                engine = tr.make_pricing_engine(as_of)
-                inst.setPricingEngine(engine)
                 result = {'npv': inst.NPV(), 'leg1bpv': inst.legBPS(0), 'leg2bpv': inst.legBPS(1)}
                 result = dict([(x, round(y, 2)) for x, y in result.items()])
                 #for leg
@@ -229,26 +233,33 @@ def reval(request):
 def handle_uploaded_file(f):
     #assume all dates are same
     msg = []
-    iter = 1
-    with f as openfileobject:
-        for line in openfileobject:
-            if iter > 1 :
-                temp = line.decode('ASCII').split(',')
-                if iter == 2:
-                    yts, _t = IRTermStructure.objects.get_or_create(name=temp[2], ref_date=str2date(temp[0]))
-                #'2021-11-08,USD,USD LIBOR,3M,DEPO,Actual360,0.12275'
-                # 0          1   2         3  4    5         6
-                if temp[3][:2] == 'ED':
-                    temp[3] = temp[3][:4]
-                    temp[6] = float(temp[6])*100
-                r, _t = RateQuote.objects.update_or_create(name=temp[2]+' '+temp[3], 
-                                                        ref_date=str2date(temp[0]), 
-                                                        defaults={ 'tenor': temp[3], 'instrument': temp[4], 
-                                                        'ccy': Ccy.objects.get(code=temp[1]), 
-                                                        'day_counter': temp[5], 'rate': float(temp[6])*0.01 })
-                yts.rates.add(r)
-                msg.append(str(r))
-            iter += 1
+    #iter = 1
+    df = pd.read_csv(f)
+    if set(df.columns) == {'Instrument', 'Ccy', 'Date', 'Market Rate', 'Curve', 'Term', 'Day Counter'}:
+        for idx, row in df.iterrows():
+            arg_ = {'name': row['Curve'], 'ref_date': str2date(row['Date']), 'ccy': row['Ccy']}
+            arg_upd = {}
+            ccy_ = Ccy.objects.get(code=row['Ccy'])
+            if ccy_.foreign_exchange_curve == row['Curve']:
+                arg_upd['as_fx_curve'] = ccy_
+            if ccy_.risk_free_curve == row['Curve']:
+                arg_upd['as_rf_curve'] = ccy_
+            yts, temp_ = IRTermStructure.objects.update_or_create(**arg_, defaults=arg_upd)
+            if row['Term'][:2] == 'ED':
+                row['Term'] = row['Term'][:4]
+                row['Market Rate'] = 100*float(row['Market Rate'])
+            r, temp_ = RateQuote.objects.update_or_create(name=row['Curve']+' '+row['Term'], 
+                                                                ref_date=str2date(row['Date']), 
+                                                                defaults={ 'tenor': row['Date'], 
+                                                                        'instrument': row['Instrument'], 
+                                                                        'ccy': Ccy.objects.get(code=row['Ccy']), 
+                                                                        'day_counter': row['Day Counter'], 
+                                                                        'rate': row['Market Rate']*0.01 }
+                                                            )
+            yts.rates.add(r)
+            msg.append(str(r))
+    else:
+        msg = 'Fail'
     return msg
 
 @csrf_exempt
@@ -265,8 +276,8 @@ def market_data_import(request):
 def yield_curve_search(request):
     if request.method == 'POST':
         form = YieldCurveSearchForm(request.POST)
-        print(form.data.dict())
-        search_result = pd.DataFrame(IRTermStructure.objects.filter(**form.data.dict()).values())
+        form_ = dict([ (x[0], x[1]) for x in form.data.dict().items() if len(x[1])>0 ])
+        search_result = pd.DataFrame(IRTermStructure.objects.filter(**form_).values())
         return render(request, 'swpm/yield_curve.html', {'form': form, 'search_result': search_result.to_html(classes=['app-list'])})
     else:
         return render(request, 'swpm/yield_curve.html', {'form': YieldCurveSearchForm()})

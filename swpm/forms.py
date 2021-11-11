@@ -123,13 +123,13 @@ class AsOfForm(forms.Form):
 
 class RevalForm(forms.Form):
     reval_date = forms.DateField(widget=DateInput(attrs={'type': 'date'}))
-    books = forms.ModelMultipleChoiceField(Book.objects.all())
-    portfolios = forms.ModelMultipleChoiceField(Portfolio.objects.all())
+    books = forms.ModelMultipleChoiceField(Book.objects.all(), required=False)
+    portfolios = forms.ModelMultipleChoiceField(Portfolio.objects.all(), required=False)
 
 class UploadFileForm(forms.Form):
     file = forms.FileField()
 
 class YieldCurveSearchForm(forms.Form):
     name = forms.CharField(max_length=16, required=False)
-    ref_date = forms.DateField(widget=DateInput(attrs={'type': 'date'}), required=False)
-    ccy = forms.ModelChoiceField(Ccy.objects.all(), required=False)
+    ref_date = forms.DateField(widget=DateInput(attrs={'type': 'date'}), required=False, label='Date')
+    ccy = forms.ModelChoiceField(Ccy.objects.all(), required=False, label='Currency')
