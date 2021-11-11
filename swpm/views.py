@@ -1,4 +1,5 @@
 from django.contrib.auth import authenticate, login, logout
+from django.db.models.query import RawQuerySet
 from django.shortcuts import redirect, render
 from django.db import IntegrityError
 from django.http import *
@@ -16,7 +17,10 @@ import json
 import pandas as pd
 
 def str2date(s):
-    return datetime.datetime.strptime(s, '%Y-%m-%d')
+    if len(s) == 10:
+        return datetime.datetime.strptime(s, '%Y-%m-%d')
+    elif len(str(s)) == 8:
+        return datetime.datetime.strptime(str(s), '%Y%m%d')
 
 def index(request):
     mytime = timezone.now()
@@ -107,18 +111,15 @@ def trade(request, **kwargs):
 
 @csrf_exempt
 def trade_list(request):
-    trades1 = list(FXO.objects.all())
-    trades2 = list(Swap.objects.all())
-    c = trades1 + trades2
-    #temp = json.loads(serialize('json', trades))
-    #return render(request, 
-    #    'swpm/trade-list.html', 
-    #    {"data": json.loads(serialize('json', trades))}
-    #)
-    return render(request, 
-        'swpm/trade-list.html', 
-        {"data": c}
-    )
+    if request.method=='POST':
+        form = TradeSearchForm(request.POST)
+        form_ = dict([ (x[0], x[1]) for x in form.data.dict().items() if len(x[1])>0 ])
+        trades1 = list(FXO.objects.filter(**form_).values())
+        trades2 = list(Swap.objects.filter(**form_).values())
+        search_result = trades1 + trades2
+        return render(request, 'swpm/trade-list.html', {'form': TradeSearchForm(), "search_result": search_result})
+    else:
+        return render(request, 'swpm/trade-list.html', {'form': TradeSearchForm()})
 
 
 @csrf_exempt
@@ -273,11 +274,26 @@ def market_data_import(request):
     return render(request, 'swpm/market_data_import.html', {'upload_file_form': form})
 
 @csrf_exempt
-def yield_curve_search(request):
+def yield_curve(request, curve=None, ref_date=None):
     if request.method == 'POST':
         form = YieldCurveSearchForm(request.POST)
         form_ = dict([ (x[0], x[1]) for x in form.data.dict().items() if len(x[1])>0 ])
-        search_result = pd.DataFrame(IRTermStructure.objects.filter(**form_).values())
-        return render(request, 'swpm/yield_curve.html', {'form': form, 'search_result': search_result.to_html(classes=['app-list'])})
+        search_result = list(IRTermStructure.objects.filter(**form_).values())
+        return render(request, 'swpm/yield_curve.html', {'form': form, 'search_result': search_result})
+    elif request.method == 'GET':
+        if curve and ref_date:
+            yts_model = IRTermStructure.objects.get(name=curve, ref_date=str2date(ref_date))
+            yts = yts_model.term_structure()
+            dates = yts.dates()
+            rates = []
+            for i, r in enumerate(yts_model.rates.all()):
+                adj_rate = r.rate if r.instrument=='FUT' else r.rate*100
+                rates.append({'id': r.id, 'tenor': r.tenor, 'rate': adj_rate, 'date': dates[i+1].ISO(), 
+                'zero_rate': yts.zeroRate(dates[i], ql.Actual365Fixed(), ql.Continuous).rate()*100
+                })
+            data = {'name': yts_model.name, 'ref_date': str2date(ref_date), 'rates': rates}
+            return render(request, 'swpm/yield_curve.html', {'form': YieldCurveSearchForm(), 'data': data})
+        else:
+            return render(request, 'swpm/yield_curve.html', {'form': YieldCurveSearchForm()})
     else:
-        return render(request, 'swpm/yield_curve.html', {'form': YieldCurveSearchForm()})
+        return JsonResponse({"error": "GET or PUT request required."}, status=400)

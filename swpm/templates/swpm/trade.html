@@ -5,7 +5,7 @@
 {% block body %}
 <div class="flex-container">
 
-	<div class="trade-ticket flex-item">
+	<div class="trade-ticket flex-item" style="min-width: 45%;">
 		<form action="{% url 'pricing' %}" method="post">
 			<fieldset>
 				<legend>{{ trade_type }}</legend>
@@ -47,7 +47,7 @@
 	</div>
 	<!--End of class="trade-ticket flex-item">-->
 
-	<div class='valuation flex-item'>
+	<div class='valuation flex-item' style="width: auto;">
 		<table class='valuation-table'>
 			<fieldset>
 				<legend>Valuation</legend>

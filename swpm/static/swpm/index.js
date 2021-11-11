@@ -26,6 +26,10 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('[id*="pay_rec"]')[1].value = '-1';
         document.querySelectorAll('[id*="ccy"]')[0].value = 'USD';
         document.querySelectorAll('[id*="ccy"]')[1].value = 'USD';
+        document.querySelectorAll('[id*="cp"]')[0].value = 'C';
+        document.querySelectorAll('[id*="buy_sell"]')[0].value = 'B';
+        document.querySelectorAll('[id*="type"]')[0].value = 'EUR';
+        document.querySelectorAll('[id*="ccy_pair"]')[0].value = 'EUR/USD';
     });
 	
 	$('.btn-primary').click( () => {

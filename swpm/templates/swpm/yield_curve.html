@@ -3,14 +3,66 @@
 {% load humanize %}
 
 {% block body %}
-		<div>
+	<div class="flex-container">
+		<div class="flex-item" style="width: 100%;">
+			<legend>Search Yield Curve</legend>
             <form action="{% url 'yield_curve_search' %}" method="post">
                 {{ form }}
                 <button type="submit" class="btn btn-primary">Search</button>
             </form>
-			{% autoescape off %}
-				{{ search_result }}
-			{% endautoescape %}
+		</div>
+	</div>
+		<div class="flex-container">
+			<div class="curve-rates flex-item" style="width: auto;">
+				{% if search_result %}
+				<fieldset>
+					<table class='curve-list'  data-toggle="table">
+						<thead>
+							<tr>
+								<th data-field="name" data-sortable="true">Name</th>
+								<th data-field="date" data-sortable="true">Date</th>
+								<th data-field="ccy" data-sortable="true">Ccy</th>
+							</tr>
+						</thead>
+						<tbody>
+							{% for r in search_result %}
+							<tr>
+								<td class='name'><a href="{% url 'yield_curve' ref_date=r.ref_date curve=r.name %}">{{ r.name }}</a></td>
+								<td class='date'><a href="{% url 'yield_curve' ref_date=r.ref_date curve=r.name %}">{{ r.ref_date |date:'Y-m-d' }}</a></td>
+								<td class='ccy'><a href="{% url 'yield_curve' ref_date=r.ref_date curve=r.name %}">{{ r.ccy_id }}</a></td>
+							</tr>
+							{% endfor %}
+						</tbody>
+					</table>
+				</fieldset>
+				{% elif data %}
+				<div style="padding: 20px;">
+					<strong>{{ data.name }}</strong> as of <strong>{{ data.ref_date |date:'Y-m-d' }}</strong>
+					<table class='rate-list'  data-toggle="table">
+						<thead><tr>
+							<th data-field="id" data-sortable="true">ID</th>
+							<th data-field="tenor" data-sortable="true">Tenor</th>
+							<th data-field="date" data-sortable="true">Date</th>
+							<th data-field="mkt_rate" data-sortable="true">Market Rate</th>
+							<th data-field="zero_rate" data-sortable="true">Zero Rate</th>
+						</tr></thead>
+						<tbody>
+						{% for r in data.rates %}
+							<tr>
+								<td class='id'><a href="#">{{ r.id }}</a></td>
+								<td class='tenor'>{{ r.tenor }}</td>
+								<td class='date'>{{ r.date }}</td>
+								<td class='mkt_rate'>{{ r.rate |floatformat:12 }}</td>
+								<td class='zero_rate'>{{ r.zero_rate |floatformat:12 }}</td>
+							</tr>
+						{% endfor %}
+						</tbody>
+					</table>
+				</div>
+				{% else %}
+				<span>No result found</span>
+				{% endif %}
+			</div>
 		</div>
 {% endblock %}
 

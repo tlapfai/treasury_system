@@ -128,7 +128,9 @@ class IRTermStructure(models.Model):
         unique_together = ('name', 'ref_date')
     def term_structure(self):
         helpers = [rate.helper() for rate in self.rates.all()]
-        return ql.YieldTermStructureHandle(ql.PiecewiseLogLinearDiscount(to_qlDate(self.ref_date), helpers, ql.Actual360()))
+        yts = ql.PiecewiseLogLinearDiscount(to_qlDate(self.ref_date), helpers, ql.Actual360())
+        yts.enableExtrapolation()
+        return yts
     def __str__(self):
         return f"{self.name} as of {self.ref_date}"
 
@@ -147,7 +149,7 @@ class RateIndex(models.Model):
         if ref_date:
             yts = IRTermStructure.objects.get(name=self.yts, ref_date=ref_date).term_structure()
             if yts:
-                idx_obj = idx_cls(ql.Period(self.tenor), yts)
+                idx_obj = idx_cls(ql.Period(self.tenor), ql.YieldTermStructureHandle(yts))
             else:
                 idx_obj = idx_cls(ql.Period(self.tenor))
         else:
@@ -242,9 +244,10 @@ class Trade(models.Model):
     input_user = models.ForeignKey(User, SET_NULL, null=True, related_name='input_trades')
     counterparty = models.ForeignKey(Counterparty, DO_NOTHING, related_name="trade_set", null=True, blank=True)
     def delete(self, *args, **kwargs):
-         if self.detail:
+        super().delete(*args, **kwargs)
+        if self.detail:
              self.detail.delete()
-         super().delete(*args, **kwargs)
+         
     #class Meta:
         #abstract = True
         #ordering = ['id']
@@ -294,7 +297,7 @@ class FXO(Trade):
             v = self.ccy_pair.vol.get(ref_date=as_of).handle()
             q = IRTermStructure.objects.get(ref_date=as_of, as_fx_curve=self.ccy_pair.base_ccy).term_structure()
             r = IRTermStructure.objects.get(ref_date=as_of, as_fx_curve=self.ccy_pair.quote_ccy).term_structure()
-            process = ql.BlackScholesMertonProcess(spot_rate.handle(), q, r, v)
+            process = ql.BlackScholesMertonProcess(spot_rate.handle(), ql.YieldTermStructureHandle(q), ql.YieldTermStructureHandle(r), v)
             return ql.AnalyticEuropeanEngine(process)
 
 
@@ -311,12 +314,16 @@ class Swap(Trade):
     def make_pricing_engine(self, as_of):
         leg = self.legs.get(pay_rec=-1)
         yts1 = leg.ccy.rf_curve.get(ref_date=as_of).term_structure()
-        return ql.DiscountingSwapEngine(yts1)
+        return ql.DiscountingSwapEngine(ql.YieldTermStructureHandle(yts1))
     def __str__(self):
         return f"Swap ID: {self.id}, Notional={self.legs.first().notional:.0f} & {self.legs.last().notional:.0f}"
+    def delete(self, *args, **kwargs):
+        super().delete(*args, **kwargs)
+        if self.detail:
+             self.detail.delete()
 
 class SwapLeg(models.Model):
-    trade = models.ForeignKey(Swap, DO_NOTHING, null=True, blank=True, related_name="legs")
+    trade = models.ForeignKey(Swap, CASCADE, null=True, blank=True, related_name="legs")
     ccy = models.ForeignKey(Ccy, CASCADE, related_name="swap_legs")
     effective_date = models.DateField(default=datetime.date.today())
     maturity_date = models.DateField()
@@ -346,12 +353,11 @@ class SwapLeg(models.Model):
             # 'rate': cf.rate(),
             # "amount": cf.amount()
             # } for cf in leg])
-            # temp.to_csv('temp.csv')
         else:
             leg = ql.FixedRateLeg(sch, QL_DAY_COUNTER[self.day_counter], [self.notional], [self.fixed_rate*0.01])
 
         return leg
     def make_pricing_engine(self, as_of):
         discount_curve = self.ccy.rf_curve.get(ref_date=as_of).term_structure()
-        return ql.DiscountingSwapEngine(discount_curve)
+        return ql.DiscountingSwapEngine(ql.YieldTermStructureHandle(discount_curve))
 

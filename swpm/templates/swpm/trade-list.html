@@ -4,42 +4,52 @@
 
 {% block body %}
 		<div>
+			<legend>Search Trade</legend>
+			<form action="{% url 'trade_list' %}" method="post">
+				{{ form }}
+				<button type="submit" class="btn btn-primary">Search</button>
+			</form>
+		</div>
+
+		<div>
 			<fieldset>
-				<legend>Trade List</legend>
 				<table class='trade-list'  data-toggle="table">
-					<thead><tr>
-						<th data-field="tradeid" data-sortable="true">Trade ID</th>
-						<th>Currency Pair</th>
-						<th>Type</th>
-						<th>CP</th>
-						<th data-field="tradedate" data-sortable="true">Trade Date</th>
-						<th data-field="maturitydate" data-sortable="true">Maturity</th>
-						<th>Notional 1</th>
-						<th>Notional 2</th>
-						<th>Input User</th>
-						<th>Book</th>
-						<th>Counterparty</th>
-					</tr></thead>
-					<tbody>
-					{% for t in data %}
+					<thead>
 						<tr>
-							<td class='tradeid'><a href="trade/{{ t.id }}">{{ t.id }}</a></td>
-							<td class='ccypair'>{{ t.ccy_pair_id }}</td>
-							<td class='type'>{{ t.type }}</td>
-							<td class='cp'>{{ t.cp }}</td>
-							<td class='tradedate'>{{ t.trade_date |date:'Y-m-d'}}</td>
-							<td class='maturitydate'>{{ t.maturity_date |date:'Y-m-d'}}</td>
-							<td class='notional1'>{{ t.notional_1 |floatformat:0 | intcomma }}</td>
-							<td class='notional2'>{{ t.notional_2 |floatformat:0 | intcomma }}</td>
-							<td class='inputuser'>{{ t.input_user_id }}</td>
-							<td class="book">{{ t.book_id }}</td>
-							<td class="counterparty">{{ t.counterparty_id }}</td>
+							<th data-field="tradeid" data-sortable="true">Trade ID</th>
+							<th data-field="ccypair" data-sortable="true">Currency Pair</th>
+							<th>Type</th>
+							<th>CP</th>
+							<th data-field="tradedate" data-sortable="true">Trade Date</th>
+							<th data-field="maturitydate" data-sortable="true">Maturity</th>
+							<th>Notional 1</th>
+							<th>Notional 2</th>
+							<th>Input User</th>
+							<th>Book</th>
+							<th>Counterparty</th>
 						</tr>
-					{% endfor %}
+					</thead>
+					<tbody>
+						{% for t in search_result %}
+							<tr>
+								<td class='tradeid'><a href="trade/{{ t.id }}">{{ t.id }}</a></td>
+								<td class='ccypair'>{{ t.ccy_pair_id }}</td>
+								<td class='type'>{{ t.type }}</td>
+								<td class='cp'>{{ t.cp }}</td>
+								<td class='tradedate'>{{ t.trade_date |date:'Y-m-d'}}</td>
+								<td class='maturitydate'>{{ t.maturity_date |date:'Y-m-d'}}</td>
+								<td class='notional1'>{{ t.notional_1 |floatformat:0 | intcomma }}</td>
+								<td class='notional2'>{{ t.notional_2 |floatformat:0 | intcomma }}</td>
+								<td class='inputuser'>{{ t.input_user_id }}</td>
+								<td class="book">{{ t.book_id }}</td>
+								<td class="counterparty">{{ t.counterparty_id }}</td>
+							</tr>
+						{% endfor %}
 					</tbody>
 				</table>
 			</fieldset>
 		</div>
+
 {% endblock %}
 
 {% block script %}

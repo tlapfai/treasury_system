@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, re_path
 from . import views
 
 urlpatterns = [
@@ -14,7 +14,8 @@ urlpatterns = [
     path('trade_list', views.trade_list, name='trade_list'),
     path('trade/<str:inst>', views.trade, name='trade'),
 
-    path('yield_curve_search', views.yield_curve_search, name='yield_curve_search'), 
+    path('yield_curve/search', views.yield_curve, name='yield_curve_search'), 
+    re_path(r'^yield_curve/(?P<curve>[-\w\s]+)/(?P<ref_date>\d{4}-\d{2}-\d{2})$', views.yield_curve, name='yield_curve'), 
     # API
     path('reval', views.reval, name='reval'), 
     path('market_data_import', views.market_data_import, name='market_data_import'), 

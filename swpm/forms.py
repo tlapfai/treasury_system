@@ -133,3 +133,7 @@ class YieldCurveSearchForm(forms.Form):
     name = forms.CharField(max_length=16, required=False)
     ref_date = forms.DateField(widget=DateInput(attrs={'type': 'date'}), required=False, label='Date')
     ccy = forms.ModelChoiceField(Ccy.objects.all(), required=False, label='Currency')
+
+class TradeSearchForm(forms.Form):
+    id = forms.IntegerField(required=False)
+    trade_date = forms.DateField(widget=DateInput(attrs={'type': 'date'}), required=False)
