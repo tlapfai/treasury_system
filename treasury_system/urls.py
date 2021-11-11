@@ -20,4 +20,5 @@ from django.urls.conf import include
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('swpm.urls')), 
+    path('django_plotly_dash/', include('django_plotly_dash.urls')),
 ]

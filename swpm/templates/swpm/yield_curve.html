@@ -1,10 +1,11 @@
 {% extends "swpm/layout.html" %}
 {% load static %}
 {% load humanize %}
+{% load plotly_dash %}
 
 {% block body %}
-	<div class="flex-container">
-		<div class="flex-item" style="width: 100%;">
+	<div class="flex-container" style="width: auto;">
+		<div class="flex-item"  style="width: auto;">
 			<legend>Search Yield Curve</legend>
             <form action="{% url 'yield_curve_search' %}" method="post">
                 {{ form }}
@@ -36,7 +37,10 @@
 					</table>
 				</fieldset>
 				{% elif data %}
-				<div style="padding: 20px;">
+				<div class="flex-item yts-plot">
+					{% plotly_direct name="yts_plot" %}
+				</div>
+				<div class="flex-item" style="padding: 20px;">
 					<strong>{{ data.name }}</strong> as of <strong>{{ data.ref_date |date:'Y-m-d' }}</strong>
 					<table class='rate-list'  data-toggle="table">
 						<thead><tr>

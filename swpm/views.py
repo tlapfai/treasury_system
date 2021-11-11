@@ -16,6 +16,11 @@ import datetime
 import json
 import pandas as pd
 
+from dash import html
+from dash import dcc
+from django_plotly_dash import DjangoDash
+import plotly.express as px
+
 def str2date(s):
     if len(s) == 10:
         return datetime.datetime.strptime(s, '%Y-%m-%d')
@@ -289,8 +294,18 @@ def yield_curve(request, curve=None, ref_date=None):
             for i, r in enumerate(yts_model.rates.all()):
                 adj_rate = r.rate if r.instrument=='FUT' else r.rate*100
                 rates.append({'id': r.id, 'tenor': r.tenor, 'rate': adj_rate, 'date': dates[i+1].ISO(), 
-                'zero_rate': yts.zeroRate(dates[i], ql.Actual365Fixed(), ql.Continuous).rate()*100
+                'zero_rate': yts.zeroRate(dates[i+1], ql.Actual365Fixed(), ql.Continuous).rate()*100
                 })
+            plt_points = min(len(rates)-1, 14)
+            dataPx = px.line(x=[rr['date'] for rr in rates], y=[rr['zero_rate'] for rr in rates], 
+                            range_x=[dates[0].ISO(), rates[plt_points]['date']], 
+                            range_y=[0, rates[plt_points]['zero_rate']+0.2], 
+                            markers=True, labels={'x': 'Date', 'y': 'Zero Rate'})
+            app = DjangoDash('yts_plot')
+            app.layout = html.Div([dcc.Graph(id="yts_plot_id", figure=dataPx)], 
+                    className = "yts_plot_class", 
+                    style = { "width" : "1100px" }
+                )
             data = {'name': yts_model.name, 'ref_date': str2date(ref_date), 'rates': rates}
             return render(request, 'swpm/yield_curve.html', {'form': YieldCurveSearchForm(), 'data': data})
         else:
