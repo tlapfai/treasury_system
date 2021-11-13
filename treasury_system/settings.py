@@ -25,7 +25,8 @@ SECRET_KEY = '0!z_tq5nm$df1ljau!c(j!3u_(+px+0_npa7naf!-qlpml4tn9'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['treasury-system.herokuapp.com/']
+ALLOWED_HOSTS = ['127.0.0.1', 
+    'treasury-system.herokuapp.com/']
 
 
 # Application definition
