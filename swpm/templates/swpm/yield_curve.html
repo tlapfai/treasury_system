@@ -38,32 +38,61 @@
 				</fieldset>
 				{% elif data %}
 				<div class="row interest-rate-data">
-					<div class="col-md-6" style="padding: 4px;">
-						<strong>{{ data.name }}</strong> as of <strong>{{ data.ref_date |date:'Y-m-d' }}</strong>
-						<table class='rate-list'  data-toggle="table">
-							<thead><tr>
-								<th data-field="id" data-sortable="true">ID</th>
-								<th data-field="tenor" data-sortable="true">Tenor</th>
-								<th data-field="date" data-sortable="true">Date</th>
-								<th data-field="mkt_rate" data-sortable="true">Market Rate</th>
-								<th data-field="zero_rate" data-sortable="true">Zero Rate</th>
-							</tr></thead>
-							<tbody>
-							{% for r in data.rates %}
-								<tr>
-									<td class='id'><a href="#">{{ r.id }}</a></td>
-									<td class='tenor'>{{ r.tenor }}</td>
-									<td class='date'>{{ r.date }}</td>
-									<td class='mkt_rate'>{{ r.rate |floatformat:10 }}</td>
-									<td class='zero_rate'>{{ r.zero_rate |floatformat:10 }}</td>
-								</tr>
-							{% endfor %}
-							</tbody>
-						</table>
+					<div class="loader-inner ball-spin-fade-loader"></div>
+					<div class="row">
+						<div class="col-md-12">
+							<ul class="nav nav-tabs" id="myTab" role="tablist">
+								<li class="nav-item" role="presentation">
+									<button class="nav-link active" id="home-tab" data-bs-toggle="tab" data-bs-target="#home" type="button" role="tab" aria-controls="home" aria-selected="true">Rate</button>
+								</li>
+								<li class="nav-item" role="presentation">
+									<button class="nav-link" id="profile-tab" data-bs-toggle="tab" data-bs-target="#profile" type="button" role="tab" aria-controls="profile" aria-selected="false">Graph</button>
+								</li>
+								<li class="nav-item" role="presentation">
+									<button class="nav-link" id="contact-tab" data-bs-toggle="tab" data-bs-target="#contact" type="button" role="tab" aria-controls="contact" aria-selected="false">Other</button>
+								</li>
+							</ul>
+							<div class="tab-content" id="myTabContent">
+								<!-- rate list -->
+								<div class="tab-pane fade show active" id="home" role="tabpanel" aria-labelledby="home-tab">
+									<div class="col-md-12" style="padding: 4px;">
+										<table class='rate-list'  data-toggle="table">
+											<strong>{{ data.name }}</strong> as of <strong>{{ data.ref_date |date:'Y-m-d' }}</strong>
+											<thead><tr>
+												<th data-field="id" data-sortable="true">ID</th>
+												<th data-field="tenor" data-sortable="true">Tenor</th>
+												<th data-field="date" data-sortable="true">Date</th>
+												<th data-field="mkt_rate" data-sortable="true">Market Rate</th>
+												<th data-field="zero_rate" data-sortable="true">Zero Rate</th>
+											</tr></thead>
+											<tbody>
+											{% for r in data.rates %}
+												<tr>
+													<td class='id'><a href="#">{{ r.id }}</a></td>
+													<td class='tenor'>{{ r.tenor }}</td>
+													<td class='date'>{{ r.date }}</td>
+													<td class='mkt_rate'>{{ r.rate |floatformat:10 }}</td>
+													<td class='zero_rate'>{{ r.zero_rate |floatformat:10 }}</td>
+												</tr>
+											{% endfor %}
+											</tbody>
+										</table>
+									</div>
+								</div>
+								<!-- rate list end -->
+								<!-- Graph Tab start -->
+								<div class="tab-pane fade" id="profile" role="tabpanel" aria-labelledby="profile-tab">
+									<div class="yts-plot col-md-12">
+										{% plotly_direct name="yts_plot" %}
+									</div>
+								</div>
+								<!-- Graph Tab end -->
+								<div class="tab-pane fade" id="contact" role="tabpanel" aria-labelledby="contact-tab">3</div>
+							</div>
+						</div>
 					</div>
-					<div class="yts-plot col-md-6">
-						{% plotly_direct name="yts_plot" %}
-					</div>
+
+
 				</div>
 				<!-- end of class="row"-->
 				{% else %}

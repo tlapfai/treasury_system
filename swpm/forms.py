@@ -130,7 +130,7 @@ class UploadFileForm(forms.Form):
     file = forms.FileField()
 
 class YieldCurveSearchForm(forms.Form):
-    name = forms.CharField(max_length=16, required=False)
+    name__contains = forms.CharField(max_length=16, required=False)
     ref_date = forms.DateField(widget=DateInput(attrs={'type': 'date'}), required=False, label='Date')
     ccy = forms.ModelChoiceField(Ccy.objects.all(), required=False, label='Currency')
 

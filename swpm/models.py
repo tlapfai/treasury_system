@@ -115,7 +115,7 @@ class RateQuote(models.Model):
         #        index = OvernightIndex(...)
         #        swapIndex = ql.OvernightIndexedSwapIndex("EFFR", ql.Period(self.tenor), 2, "USD", index)
     def __str__(self):
-        return f"{self.name}: ({self.ccy}): {self.rate}"
+        return f"{self.name}: ({self.ccy}) as of {self.ref_date}: {self.rate}"
 
 class IRTermStructure(models.Model):
     name = models.CharField(max_length=16)

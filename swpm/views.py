@@ -243,7 +243,7 @@ def handle_uploaded_file(f):
     df = pd.read_csv(f)
     if set(df.columns) == {'Instrument', 'Ccy', 'Date', 'Market Rate', 'Curve', 'Term', 'Day Counter'}:
         for idx, row in df.iterrows():
-            arg_ = {'name': row['Curve'], 'ref_date': str2date(row['Date']), 'ccy': row['Ccy']}
+            arg_ = {'name': row['Curve'], 'ref_date': str2date(row['Date']), 'ccy': Ccy.objects.get(code=row['Ccy'])}
             arg_upd = {}
             ccy_ = Ccy.objects.get(code=row['Ccy'])
             if ccy_.foreign_exchange_curve == row['Curve']:
@@ -256,7 +256,7 @@ def handle_uploaded_file(f):
                 row['Market Rate'] = 100*float(row['Market Rate'])
             r, temp_ = RateQuote.objects.update_or_create(name=row['Curve']+' '+row['Term'], 
                                                                 ref_date=str2date(row['Date']), 
-                                                                defaults={ 'tenor': row['Date'], 
+                                                                defaults={ 'tenor': row['Term'], 
                                                                         'instrument': row['Instrument'], 
                                                                         'ccy': Ccy.objects.get(code=row['Ccy']), 
                                                                         'day_counter': row['Day Counter'], 
@@ -265,7 +265,7 @@ def handle_uploaded_file(f):
             yts.rates.add(r)
             msg.append(str(r))
     else:
-        msg = 'Fail'
+        msg = 'Header is wrong'
     return msg
 
 @csrf_exempt
@@ -283,7 +283,7 @@ def yield_curve(request, curve=None, ref_date=None):
     if request.method == 'POST':
         form = YieldCurveSearchForm(request.POST)
         form_ = dict([ (x[0], x[1]) for x in form.data.dict().items() if len(x[1])>0 ])
-        search_result = list(IRTermStructure.objects.filter(**form_).values())
+        search_result = list(IRTermStructure.objects.filter(**form_).order_by('-ref_date').values())
         return render(request, 'swpm/yield_curve.html', {'form': form, 'search_result': search_result})
     elif request.method == 'GET':
         if curve and ref_date:
@@ -297,10 +297,12 @@ def yield_curve(request, curve=None, ref_date=None):
                 'zero_rate': yts.zeroRate(dates[i+1], ql.Actual365Fixed(), ql.Continuous).rate()*100
                 })
             plt_points = min(len(rates)-1, 14)
+            # https://plotly.com/python/px-arguments/
             dataPx = px.line(x=[rr['date'] for rr in rates], y=[rr['zero_rate'] for rr in rates], 
                             range_x=[dates[0].ISO(), rates[plt_points]['date']], 
                             range_y=[0, rates[plt_points]['zero_rate']*1.1], 
                             markers=True, labels={'x': 'Date', 'y': 'Zero Rate'})
+            dataPx.update_layout(plot_bgcolor='#111111', paper_bgcolor='#111111', font_color='skyblue')
             app = DjangoDash('yts_plot')
             app.layout = html.Div([dcc.Graph(id="yts_plot_id", figure=dataPx)], 
                     className = "yts_plot_class", 
