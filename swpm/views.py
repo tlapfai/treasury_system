@@ -299,12 +299,12 @@ def yield_curve(request, curve=None, ref_date=None):
             plt_points = min(len(rates)-1, 14)
             dataPx = px.line(x=[rr['date'] for rr in rates], y=[rr['zero_rate'] for rr in rates], 
                             range_x=[dates[0].ISO(), rates[plt_points]['date']], 
-                            range_y=[0, rates[plt_points]['zero_rate']+0.2], 
+                            range_y=[0, rates[plt_points]['zero_rate']*1.1], 
                             markers=True, labels={'x': 'Date', 'y': 'Zero Rate'})
             app = DjangoDash('yts_plot')
             app.layout = html.Div([dcc.Graph(id="yts_plot_id", figure=dataPx)], 
                     className = "yts_plot_class", 
-                    style = { "width" : "1100px" }
+                    style = { "width" : "100%" }
                 )
             data = {'name': yts_model.name, 'ref_date': str2date(ref_date), 'rates': rates}
             return render(request, 'swpm/yield_curve.html', {'form': YieldCurveSearchForm(), 'data': data})

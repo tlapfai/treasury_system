@@ -5,19 +5,19 @@
 
 {% block body %}
 	<div class="flex-container" style="width: auto;">
-		<div class="flex-item"  style="width: auto;">
+		<div class="col-md-12">
 			<legend>Search Yield Curve</legend>
             <form action="{% url 'yield_curve_search' %}" method="post">
                 {{ form }}
                 <button type="submit" class="btn btn-primary">Search</button>
             </form>
 		</div>
-	</div>
-		<div class="flex-container">
-			<div class="curve-rates flex-item" style="width: auto;">
+
+		<div class="lower-panel" style="width: 100%;">
+			<div class="search-result">
 				{% if search_result %}
 				<fieldset>
-					<table class='curve-list'  data-toggle="table">
+					<table class='curve-list' data-toggle="table">
 						<thead>
 							<tr>
 								<th data-field="name" data-sortable="true">Name</th>
@@ -37,37 +37,41 @@
 					</table>
 				</fieldset>
 				{% elif data %}
-				<div class="flex-item yts-plot">
-					{% plotly_direct name="yts_plot" %}
+				<div class="row interest-rate-data">
+					<div class="col-md-6" style="padding: 4px;">
+						<strong>{{ data.name }}</strong> as of <strong>{{ data.ref_date |date:'Y-m-d' }}</strong>
+						<table class='rate-list'  data-toggle="table">
+							<thead><tr>
+								<th data-field="id" data-sortable="true">ID</th>
+								<th data-field="tenor" data-sortable="true">Tenor</th>
+								<th data-field="date" data-sortable="true">Date</th>
+								<th data-field="mkt_rate" data-sortable="true">Market Rate</th>
+								<th data-field="zero_rate" data-sortable="true">Zero Rate</th>
+							</tr></thead>
+							<tbody>
+							{% for r in data.rates %}
+								<tr>
+									<td class='id'><a href="#">{{ r.id }}</a></td>
+									<td class='tenor'>{{ r.tenor }}</td>
+									<td class='date'>{{ r.date }}</td>
+									<td class='mkt_rate'>{{ r.rate |floatformat:10 }}</td>
+									<td class='zero_rate'>{{ r.zero_rate |floatformat:10 }}</td>
+								</tr>
+							{% endfor %}
+							</tbody>
+						</table>
+					</div>
+					<div class="yts-plot col-md-6">
+						{% plotly_direct name="yts_plot" %}
+					</div>
 				</div>
-				<div class="flex-item" style="padding: 20px;">
-					<strong>{{ data.name }}</strong> as of <strong>{{ data.ref_date |date:'Y-m-d' }}</strong>
-					<table class='rate-list'  data-toggle="table">
-						<thead><tr>
-							<th data-field="id" data-sortable="true">ID</th>
-							<th data-field="tenor" data-sortable="true">Tenor</th>
-							<th data-field="date" data-sortable="true">Date</th>
-							<th data-field="mkt_rate" data-sortable="true">Market Rate</th>
-							<th data-field="zero_rate" data-sortable="true">Zero Rate</th>
-						</tr></thead>
-						<tbody>
-						{% for r in data.rates %}
-							<tr>
-								<td class='id'><a href="#">{{ r.id }}</a></td>
-								<td class='tenor'>{{ r.tenor }}</td>
-								<td class='date'>{{ r.date }}</td>
-								<td class='mkt_rate'>{{ r.rate |floatformat:12 }}</td>
-								<td class='zero_rate'>{{ r.zero_rate |floatformat:12 }}</td>
-							</tr>
-						{% endfor %}
-						</tbody>
-					</table>
-				</div>
+				<!-- end of class="row"-->
 				{% else %}
 				<span>No result found</span>
 				{% endif %}
 			</div>
 		</div>
+	</div>
 {% endblock %}
 
 {% block script %}
@@ -75,6 +79,5 @@
 	<script src="{% static 'swpm/jquery-3.6.0.slim.min.js' %}"></script>
 	
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
     <script src="https://unpkg.com/bootstrap-table@1.18.3/dist/bootstrap-table.min.js"></script>
 {% endblock %}
