@@ -26,7 +26,7 @@ SECRET_KEY = '0!z_tq5nm$df1ljau!c(j!3u_(+px+0_npa7naf!-qlpml4tn9'
 DEBUG = True
 
 ALLOWED_HOSTS = ['127.0.0.1', 
-    'treasury-system.herokuapp.com/']
+    'treasury-system.herokuapp.com']
 
 
 # Application definition
