@@ -190,14 +190,14 @@ def pricing(request, commit=False):
                     is_pay = [leg.pay_rec>0 for leg in legs]
                     inst = ql.Swap(leg_inst, is_pay)
                     yts1 = legs[0].ccy.rf_curve.get(ref_date=as_of).term_structure()
-                    inst.setPricingEngine(ql.DiscountingSwapEngine(yts1))
+                    inst.setPricingEngine(ql.DiscountingSwapEngine(ql.YieldTermStructureHandle(yts1)))
                     valuation_message = None
                 result = {'npv': inst.NPV(), 'leg1bpv': inst.legBPS(0), 'leg2bpv': inst.legBPS(1)}
                 result = dict([(x, round(y, 2)) for x, y in result.items()])
                 #for leg
                 valuation_form = SwapValuationForm(initial=result)
             else:
-                return trade(request, inst='swap', trade_form=swap_form, as_of_form=as_of_form, trade_forms=swap_leg_form_set)
+                return trade(request, inst='swap', trade_form=swap_form, as_of_form=as_of_form, trade_forms=swap_leg_form_set, val_form=SwapValuationForm())
             return trade(request, inst='swap', trade_form=swap_form, as_of_form=as_of_form, trade_forms=swap_leg_form_set, 
                 val_form=valuation_form, valuation_message=valuation_message)
 

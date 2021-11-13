@@ -143,9 +143,9 @@ class RateIndex(models.Model):
     yts = models.CharField(max_length=16, null=True, blank=True)
     def __str__(self):
         return self.name
-    def get_index(self, ref_date=None, fixing_since=None):
-        index_dict = {'USD LIBOR': ql.USDLibor}
-        idx_cls = index_dict[self.ccy.code+" "+self.index]
+    def get_index(self, ref_date=None, eff_date=None):
+        if self.ccy.code+" "+self.index == 'USD LIBOR':
+            idx_cls = ql.USDLibor
         if ref_date:
             yts = IRTermStructure.objects.get(name=self.yts, ref_date=ref_date).term_structure()
             if yts:
@@ -154,9 +154,12 @@ class RateIndex(models.Model):
                 idx_obj = idx_cls(ql.Period(self.tenor))
         else:
             idx_obj = idx_cls(ql.Period(self.tenor))
-        if fixing_since:
-            for f in self.fixings.filter(ref_date__gte=fixing_since):
+
+        if eff_date:
+            first_fixing_date = idx_obj.fixingDate(to_qlDate(eff_date))
+            for f in self.fixings.filter(ref_date__gte=first_fixing_date.ISO()):
                 idx_obj.addFixings([to_qlDate(f.ref_date)], [f.value])
+        
         return idx_obj
 
 class RateIndexFixing(models.Model):
@@ -329,7 +332,7 @@ class SwapLeg(models.Model):
     maturity_date = models.DateField()
     notional = models.FloatField(default=1e6, validators=[validate_positive])
     pay_rec = models.IntegerField(choices=SWAP_PAY_REC)
-    fixed_rate = models.FloatField(default=0, null=True, blank=True)
+    fixed_rate = models.FloatField(null=True, blank=True)
     index = models.ForeignKey(RateIndex, SET_NULL, null=True, blank=True)
     spread = models.FloatField(null=True, blank=True)
     reset_freq = models.CharField(max_length=16, validators=[RegexValidator], null=True, blank=True)
@@ -340,8 +343,7 @@ class SwapLeg(models.Model):
         sch = ql.MakeSchedule(to_qlDate(self.effective_date), to_qlDate(self.maturity_date), ql.Period(self.payment_freq), calendar=ql.UnitedStates())
         # to be genalize cdr
         if self.index:
-            #leg_idx = self.index.get_index(ref_date=as_of, fixing_since=(datetime.datetime.strptime('2021-11-04', '%Y-%m-%d'))) # need to fix
-            leg_idx = self.index.get_index(ref_date=as_of, fixing_since=self.trade.trade_date if self.trade else datetime.date.today()) # need to fix
+            leg_idx = self.index.get_index(ref_date=as_of, eff_date=self.effective_date) # need to fix
             leg = ql.IborLeg([self.notional], sch, leg_idx, QL_DAY_COUNTER[self.day_counter], fixingDays=[leg_idx.fixingDays()], spreads=[float(self.spread or 0.0)])
             # temp=pd.DataFrame([{
             # 'fixingDate': cf.fixingDate().ISO(),

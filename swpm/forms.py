@@ -69,6 +69,7 @@ class SwapLegForm(ModelForm):
             }
         labels = {
             'pay_rec': 'Pay/Receive', 
+            'calendar': 'Payment Calendar'
         }
     def clean(self):
         cleaned_data = super().clean()
@@ -130,7 +131,7 @@ class UploadFileForm(forms.Form):
     file = forms.FileField()
 
 class YieldCurveSearchForm(forms.Form):
-    name__contains = forms.CharField(max_length=16, required=False)
+    name__contains = forms.CharField(max_length=16, required=False, label='Name')
     ref_date = forms.DateField(widget=DateInput(attrs={'type': 'date'}), required=False, label='Date')
     ccy = forms.ModelChoiceField(Ccy.objects.all(), required=False, label='Currency')
 
