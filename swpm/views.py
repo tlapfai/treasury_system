@@ -16,8 +16,9 @@ import datetime
 import json
 import pandas as pd
 
-import dash_core_components as dcc
-import dash_html_components as html
+#import dash_core_components as dcc
+#import dash_html_components as html
+from dash import dcc, html
 from django_plotly_dash import DjangoDash
 import plotly.express as px
 
