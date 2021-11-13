@@ -16,8 +16,8 @@ import datetime
 import json
 import pandas as pd
 
-from dash import html
-from dash import dcc
+import dash_core_components as dcc
+import dash_html_components as html
 from django_plotly_dash import DjangoDash
 import plotly.express as px
 
@@ -28,7 +28,6 @@ def str2date(s):
         return datetime.datetime.strptime(str(s), '%Y%m%d')
 
 def index(request):
-    mytime = timezone.now()
     myform = CcyPairForm()
     myFXOform = FXOForm(initial={'trade_date': datetime.date.today()})
     #trade_detail_form = TradeDetailForm()
