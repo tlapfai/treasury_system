@@ -16,9 +16,10 @@ import datetime
 import json
 import pandas as pd
 
-from dash import html
-from dash import dcc
 from django_plotly_dash import DjangoDash
+import dash_core_components as dcc
+import dash_html_components as html
+from dash.dependencies import Input, Output
 import plotly.express as px
 
 def str2date(s):
