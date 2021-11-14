@@ -10,17 +10,19 @@ from django.core.serializers import serialize
 from django.template import Context
 from django.forms import modelformset_factory
 
+from django_plotly_dash import DjangoDash
+import dash_core_components as dcc
+import dash_html_components as html
+from dash.dependencies import Input, Output
+import plotly.express as px
+
 from .models import *
 from .forms import *
 import datetime
 import json
 import pandas as pd
 
-from django_plotly_dash import DjangoDash
-import dash_core_components as dcc
-import dash_html_components as html
-from dash.dependencies import Input, Output
-import plotly.express as px
+
 
 def str2date(s):
     if len(s) == 10:
