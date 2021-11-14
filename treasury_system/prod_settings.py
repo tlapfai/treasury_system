@@ -3,6 +3,7 @@
 from .settings import *
 import django_heroku
 import dj_database_url
+import environ
 
 DEBUG = False
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', SECRET_KEY)
@@ -12,8 +13,12 @@ ALLOWED_HOSTS = ['treasury-system.herokuapp.com']
 # Activate Django-Heroku.
 django_heroku.settings(locals())
 
+env = environ.Env(
+    # set casting, default value
+    DEBUG=(bool, False)
+)
 DATABASES = {
-    'default': dj_database_url.config(),
+    'default': env.db(),
 }
 
 # Static asset configuration.
