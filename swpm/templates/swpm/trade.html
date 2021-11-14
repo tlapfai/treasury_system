@@ -4,56 +4,94 @@
 
 {% block body %}
 <div class="row">
-	<div class="trade-ticket col-md-8">
+	<div class="trade-ticket col-md-8" style="border: skyblue; border-style: solid;">
 		<form action="{% url 'pricing' %}" method="post">
+			{% csrf_token %}
 			<fieldset>
 				<legend>{{ trade_type }}</legend>
 				{% if valuation_message %}
 					<span>{{ valuation_message }}</span>
 				{% endif %}
-				<table style="width: auto;">
-					{{ as_of_form.as_table }}
-					{% if trade_forms %}
-						{{ swap_form }}
-						<table class="swap-leg">
-							<tbody>
-								<tr>
-									<th>Leg1</th>
-									<th>Leg2</th>
-								</tr>
-								<tr>
-									{% for f in trade_forms %}
-									<td>
-										<table>{{ f.as_table }}</table>
-									</td>
-									{% endfor %}
-									{{ trade_forms.management_form }}
-								</tr>
-							</tbody>
-						</table>
-					{% else %}
-						{{ trade_form.as_table }}
-					{% endif %}
-				</table>
-				<input type="hidden" name="trade_type" value="{{ trade_type }}">
-				<input type="hidden" name="origin_page" value="{{ request.path }}">
-				<button type="submit" class="btn btn-primary">Price</button>
-				{% if user.is_authenticated %}
-				<button type="submit" class="btn btn-primary" formaction="{% url 'pricing-do' %}">Do</button>
-				{% endif %}
+				<!-- tab set start -->
+				<nav>
+					<ul class="nav nav-tabs" id="ticketTab" role="tablist">
+						<li class="nav-item" role="presentation">
+						  <button class="nav-link active" id="terms-tab" data-bs-toggle="tab" data-bs-target="#terms" type="button" role="tab" aria-controls="terms" aria-selected="true">Terms</button>
+						</li>
+						<li class="nav-item" role="presentation">
+						  <button class="nav-link" id="profile-tab" data-bs-toggle="tab" data-bs-target="#profile" type="button" role="tab" aria-controls="profile" aria-selected="false">Profile</button>
+						</li>
+						<li class="nav-item" role="presentation">
+						  <button class="nav-link" id="mktdata-tab" data-bs-toggle="tab" data-bs-target="#mktdata" type="button" role="tab" aria-controls="mktdata" aria-selected="false">Market Data</button>
+						</li>
+					  </ul>
+					<div class="tab-content" id="ticketTabContent">
+						<!-- terms contents start -->
+						<div class="tab-pane fade show active" id="terms" role="tabpanel" aria-labelledby="terms-tab">
+							<button type="submit" class="btn btn-primary" formaction="{% url 'load_market_data' %}">Load Market Data</button>
+							<button type="submit" class="btn btn-primary">Price</button>
+							{% if user.is_authenticated %}
+								<button type="submit" class="btn btn-primary" formaction="{% url 'pricing-do' %}">Do</button>
+							{% endif %}
+							<!-- table for form start -->
+							<table style="width: 100%; border: solid 2px red;">
+								<table style="width: 100%; border: solid 2px black;">{{ as_of_form.as_table }}</table>
+								{% if trade_forms %}
+									<table style="width: 100%; border: solid 2px orange;">{{ swap_form }}</table>
+									<table class="swap-legs" style="width:100%; border: solid 2px palevioletred;">
+										<tbody>
+											<tr>
+												<th>Leg 1</th>
+												<th>Leg 2</th>
+											</tr>
+											<tr>
+												{% for f in trade_forms %}
+												<td>
+													<table>{{ f.as_table }}</table>
+												</td>
+												{% endfor %}
+												{{ trade_forms.management_form }}
+											</tr>
+										</tbody>
+									</table>
+								{% else %}
+									<table style="width: 100%; border: solid 2px orange;">
+										{{ trade_form.as_table }}
+									</table>
+								{% endif %}
+								<input type="hidden" name="trade_type" value="{{ trade_type }}">
+								<input type="hidden" name="origin_page" value="{{ request.path }}">
+								
+							</table>
+							<!-- table for form end   -->
+						</div>
+						<!-- terms contents end   -->
+						<div class="tab-pane fade" id="profile" role="tabpanel" aria-labelledby="profile-tab">
+							<table>
+								TEMP
+							</table>
+						</div>
+						<div class="tab-pane fade" id="mktdata" role="tabpanel" aria-labelledby="mktdata-tab">
+							<table>
+								{{ market_data_form.fx_spot.as_table }}
+							</table>
+						</div>
+					</div>
+				<!-- tab set end  -->
+				</nav>
 			</fieldset>
 		</form>
 	</div>
 	<!--End of class="trade-ticket">-->
 
-	<div class='valuation col-md-4'>
-		<table class='valuation-table' style="width: auto;">
+	<div class='valuation col-md-4' style="border: skyblue; border-style: solid;">
+		<table class='valuation-table' style="width: 100%;">
 			<fieldset>
 				<legend>Valuation</legend>
 				{{ val_form.as_table }}
 			</fieldset>
 		</table>
-	</div>
+	</div> <!-- end of class='valuation'-->
 
 </div>
 <!-- end of class="row"-->
@@ -64,9 +102,9 @@
 {% block script %}
 
 <script src="{% static 'swpm/jquery-3.6.0.slim.min.js' %}"></script>
-<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+<!-- <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
 <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/2.4.4/cjs/popper.min.js"></script>
-<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script> -->
 	
 <script src="https://unpkg.com/bootstrap-table@1.18.3/dist/bootstrap-table.min.js"></script>
 

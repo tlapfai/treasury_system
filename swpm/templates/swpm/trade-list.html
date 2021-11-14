@@ -6,6 +6,7 @@
 		<div>
 			<legend>Search Trade</legend>
 			<form action="{% url 'trade_list' %}" method="post">
+				{% csrf_token %}
 				{{ form }}
 				<button type="submit" class="btn btn-primary">Search</button>
 			</form>

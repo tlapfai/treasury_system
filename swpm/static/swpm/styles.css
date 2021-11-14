@@ -28,15 +28,7 @@
   border: solid rgba(52, 122, 250, 0.699);
 }
 
-.valuation-table + th {
-	text-align: left;
-	border: solid skyblue;
-}
 
-.valuation-table + td {
-	text-align: right;
-	border: solid skyblue;
-}
 
 .loader {
   border: 16px solid #f3f3f3; /* Light grey */
@@ -67,4 +59,23 @@
 
 .interest-rate-data, .search-result {
   font-size: x-small;
+}
+
+/* trade */
+.valuation-table + th {
+	text-align: left;
+	border: solid skyblue;
+}
+
+.valuation-table + td {
+	text-align: right;
+	border: solid skyblue;
+}
+
+input:invalid, select:invalid {
+  border: 2px solid red;
+}
+
+div#mktdata select#id_ccy_pair {
+  pointer-events: none;
 }

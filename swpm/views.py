@@ -1,4 +1,4 @@
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import REDIRECT_FIELD_NAME, authenticate, login, logout
 from django.db.models.query import RawQuerySet
 from django.shortcuts import redirect, render
 from django.db import IntegrityError
@@ -48,6 +48,7 @@ def login_view(request):
         if user is not None:
             login(request, user)
             return HttpResponseRedirect(reverse("index"))
+            #return redirect(request.POST.get('next'))
         else:
             return render(request, "swpm/login.html", {
                 "message": "Invalid username and/or password."
@@ -89,36 +90,43 @@ def register(request):
 def trade(request, **kwargs):
     as_of_form = AsOfForm(initial={'as_of': datetime.date.today()})
     valuation_message = kwargs.get('valuation_message')
-    if kwargs['inst'] == "fxo":
-        trade_type = "FX Option"
-        val_form = FXOValuationForm()
-        if kwargs.get('trade_form'):
-            trade_form = kwargs['trade_form']
-            as_of_form = kwargs['as_of_form']
-            val_form = kwargs.get('val_form')
+    try:
+        inst = kwargs['inst']
+    except KeyError:
+        return HttpResponseNotFound('<h1>Page not found</h1>')
+    else:
+        if inst == "fxo":
+            trade_type = "FX Option"
+            val_form = FXOValuationForm()
+            if kwargs.get('trade_form'):
+                trade_form = kwargs['trade_form']
+                as_of_form = kwargs['as_of_form']
+                val_form = kwargs.get('val_form')
+                market_data_form = kwargs.get('market_data_form')
+            else:
+                trade_form = FXOForm(initial={'trade_date': datetime.date.today()})
+        elif kwargs['inst'] == 'swap':
+            trade_type = "Swap"
+            if kwargs.get('trade_form'):
+                swap_form = kwargs.get('trade_form')
+                as_of_form = kwargs.get('as_of_form')
+                trade_forms= kwargs.get('trade_forms')
+                val_form = kwargs.get('val_form')
+            else:
+                SwapLegFormSet = modelformset_factory(SwapLeg, SwapLegForm, extra=2)
+                trade_forms = SwapLegFormSet(queryset=SwapLeg.objects.none(), initial=[{'maturity_date': datetime.date.today()+datetime.timedelta(days=365)}])
+                swap_form = SwapForm(initial={'trade_date': datetime.date.today()})
+                val_form = SwapValuationForm()
         else:
-            trade_form = FXOForm(initial={'trade_date': datetime.date.today()})
-    elif kwargs['inst'] == 'swap':
-        trade_type = "Swap"
-        if kwargs.get('trade_form'):
-            swap_form = kwargs.get('trade_form')
-            as_of_form = kwargs.get('as_of_form')
-            trade_forms= kwargs.get('trade_forms')
-            val_form = kwargs.get('val_form')
-        else:
-            SwapLegFormSet = modelformset_factory(SwapLeg, SwapLegForm, extra=2)
-            trade_forms = SwapLegFormSet(queryset=SwapLeg.objects.none(), initial=[{'maturity_date': datetime.date.today()+datetime.timedelta(days=365)}])
-            swap_form = SwapForm(initial={'trade_date': datetime.date.today()})
-            val_form = SwapValuationForm()
-
-    return render(request, "swpm/trade.html", locals())
+            return HttpResponseNotFound('<h1>Page not found</h1>')
+        return render(request, "swpm/trade.html", locals())
 
 
-@csrf_exempt
 def trade_list(request):
     if request.method=='POST':
         form = TradeSearchForm(request.POST)
         form_ = dict([ (x[0], x[1]) for x in form.data.dict().items() if len(x[1])>0 ])
+        form_.pop('csrfmiddlewaretoken')
         trades1 = list(FXO.objects.filter(**form_).values())
         trades2 = list(Swap.objects.filter(**form_).values())
         search_result = trades1 + trades2
@@ -126,8 +134,34 @@ def trade_list(request):
     else:
         return render(request, 'swpm/trade-list.html', {'form': TradeSearchForm()})
 
+def load_market_data(request, pricing=False):
+    if request.method == 'POST':
+        as_of = request.POST['as_of']
+        as_of_form = AsOfForm(request.POST)
+        ql.Settings.instance().evaluationDate = ql.Date(as_of,'%Y-%m-%d')
+        val_form = FXOValuationForm()
+        market_data = {}
+        if request.POST['trade_type'] == 'FX Option':
+            inst = 'fxo'
+            trade_form = FXOForm(request.POST, instance=FXO())
+            try:
+                ccy_pair = CcyPair.objects.get(name=trade_form.data['ccy_pair'])
+                fx_spot_quote = FxSpotRateQuote.objects.get(ref_date=as_of, ccy_pair=ccy_pair)
+            except AttributeError:
+                valuation_message = 'Cannot find market data'
+                if pricing:
+                    return None
+                else:
+                    return trade(request, as_of_form=as_of_form, inst=inst, trade_form=trade_form, val_form=val_form, valuation_message=valuation_message)
+            else:
+                market_data['fx_spot'] = FxSpotRateQuoteForm(instance=fx_spot_quote)
+        if pricing:
+            return market_data
+        else:
+            return trade(request, as_of_form=as_of_form, inst=inst, trade_form=trade_form, val_form=val_form, market_data_form=market_data)
+            
 
-@csrf_exempt
+
 def pricing(request, commit=False):
     if request.method == 'POST':
         as_of = request.POST['as_of']
@@ -136,20 +170,29 @@ def pricing(request, commit=False):
         valuation_message = None
         if request.POST['trade_type'] == 'FX Option':
             fxo_form = FXOForm(request.POST, instance=FXO())
+            market_data_form = load_market_data(request, pricing=True)
+            if market_data_form == None:
+                return trade(request, inst='fxo', 
+                        trade_form=fxo_form, 
+                        as_of_form=as_of_form, 
+                        val_form=FXOValuationForm(), 
+                        valuation_message="Market data is not sufficient")
+
             if fxo_form.is_valid():
                 tr = fxo_form.save(commit=False)
-                if commit and request.POST.get('book') and request.POST.get('counterparty'):
-                    tr.input_user = request.user
-                    tr.detail = TradeDetail.objects.create()
-                    tr.save()
-                    valuation_message = f"Trade is done, ID is {tr.id}."
-
                 inst = tr.instrument()
                 engine = tr.make_pricing_engine(as_of)
                 inst.setPricingEngine(engine)
                 side = 1.0 if tr.buy_sell=="B" else -1.0
                 # will get full market data
                 spot = tr.ccy_pair.rates.get(ref_date=as_of).rate
+
+                if commit and request.POST.get('book') and request.POST.get('counterparty'):
+                    # need to check market data
+                    tr.input_user = request.user
+                    tr.detail = TradeDetail.objects.create()
+                    tr.save()
+                    valuation_message = f"Trade is done, ID is {tr.id}."
     
                 result = {'npv': inst.NPV(), 
                             'delta': inst.delta(),
@@ -165,7 +208,12 @@ def pricing(request, commit=False):
             else:
                 valuation_form = FXOValuationForm()
             
-            return trade(request, inst='fxo', trade_form=fxo_form, as_of_form=as_of_form, val_form=valuation_form, valuation_message=valuation_message)
+            return trade(request, inst='fxo', 
+                        trade_form=fxo_form, 
+                        as_of_form=as_of_form, 
+                        val_form=valuation_form, 
+                        market_data_form=market_data_form, 
+                        valuation_message=valuation_message)
         elif request.POST.get('trade_type') == 'Swap':
             SwapLegFormSet = modelformset_factory(SwapLeg, SwapLegForm, extra=2)
             swap_leg_form_set = SwapLegFormSet(request.POST)

@@ -1,14 +1,24 @@
-from django.forms import ModelForm, modelformset_factory, SelectDateWidget, DateInput, NumberInput, ModelMultipleChoiceField
+from django.db.models import fields
+from django.forms import ModelForm, modelformset_factory, SelectDateWidget, DateInput, NumberInput, ModelMultipleChoiceField, widgets
 from django import forms
-from django.forms.models import BaseModelFormSet
+from django.forms.models import BaseModelFormSet, ModelChoiceField
 from django.utils.translation import gettext as _
 import datetime
+
+from django_plotly_dash.dash_wrapper import wid2str
 from .models import *
 
 class CcyPairForm(ModelForm):
     class Meta:
         model = CcyPair
         fields = '__all__'
+
+class FxSpotRateQuoteForm(ModelForm):
+    class Meta:
+        model = FxSpotRateQuote
+        fields = ['ccy_pair', 'rate']
+        widgets = {
+        }
         
 class IRTermStructureForm(ModelForm):
     class Meta:
