@@ -36,7 +36,6 @@ class FXOForm(ModelForm):
         widgets = {
             'trade_date': DateInput(attrs={'type': 'date'}),
             'maturity_date': DateInput(attrs={'type': 'date'}),
-            'strike_price': NumberInput(attrs={'step': '0.0001'}), 
             }
         labels = {
             'buy_sell': 'Buy/Sell',
@@ -51,7 +50,7 @@ class FXOForm(ModelForm):
         notional_1 = cleaned_data.get('notional_1')
         notional_2 = cleaned_data.get('notional_2')
         option_type = cleaned_data.get('type')
-        if option_type=="EUR" and abs(strike_price*notional_1 - notional_2)>1.0 :
+        if option_type=="EUR" and abs(strike_price*notional_1 - notional_2)>0.1 :
             raise ValidationError(_('Strike and notionals do not match.'), code='unmatch1')
 
     #def __init__(self, *args, **kwargs):

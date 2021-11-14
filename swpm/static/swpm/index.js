@@ -5,9 +5,28 @@ document.addEventListener('DOMContentLoaded', function() {
         $('.ccypair button').toggle();
     });
 
+    $('#id_notional_1').change( () => {
+      if ( $.isNumeric($('#id_notional_2').val()) ) {
+        $('#id_strike_price').val( ($('#id_notional_2').val()/$('#id_notional_1').val()).toFixed(10) )
+		  }
+    });
+    $('#id_notional_2').change( () => {
+      if ( $.isNumeric($('#id_notional_1').val()) ) {
+        $('#id_strike_price').val( ($('#id_notional_2').val()/$('#id_notional_1').val()).toFixed(10) )
+		  }
+    });
+    $('#id_strike_price').change( () => {
+      if ( $.isNumeric($('#id_notional_1').val()) ) {
+        $('#id_notional_2').val( ($('#id_notional_1').val()*$('#id_strike_price').val()).toFixed(2) )
+		  }
+      else if ( $.isNumeric($('#id_notional_2').val()) ) {
+        $('#id_notional_1').val( ($('#id_notional_2').val()/$('#id_strike_price').val()).toFixed(2) )
+		  }
+    });
+
     document.querySelectorAll('legend')[0].addEventListener('click', () =>{
         const effective_date = new Date();
-		effective_date.setDate(effective_date.getDate()+2);
+		    effective_date.setDate(effective_date.getDate()+2);
         var oneyear = new Date();
         oneyear.setFullYear(oneyear.getFullYear()+1);
 		    oneyear.setDate(oneyear.getDate()+2);

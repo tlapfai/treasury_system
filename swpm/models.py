@@ -337,10 +337,10 @@ class SwapLeg(models.Model):
     spread = models.FloatField(null=True, blank=True)
     reset_freq = models.CharField(max_length=16, validators=[RegexValidator], null=True, blank=True)
     payment_freq = models.CharField(max_length=16, validators=[RegexValidator])
-    calendar = models.ForeignKey(Calendar, SET_NULL, null=True, blank=True)
+    calendar = models.ForeignKey(Calendar, CASCADE)
     day_counter = models.CharField(max_length=16, choices=DAY_COUNTER.choices)
     def leg(self, as_of):
-        sch = ql.MakeSchedule(to_qlDate(self.effective_date), to_qlDate(self.maturity_date), ql.Period(self.payment_freq), calendar=ql.UnitedStates())
+        sch = ql.MakeSchedule(to_qlDate(self.effective_date), to_qlDate(self.maturity_date), ql.Period(self.payment_freq), calendar=self.calendar.calendar())
         # to be genalize cdr
         if self.index:
             leg_idx = self.index.get_index(ref_date=as_of, eff_date=self.effective_date) # need to fix
