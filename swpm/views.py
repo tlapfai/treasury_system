@@ -287,11 +287,16 @@ def reval(request):
     else:
         return render(request, 'swpm/reval.html', {'reval_form': RevalForm(initial={'reval_date': datetime.date.today()})})
 
-def handle_uploaded_file(f):
+def handle_uploaded_file(f=None, text=None):
     #assume all dates are same
     msg = []
-    #iter = 1
-    df = pd.read_csv(f)
+    if f:
+        df = pd.read_csv(f)
+    elif text:
+        lines = text.split('\r\n')
+        temp = [line.split(',') for line in lines]
+        df = pd.DataFrame(temp[1:], columns=temp[0])
+
     if set(df.columns) == {'Instrument', 'Ccy', 'Date', 'Market Rate', 'Curve', 'Term', 'Day Counter'}:
         for idx, row in df.iterrows():
             arg_ = {'name': row['Curve'], 'ref_date': str2date(row['Date']), 'ccy': Ccy.objects.get(code=row['Ccy'])}
@@ -304,14 +309,14 @@ def handle_uploaded_file(f):
             yts, temp_ = IRTermStructure.objects.update_or_create(**arg_, defaults=arg_upd)
             if row['Term'][:2] == 'ED':
                 row['Term'] = row['Term'][:4]
-                row['Market Rate'] = 100*float(row['Market Rate'])
+                row['Market Rate'] = 100.0*float(row['Market Rate'])
             r, temp_ = RateQuote.objects.update_or_create(name=row['Curve']+' '+row['Term'], 
                                                                 ref_date=str2date(row['Date']), 
                                                                 defaults={ 'tenor': row['Term'], 
                                                                         'instrument': row['Instrument'], 
                                                                         'ccy': Ccy.objects.get(code=row['Ccy']), 
                                                                         'day_counter': row['Day Counter'], 
-                                                                        'rate': row['Market Rate']*0.01 }
+                                                                        'rate': float(row['Market Rate'])*0.01 }
                                                             )
             yts.rates.add(r)
             msg.append(str(r))
@@ -322,8 +327,10 @@ def handle_uploaded_file(f):
 @csrf_exempt
 def market_data_import(request):
     if request.method == 'POST':
-        #form = UploadFileForm(request.POST, request.FILES)
-        message = handle_uploaded_file(request.FILES['file'])
+        if request.FILES.get('file'):
+            message = handle_uploaded_file(request.FILES['file'])
+        elif request.POST.get('text'):
+            message = handle_uploaded_file(text=request.POST['text'])
         return render(request, 'swpm/market_data_import.html', {'upload_file_form': UploadFileForm(), 'message': message})
     else:
         form = UploadFileForm()

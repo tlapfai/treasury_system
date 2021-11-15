@@ -125,7 +125,7 @@ class IRTermStructure(models.Model):
     as_fx_curve = models.ForeignKey(Ccy, CASCADE, related_name="fx_curve", null=True)
     as_rf_curve = models.ForeignKey(Ccy, CASCADE, related_name="rf_curve", null=True)
     class Meta:
-        unique_together = ('name', 'ref_date')
+        unique_together = ('name', 'ref_date', 'ccy')
     def term_structure(self):
         helpers = [rate.helper() for rate in self.rates.all()]
         yts = ql.PiecewiseLogLinearDiscount(to_qlDate(self.ref_date), helpers, ql.Actual360())

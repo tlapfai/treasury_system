@@ -137,7 +137,8 @@ class RevalForm(forms.Form):
     portfolios = forms.ModelMultipleChoiceField(Portfolio.objects.all(), required=False)
 
 class UploadFileForm(forms.Form):
-    file = forms.FileField()
+    file = forms.FileField(required=False)
+    text = forms.CharField(widget=forms.Textarea, required=False)
 
 class YieldCurveSearchForm(forms.Form):
     name__contains = forms.CharField(max_length=16, required=False, label='Name')
