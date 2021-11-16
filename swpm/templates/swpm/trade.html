@@ -3,14 +3,14 @@
 {% load humanize %}
 
 {% block body %}
-<div class="row">
+<div class="row container-fluid">
 	<div class="trade-ticket col-md-8" style="border: skyblue; border-style: solid;">
 		<form action="{% url 'pricing' %}" method="post">
 			{% csrf_token %}
 			<fieldset>
 				<legend>{{ trade_type }}</legend>
 				{% if valuation_message %}
-					<span>{{ valuation_message }}</span>
+					<div class="callout"><span>{{ valuation_message }}</span></div>
 				{% endif %}
 				<!-- tab set start -->
 				<nav>
@@ -70,9 +70,14 @@
 							<table>
 								<h4>Cashflows</h4>
 								{% for leg in leg_cf %}
+									<table>
 									{% for cf in leg %}
-										<li>{{ cf.0 }}</li>
+										<tr>
+											<th>{{ cf.0 }}</th>
+											<td>{{ cf.1 |floatformat:2 }}</td>
+										</tr>
 									{% endfor %}
+									</table>
 								{% endfor %}
 							</table>
 						</div>
