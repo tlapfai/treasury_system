@@ -3,7 +3,7 @@
 {% load humanize %}
 
 {% block body %}
-		<div>
+		<div class="container-fluid">
 			<legend>Search Trade</legend>
 			<form action="{% url 'trade_list' %}" method="post">
 				{% csrf_token %}
@@ -12,12 +12,13 @@
 			</form>
 		</div>
 
-		<div>
+		<div class="container-fluid">
 			<fieldset>
 				<table class='trade-list'  data-toggle="table">
 					<thead>
 						<tr>
 							<th data-field="tradeid" data-sortable="true">Trade ID</th>
+							<th data-field="producttype" data-sortable="true">Product Type</th>
 							<th data-field="ccypair" data-sortable="true">Currency Pair</th>
 							<th>Type</th>
 							<th>CP</th>
@@ -33,7 +34,8 @@
 					<tbody>
 						{% for t in search_result %}
 							<tr>
-								<td class='tradeid'><a href="trade/{{ t.id }}">{{ t.id }}</a></td>
+								<td class='tradeid'><a href="trade/{{ t.product_type }}/{{ t.id }}">{{ t.id }}</a></td>
+								<td class='tradeid'>{{ t.product_type }}</td>
 								<td class='ccypair'>{{ t.ccy_pair_id }}</td>
 								<td class='type'>{{ t.type }}</td>
 								<td class='cp'>{{ t.cp }}</td>
