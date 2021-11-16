@@ -94,9 +94,7 @@ def trade(request, **kwargs):
     as_of_form = AsOfForm(initial={'as_of': datetime.date.today()})
     valuation_message = kwargs.get('valuation_message')
     try:
-        print(kwargs)
         inst = kwargs['inst'].upper()
-        print(inst)
     except KeyError:
         return HttpResponseNotFound('<h1>Product type not found</h1>')
     else:
@@ -123,16 +121,28 @@ def trade(request, **kwargs):
         elif inst == 'SWAP':
             trade_type = "Swap"
             if kwargs.get('trade_form'):
-                swap_form = kwargs.get('trade_form')
+                # locals().update(kwargs)
+                trade_form = kwargs.get('trade_form')
                 as_of_form = kwargs.get('as_of_form')
                 trade_forms= kwargs.get('trade_forms')
                 val_form = kwargs.get('val_form')
                 leg_cf = kwargs.get('leg_cf')
             else:
-                SwapLegFormSet = modelformset_factory(SwapLeg, SwapLegForm, extra=2)
-                trade_forms = SwapLegFormSet(queryset=SwapLeg.objects.none(), initial=[{'maturity_date': datetime.date.today()+datetime.timedelta(days=365)}])
-                swap_form = SwapForm(initial={'trade_date': datetime.date.today()})
                 val_form = SwapValuationForm()
+                trade_id = kwargs.get('id')
+                if trade_id:
+                    try:
+                        loaded_trade = Swap.objects.get(id=trade_id)
+                    except KeyError:
+                        return HttpResponseNotFound('<h1>Trade not found</h1>')
+                    else:
+                        trade_form = SwapForm(instance=loaded_trade)
+                        SwapLegFormSet = modelformset_factory(SwapLeg, SwapLegForm, extra=0)
+                        trade_forms = SwapLegFormSet(queryset=SwapLeg.objects.filter(trade=loaded_trade))  # to be fixed
+                else:
+                    SwapLegFormSet = modelformset_factory(SwapLeg, SwapLegForm, extra=2)
+                    trade_form = SwapForm(initial={'trade_date': datetime.date.today()})
+                    trade_forms = SwapLegFormSet(queryset=SwapLeg.objects.none(), initial=[{'maturity_date': datetime.date.today()+datetime.timedelta(days=365)}])
         else:
             return HttpResponseNotFound('<h1>Page not found</h1>')
         return render(request, "swpm/trade.html", locals())
@@ -238,15 +248,18 @@ def pricing(request, commit=False):
                 tr = swap_form.save(commit=False)
                 legs = swap_leg_form_set.save(commit=False)
                 leg_cf = []
+                leg_sch = []
+                for leg in legs:
+                    leg.trade = tr
+                    leg_cf.append([(c.date().ISO(), c.amount()) for c in leg.leg(as_of)])
+                    leg_sch.append([x[1].ISO() for x in enumerate(leg.get_schedule()) if x[0]>0])
                 if commit and request.POST.get('book') and request.POST.get('counterparty'):
                     tr.input_user = request.user
                     tr.detail = TradeDetail.objects.create()
                     tr.maturity_date = max([leg.maturity_date for leg in legs])
                     tr.save()
                     for leg in legs:
-                        leg.trade = tr
                         leg.save()
-                        leg_cf.append([(c.date().ISO(), c.amount()) for c in leg.leg(as_of)])
                     valuation_message = f"Trade is done, ID is {tr.id}."
                     inst = tr.instrument(as_of)
                     engine = tr.make_pricing_engine(as_of)
@@ -264,7 +277,7 @@ def pricing(request, commit=False):
             else:
                 return trade(request, inst='swap', trade_form=swap_form, as_of_form=as_of_form, trade_forms=swap_leg_form_set, val_form=SwapValuationForm())
             return trade(request, inst='swap', trade_form=swap_form, as_of_form=as_of_form, trade_forms=swap_leg_form_set, 
-                val_form=valuation_form, valuation_message=valuation_message, leg_cf=leg_cf)
+                val_form=valuation_form, valuation_message=valuation_message, leg_cf=leg_cf, leg_sch=leg_sch)
 
 @csrf_exempt                    
 def save_ccypair(request):

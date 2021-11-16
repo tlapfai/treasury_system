@@ -341,8 +341,10 @@ class SwapLeg(models.Model):
     payment_freq = models.CharField(max_length=16, validators=[RegexValidator])
     calendar = models.ForeignKey(Calendar, CASCADE)
     day_counter = models.CharField(max_length=16, choices=DAY_COUNTER.choices)
+    def get_schedule(self):
+        return ql.MakeSchedule(to_qlDate(self.effective_date), to_qlDate(self.maturity_date), ql.Period(self.payment_freq), calendar=self.calendar.calendar())
     def leg(self, as_of):
-        sch = ql.MakeSchedule(to_qlDate(self.effective_date), to_qlDate(self.maturity_date), ql.Period(self.payment_freq), calendar=self.calendar.calendar())
+        sch = self.get_schedule()
         # to be genalize cdr
         if self.index:
             leg_idx = self.index.get_index(ref_date=as_of, eff_date=self.effective_date) # need to fix

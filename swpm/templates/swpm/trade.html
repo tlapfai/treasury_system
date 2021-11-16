@@ -36,8 +36,8 @@
 							<!-- table for form start -->
 							<table style="width: 100%; border: solid 2px red;">
 								<table style="width: 100%; border: solid 2px black;">{{ as_of_form.as_table }}</table>
-								{% if trade_forms %}
-									<table style="width: 100%; border: solid 2px orange;">{{ swap_form }}</table>
+								{% if trade_forms %} <!-- has legs -->
+									<table style="width: 100%; border: solid 2px orange;">{{ trade_form }}</table>
 									<table class="swap-legs" style="width:100%; border: solid 2px palevioletred;">
 										<tbody>
 											<tr>
@@ -67,19 +67,21 @@
 						</div>
 						<!-- terms contents end   -->
 						<div class="tab-pane fade" id="profile" role="tabpanel" aria-labelledby="profile-tab">
-							<table>
-								<h4>Cashflows</h4>
+							<h4>Cashflows</h4>
+								<div class="row container-fluid">
 								{% for leg in leg_cf %}
-									<table>
+									<div class="col-md-6">
+									<table class="cashflow">
 									{% for cf in leg %}
 										<tr>
 											<th>{{ cf.0 }}</th>
-											<td>{{ cf.1 |floatformat:2 }}</td>
+											<td>{{ cf.1 |floatformat:2 | intcomma}}</td>
 										</tr>
 									{% endfor %}
 									</table>
+									</div> <!-- col-md-6 -->
 								{% endfor %}
-							</table>
+							</div>
 						</div>
 						<div class="tab-pane fade" id="mktdata" role="tabpanel" aria-labelledby="mktdata-tab">
 							<table>

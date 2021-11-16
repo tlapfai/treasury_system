@@ -79,3 +79,21 @@ input:invalid, select:invalid {
 div#mktdata select#id_ccy_pair {
   pointer-events: none;
 }
+
+table.cashflow {
+  border: solid black 1px;
+}
+
+table.cashflow th {
+  text-align: left;
+  border: solid black;
+  border-collapse: collapse;
+  min-width: 100px;
+}
+
+table.cashflow td {
+  text-align: right;
+  border: solid black;
+  border-collapse: collapse;
+  min-width: 100px;
+}
