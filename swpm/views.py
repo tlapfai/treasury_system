@@ -94,11 +94,13 @@ def trade(request, **kwargs):
     as_of_form = AsOfForm(initial={'as_of': datetime.date.today()})
     valuation_message = kwargs.get('valuation_message')
     try:
-        inst = kwargs['inst']
+        print(kwargs)
+        inst = kwargs['inst'].upper()
+        print(inst)
     except KeyError:
-        return HttpResponseNotFound('<h1>Page not found</h1>')
+        return HttpResponseNotFound('<h1>Product type not found</h1>')
     else:
-        if inst == "fxo":
+        if inst == "FXO":
             trade_type = "FX Option"
             val_form = FXOValuationForm()
             if kwargs.get('trade_form'):
@@ -107,8 +109,18 @@ def trade(request, **kwargs):
                 val_form = kwargs.get('val_form')
                 market_data_form = kwargs.get('market_data_form')
             else:
-                trade_form = FXOForm(initial={'trade_date': datetime.date.today()})
-        elif kwargs['inst'] == 'swap':
+                trade_id = kwargs.get('id')
+                if trade_id:
+                    #trade_form = FXOForm(initial={'trade_date': datetime.date.today()})
+                    try:
+                        loaded_trade = FXO.objects.get(id=trade_id)
+                    except KeyError:
+                        return HttpResponseNotFound('<h1>Trade not found</h1>')
+                    else:
+                        trade_form = FXOForm(instance=loaded_trade)
+                else:
+                    trade_form = FXOForm(initial={'trade_date': datetime.date.today()})
+        elif inst == 'SWAP':
             trade_type = "Swap"
             if kwargs.get('trade_form'):
                 swap_form = kwargs.get('trade_form')
