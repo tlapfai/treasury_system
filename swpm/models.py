@@ -264,6 +264,7 @@ class Trade(models.Model):
         
 
 class FXO(Trade):
+    product_type = models.CharField(max_length=12, default="FXO")
     maturity_date = models.DateField(null=False, default=datetime.date.today())
     buy_sell = models.CharField(max_length=1, choices=BUY_SELL)
     ccy_pair = models.ForeignKey(CcyPair, models.DO_NOTHING, null=False, related_name='options')
@@ -309,6 +310,7 @@ class FXO(Trade):
 
 class Swap(Trade):
     #objects = SwapManager()
+    product_type = models.CharField(max_length=12, default="SWAP")
     maturity_date = models.DateField(null=True, blank=True)
     def instrument(self, as_of):
         legs = [x.leg(as_of=as_of) for x in self.legs.all()] #maybe need to use x.leg(as_of=xxxxx)
