@@ -68,7 +68,12 @@
 						<!-- terms contents end   -->
 						<div class="tab-pane fade" id="profile" role="tabpanel" aria-labelledby="profile-tab">
 							<table>
-								TEMP
+								<h4>Cashflows</h4>
+								{% for leg in leg_cf %}
+									{% for cf in leg %}
+										<li>{{ cf.0 }}</li>
+									{% endfor %}
+								{% endfor %}
 							</table>
 						</div>
 						<div class="tab-pane fade" id="mktdata" role="tabpanel" aria-labelledby="mktdata-tab">

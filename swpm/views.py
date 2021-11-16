@@ -115,6 +115,7 @@ def trade(request, **kwargs):
                 as_of_form = kwargs.get('as_of_form')
                 trade_forms= kwargs.get('trade_forms')
                 val_form = kwargs.get('val_form')
+                leg_cf = kwargs.get('leg_cf')
             else:
                 SwapLegFormSet = modelformset_factory(SwapLeg, SwapLegForm, extra=2)
                 trade_forms = SwapLegFormSet(queryset=SwapLeg.objects.none(), initial=[{'maturity_date': datetime.date.today()+datetime.timedelta(days=365)}])
@@ -224,6 +225,7 @@ def pricing(request, commit=False):
             if swap_form.is_valid() and swap_leg_form_set.is_valid():
                 tr = swap_form.save(commit=False)
                 legs = swap_leg_form_set.save(commit=False)
+                leg_cf = []
                 if commit and request.POST.get('book') and request.POST.get('counterparty'):
                     tr.input_user = request.user
                     tr.detail = TradeDetail.objects.create()
@@ -232,6 +234,7 @@ def pricing(request, commit=False):
                     for leg in legs:
                         leg.trade = tr
                         leg.save()
+                        leg_cf.append([(c.date().ISO(), c.amount()) for c in leg.leg(as_of)])
                     valuation_message = f"Trade is done, ID is {tr.id}."
                     inst = tr.instrument(as_of)
                     engine = tr.make_pricing_engine(as_of)
@@ -245,12 +248,11 @@ def pricing(request, commit=False):
                     valuation_message = None
                 result = {'npv': inst.NPV(), 'leg1bpv': inst.legBPS(0), 'leg2bpv': inst.legBPS(1)}
                 result = dict([(x, round(y, 2)) for x, y in result.items()])
-                #for leg
                 valuation_form = SwapValuationForm(initial=result)
             else:
                 return trade(request, inst='swap', trade_form=swap_form, as_of_form=as_of_form, trade_forms=swap_leg_form_set, val_form=SwapValuationForm())
             return trade(request, inst='swap', trade_form=swap_form, as_of_form=as_of_form, trade_forms=swap_leg_form_set, 
-                val_form=valuation_form, valuation_message=valuation_message)
+                val_form=valuation_form, valuation_message=valuation_message, leg_cf=leg_cf)
 
 @csrf_exempt                    
 def save_ccypair(request):
