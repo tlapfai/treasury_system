@@ -110,10 +110,10 @@ class RateQuote(models.Model):
             if self.ccy.code == "USD":
                 swapIndex = ql.UsdLiborSwapIsdaFixAm(ql.Period(self.tenor))
                 return ql.SwapRateHelper(ql.QuoteHandle(ql.SimpleQuote(self.rate)), swapIndex)
-        #elif self.instrument == "OIS":
-        #    if self.ccy.code == "USD":
-        #        index = OvernightIndex(...)
-        #        swapIndex = ql.OvernightIndexedSwapIndex("EFFR", ql.Period(self.tenor), 2, "USD", index)
+        elif self.instrument == "OIS":
+            if self.ccy.code == "USD":
+                index = ql.OvernightIndex(...)
+                swapIndex = ql.OvernightIndexedSwapIndex("EFFR", ql.Period(self.tenor), 2, "USD", index)
     def __str__(self):
         return f"{self.name}: ({self.ccy}) as of {self.ref_date}: {self.rate}"
 
@@ -144,16 +144,22 @@ class RateIndex(models.Model):
     def __str__(self):
         return self.name
     def get_index(self, ref_date=None, eff_date=None):
-        if self.ccy.code+" "+self.index == 'USD LIBOR':
+        if self.name == 'USD LIBOR':
             idx_cls = ql.USDLibor
+        elif self.name == 'USD EFFR':
+            inx_cls = ql.OvernightIndex
+
         if ref_date:
-            yts = IRTermStructure.objects.get(name=self.yts, ref_date=ref_date).term_structure()
+                yts = IRTermStructure.objects.get(name=self.yts, ref_date=ref_date).term_structure()
+
+        if self.name == 'USD LIBOR':
             if yts:
                 idx_obj = idx_cls(ql.Period(self.tenor), ql.YieldTermStructureHandle(yts))
             else:
                 idx_obj = idx_cls(ql.Period(self.tenor))
-        else:
-            idx_obj = idx_cls(ql.Period(self.tenor))
+        elif self.name == 'USD EFFR':
+            if yts:
+                idx_obj = idx_cls('USD EFFR', 1, ql.USDCurrency, ql.Actual365Fixed(), ql.YieldTermStructureHandle(yts))
 
         if eff_date:
             first_fixing_date = idx_obj.fixingDate(to_qlDate(eff_date))
