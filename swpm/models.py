@@ -2,6 +2,7 @@ import datetime
 from QuantLib.QuantLib import PiecewiseLogLinearDiscount
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.db.models import query_utils
 from django.db.models.deletion import CASCADE, DO_NOTHING, SET_NULL, SET_DEFAULT
 from django.db.models.fields.related import ForeignKey
 from django.utils import timezone
@@ -24,12 +25,27 @@ SWAP_PAY_REC = [(-1, "Receive"), (1, "Pay")]
 
 BUY_SELL = [("B", "Buy"), ("S", "Sell")]
 
-DAY_COUNTER = models.TextChoices('DAY_COUNTER', ['Actual360', 'Actual365Fixed', 'ActualActual', 'Thirty360'])
-QL_DAY_COUNTER = {"Actual360": ql.Actual360(), 'Actual365Fixed': ql.Actual365Fixed(), 'ActualActual': ql.ActualActual(), 'Thirty360': ql.Thirty360()}
+CHOICE_DAY_COUNTER = models.TextChoices('DAY_COUNTER', ['Actual360', 'Actual365Fixed', 'ActualActual', 'Thirty360'])
+QL_DAY_COUNTER = {"Actual360": ql.Actual360(), 
+                'Actual365Fixed': ql.Actual365Fixed(), 
+                'ActualActual': ql.ActualActual(), 
+                'Thirty360': ql.Thirty360()}
+
+CHOICE_DAY_RULE = models.TextChoices('DAY_RULE', ['Following', 'ModifiedFollowing', 'Preceding', 'ModifiedPreceding', 'Unadjusted'])
+QL_DAY_RULE = {'Following': ql.Following, 
+            'ModifiedFollowing': ql.ModifiedFollowing, 
+            'Preceding': ql.Preceding, 
+            'ModifiedPreceding': ql.ModifiedPreceding, 
+            'Unadjusted': ql.Unadjusted}
 
 # https://docs.djangoproject.com/en/3.2/ref/models/fields/#enumeration-types
 
-CALENDAR_LIST = {'TARGET': ql.TARGET(), 'UnitedStates': ql.UnitedStates(), 'HongKong': ql.HongKong(), 'UnitedKingdom': ql.UnitedKingdom()}
+QL_CALENDAR = {'NullCalendar': ql.NullCalendar(),
+                'TARGET': ql.TARGET(), 
+                'UnitedStates': ql.UnitedStates(), 
+                'HongKong': ql.HongKong(), 
+                'UnitedKingdom': ql.UnitedKingdom()
+                }
 
 def validate_positive(value):
     if value <= 0:
@@ -51,7 +67,7 @@ class Calendar(models.Model):
     def __str__(self):
         return self.name
     def calendar(self):
-        return CALENDAR_LIST[self.name]
+        return QL_CALENDAR[self.name]
 
 class Ccy(models.Model):
     code = models.CharField(max_length=3, blank=False, primary_key=True)
@@ -96,24 +112,31 @@ class RateQuote(models.Model):
     tenor = models.CharField(max_length=5)
     instrument = models.CharField(max_length=5)
     ccy = models.ForeignKey(Ccy, CASCADE, related_name="rates")
-    day_counter = models.CharField(max_length=16, choices=DAY_COUNTER.choices)
+    day_counter = models.CharField(max_length=16, choices=CHOICE_DAY_COUNTER.choices)
+    #index = models.ForeignKey(RateIndex, DO_NOTHING, null=True, blank=True) # RateIndex is not defined yet above this model
     def helper(self):
+        q = ql.QuoteHandle(ql.SimpleQuote(self.rate))
+        tenor_ = None if self.instrument == "FUT" else ql.Period(self.tenor) 
         if self.instrument == "DEPO":
             fixing_days = self.ccy.fixing_days
             convention = ql.ModifiedFollowing
             ccy = Ccy.objects.get(code=self.ccy) #not used yet
-            return ql.DepositRateHelper(self.rate, ql.Period(self.tenor), fixing_days, ql.TARGET(), convention, False, QL_DAY_COUNTER[self.day_counter])
+            return ql.DepositRateHelper(self.rate, tenor_, fixing_days, ql.TARGET(), convention, False, QL_DAY_COUNTER[self.day_counter])
         elif self.instrument == "FUT":
             if self.tenor[:2] == 'ED':
-                return ql.FuturesRateHelper(ql.QuoteHandle(ql.SimpleQuote(self.rate)), ql.IMM.date(self.tenor[2:4]), ql.USDLibor(ql.Period('3M')))
+                return ql.FuturesRateHelper(q, ql.IMM.date(self.tenor[2:4]), ql.USDLibor(ql.Period('3M')))
         elif self.instrument == "SWAP":
             if self.ccy.code == "USD":
-                swapIndex = ql.UsdLiborSwapIsdaFixAm(ql.Period(self.tenor))
-                return ql.SwapRateHelper(ql.QuoteHandle(ql.SimpleQuote(self.rate)), swapIndex)
+                swapIndex = ql.UsdLiborSwapIsdaFixAm(tenor_)
+                return ql.SwapRateHelper(q, swapIndex)
         elif self.instrument == "OIS":
+            overnight_index = ql.OvernightIndex('USD EFFR', 0, ql.USDCurrency(), ql.UnitedStates(), ql.Actual365Fixed())
             if self.ccy.code == "USD":
-                index = ql.OvernightIndex(...)
-                swapIndex = ql.OvernightIndexedSwapIndex("EFFR", ql.Period(self.tenor), 2, "USD", index)
+                if self.tenor == '1D':
+                    return ql.DepositRateHelper(q, overnight_index)
+                else:
+                    swapIndex = ql.OvernightIndexedSwapIndex("EFFR", tenor_, 2, ql.USDCurrency(), overnight_index)
+                    return ql.OISRateHelper(2, tenor_, q, overnight_index)
     def __str__(self):
         return f"{self.name}: ({self.ccy}) as of {self.ref_date}: {self.rate}"
 
@@ -127,8 +150,9 @@ class IRTermStructure(models.Model):
     class Meta:
         unique_together = ('name', 'ref_date', 'ccy')
     def term_structure(self):
+        day_counter = ql.Actual365Fixed()
         helpers = [rate.helper() for rate in self.rates.all()]
-        yts = ql.PiecewiseLogLinearDiscount(to_qlDate(self.ref_date), helpers, ql.Actual360())
+        yts = ql.PiecewiseLogLinearDiscount(to_qlDate(self.ref_date), helpers, day_counter)
         yts.enableExtrapolation()
         return yts
     def __str__(self):
@@ -139,27 +163,31 @@ class RateIndex(models.Model):
     ccy = models.ForeignKey(Ccy, CASCADE, related_name="rate_indexes")
     index = models.CharField(max_length=16)
     tenor = models.CharField(max_length=16)
-    day_counter = models.CharField(max_length=16, choices=DAY_COUNTER.choices, null=True, blank=True)
+    day_counter = models.CharField(max_length=16, choices=CHOICE_DAY_COUNTER.choices, null=True, blank=True)
     yts = models.CharField(max_length=16, null=True, blank=True)
+    class Meta:
+        unique_together = ('name', 'tenor')
     def __str__(self):
         return self.name
     def get_index(self, ref_date=None, eff_date=None):
-        if self.name == 'USD LIBOR':
+        if 'USD LIBOR' in self.name:
             idx_cls = ql.USDLibor
-        elif self.name == 'USD EFFR':
-            inx_cls = ql.OvernightIndex
+        elif 'USD EFFR' in self.name:
+            idx_cls = ql.OvernightIndex
 
         if ref_date:
                 yts = IRTermStructure.objects.get(name=self.yts, ref_date=ref_date).term_structure()
 
-        if self.name == 'USD LIBOR':
+        if 'USD LIBOR' in self.name:
             if yts:
                 idx_obj = idx_cls(ql.Period(self.tenor), ql.YieldTermStructureHandle(yts))
             else:
                 idx_obj = idx_cls(ql.Period(self.tenor))
-        elif self.name == 'USD EFFR':
+        elif 'USD EFFR' in self.name:
             if yts:
-                idx_obj = idx_cls('USD EFFR', 1, ql.USDCurrency, ql.Actual365Fixed(), ql.YieldTermStructureHandle(yts))
+                idx_obj = idx_cls('USD EFFR', 1, ql.USDCurrency(), ql.Actual365Fixed(), ql.YieldTermStructureHandle(yts))
+            else:
+                idx_obj = idx_cls('USD EFFR', 1, ql.USDCurrency(), ql.Actual365Fixed())
 
         if eff_date:
             first_fixing_date = idx_obj.fixingDate(to_qlDate(eff_date))
@@ -345,27 +373,44 @@ class SwapLeg(models.Model):
     spread = models.FloatField(null=True, blank=True)
     reset_freq = models.CharField(max_length=16, validators=[RegexValidator], null=True, blank=True)
     payment_freq = models.CharField(max_length=16, validators=[RegexValidator])
-    calendar = models.ForeignKey(Calendar, CASCADE)
-    day_counter = models.CharField(max_length=16, choices=DAY_COUNTER.choices)
+    calendar = models.ForeignKey(Calendar, SET_DEFAULT, default=ql.NullCalendar())
+    day_counter = models.CharField(max_length=16, choices=CHOICE_DAY_COUNTER.choices)
+    day_rule = models.CharField(max_length=24, choices=CHOICE_DAY_RULE.choices, default='ModifiedFollowing')
     def get_schedule(self):
-        return ql.MakeSchedule(to_qlDate(self.effective_date), to_qlDate(self.maturity_date), ql.Period(self.payment_freq), calendar=self.calendar.calendar())
+        return ql.MakeSchedule(to_qlDate(self.effective_date), 
+                            to_qlDate(self.maturity_date), 
+                            ql.Period(self.payment_freq), 
+                            calendar=self.calendar.calendar())
     def leg(self, as_of):
         sch = self.get_schedule()
-        # to be genalize cdr
+        dc = QL_DAY_COUNTER[self.day_counter]
+        day_rule = QL_DAY_RULE[self.day_rule]
         if self.index:
             leg_idx = self.index.get_index(ref_date=as_of, eff_date=self.effective_date) # need to fix
-            leg = ql.IborLeg([self.notional], sch, leg_idx, QL_DAY_COUNTER[self.day_counter], fixingDays=[leg_idx.fixingDays()], spreads=[float(self.spread or 0.0)])
-            # temp=pd.DataFrame([{
-            # 'fixingDate': cf.fixingDate().ISO(),
-            # 'accrualStart': cf.accrualStartDate().ISO(),
-            # 'accrualEnd': cf.accrualEndDate().ISO(),
-            # "paymentDate": cf.date().ISO(),
-            # 'gearing': cf.gearing(),
-            # 'forward': cf.indexFixing(),
-            # 'rate': cf.rate(),
-            # "amount": cf.amount()
-            # } for cf in leg])
-        else:
+            if 'IBOR' in self.index.name:
+                leg = ql.IborLeg([self.notional], sch, leg_idx, dc, 
+                            paymentConvention=day_rule,
+                            fixingDays=[leg_idx.fixingDays()], 
+                            spreads=[float(self.spread or 0.0)])
+                # temp=pd.DataFrame([{
+                # 'fixingDate': cf.fixingDate().ISO(),
+                # 'accrualStart': cf.accrualStartDate().ISO(),
+                # 'accrualEnd': cf.accrualEndDate().ISO(),
+                # "paymentDate": cf.date().ISO(),
+                # 'gearing': cf.gearing(),
+                # 'forward': cf.indexFixing(),
+                # 'rate': cf.rate(),
+                # "amount": cf.amount()
+                # } for cf in leg])
+            elif 'OIS' in self.index.name:
+                leg = ql.OvernightLeg([self.notional], sch, leg_idx, dc, 
+                                        BusinessDayConvention=self.day_rule,
+                                        gearing=[1],
+                                        spread=self.spread,
+                                        TelescopicValueDates=True)
+            else:
+                pass # other floating leg
+        else: # self.index==None
             leg = ql.FixedRateLeg(sch, QL_DAY_COUNTER[self.day_counter], [self.notional], [self.fixed_rate*0.01])
 
         return leg
