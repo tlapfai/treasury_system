@@ -23,4 +23,4 @@ STATIC_ROOT = 'staticfiles'
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Turn off DEBUG mode.
-DEBUG = False
+#DEBUG = False

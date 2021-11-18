@@ -375,15 +375,19 @@ class SwapLeg(models.Model):
     spread = models.FloatField(null=True, blank=True)
     reset_freq = models.CharField(max_length=16, validators=[RegexValidator], null=True, blank=True)
     payment_freq = models.CharField(max_length=16, validators=[RegexValidator])
-    calendar = models.ForeignKey(Calendar, SET_DEFAULT, default=Calendar.objects.first().name)
+    calendar = models.ForeignKey(Calendar, SET_NULL, null=True, blank=True, default=None)
     day_counter = models.CharField(max_length=16, choices=CHOICE_DAY_COUNTER.choices)
     day_rule = models.CharField(max_length=24, choices=CHOICE_DAY_RULE.choices, default='ModifiedFollowing')
     def get_schedule(self):
+        if self.calendar:
+            cdr = self.calendar.calendar()
+        else:
+            cdr = ql.WeekendsOnly()
         return ql.MakeSchedule(to_qlDate(self.effective_date), 
                             to_qlDate(self.maturity_date), 
                             ql.Period(self.payment_freq), 
                             rule=QL_DAY_RULE(self.day_rule), 
-                            calendar=self.calendar.calendar())
+                            calendar=cdr)
     def leg(self, as_of):
         sch = self.get_schedule()
         dc = QL_DAY_COUNTER[self.day_counter]
