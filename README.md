@@ -31,3 +31,6 @@ combine two dict ==> dict1.update(dict2)
     comp_yts = ql.CompositeZeroYieldStructure(yts_handle_usd, yts_handle_ois, fun)
 
 https://github.com/lballabio/QuantLib/blob/d55b8b19a45ac265adff5daa25a6b524a994db7f/test-suite/termstructures.cpp#L399
+
+* Composite Quote (for FX etc.)
+https://rkapl123.github.io/QLAnnotatedSource/df/d48/class_quant_lib_1_1_composite_quote.html
