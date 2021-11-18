@@ -186,9 +186,9 @@ class RateIndex(models.Model):
                 idx_obj = idx_cls(ql.Period(self.tenor))
         elif 'USD EFFR' in self.name:
             if yts:
-                idx_obj = idx_cls('USD EFFR', 1, ql.USDCurrency(), ql.Actual365Fixed(), ql.YieldTermStructureHandle(yts))
+                idx_obj = idx_cls('USD EFFR', 1, ql.USDCurrency(), ql.Actual360(), ql.YieldTermStructureHandle(yts))
             else:
-                idx_obj = idx_cls('USD EFFR', 1, ql.USDCurrency(), ql.Actual365Fixed())
+                idx_obj = idx_cls('USD EFFR', 1, ql.USDCurrency(), ql.Actual360())
 
         if eff_date:
             first_fixing_date = idx_obj.fixingDate(to_qlDate(eff_date))
