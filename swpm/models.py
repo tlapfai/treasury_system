@@ -131,13 +131,14 @@ class RateQuote(models.Model):
                 swapIndex = ql.UsdLiborSwapIsdaFixAm(tenor_)
                 return ql.SwapRateHelper(q, swapIndex)
         elif self.instrument == "OIS":
-            overnight_index = ql.OvernightIndex('USD EFFR', 0, ql.USDCurrency(), ql.UnitedStates(), ql.Actual365Fixed())
+            overnight_index = ql.OvernightIndex('USD EFFR', 0, ql.USDCurrency(), ql.UnitedStates(), ql.Actual360())
             if self.ccy.code == "USD":
                 if self.tenor == '1D':
                     return ql.DepositRateHelper(q, overnight_index)
                 else:
-                    swapIndex = ql.OvernightIndexedSwapIndex("EFFR", tenor_, 2, ql.USDCurrency(), overnight_index)
-                    return ql.OISRateHelper(2, tenor_, q, overnight_index)
+                    settlementDays = 2
+                    swapIndex = ql.OvernightIndexedSwapIndex("EFFR", tenor_, settlementDays, ql.USDCurrency(), overnight_index) # not use??
+                    return ql.OISRateHelper(2, tenor_, q, overnight_index, paymentLag=0, paymentCalendar=ql.UnitedStates())
     def __str__(self):
         return f"{self.name}: ({self.ccy}) as of {self.ref_date}: {self.rate}"
 
