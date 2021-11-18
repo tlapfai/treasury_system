@@ -1,7 +1,5 @@
 test.py
 
-migrations/
-*.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

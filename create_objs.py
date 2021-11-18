@@ -67,10 +67,10 @@ for i in range(50):
         eurforex6m, _ = RateQuote.objects.update_or_create(name="EUR FOREX 6M", ref_date=d, tenor="6M", instrument="DEPO", ccy=eur, day_counter="Actual365Fixed", defaults={'rate': round(-0.001*xr, 4)})
         eurforex12m, _ = RateQuote.objects.update_or_create(name="EUR FOREX 12M", ref_date=d, tenor="12M", instrument="DEPO", ccy=eur, day_counter="Actual365Fixed", defaults={'rate': round(-0.0024*xr, 4)})
 
-        t, _ = IRTermStructure.objects.get_or_create(name="USD LIBOR", ref_date=d, as_fx_curve=usd, as_rf_curve=usd)
+        t, _ = IRTermStructure.objects.get_or_create(name="USD LIBOR", ref_date=d, ccy=usd, as_fx_curve=usd, as_rf_curve=usd)
         t.rates.add(usdlibor6m)
         t.rates.add(usdlibor12m)
-        t, _ = IRTermStructure.objects.get_or_create(name="EUR FOREX", ref_date=d, as_fx_curve=eur, as_rf_curve=eur)
+        t, _ = IRTermStructure.objects.get_or_create(name="EUR FOREX", ref_date=d, ccy=eur, as_fx_curve=eur, as_rf_curve=eur)
         t.rates.add(eurforex6m)
         t.rates.add(eurforex12m)
 
