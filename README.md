@@ -29,3 +29,5 @@ combine two dict ==> dict1.update(dict2)
     def fun(x, y):
         return (x - y)
     comp_yts = ql.CompositeZeroYieldStructure(yts_handle_usd, yts_handle_ois, fun)
+
+https://github.com/lballabio/QuantLib/blob/d55b8b19a45ac265adff5daa25a6b524a994db7f/test-suite/termstructures.cpp#L399
