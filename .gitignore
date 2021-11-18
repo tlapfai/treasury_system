@@ -1,6 +1,7 @@
 test.py
 
-swpm/migrations/*
+migrations/
+*.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
