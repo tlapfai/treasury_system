@@ -32,15 +32,16 @@ QL_DAY_COUNTER = {"Actual360": ql.Actual360(),
                 'Thirty360': ql.Thirty360()}
 
 CHOICE_DAY_RULE = models.TextChoices('DAY_RULE', ['Following', 'ModifiedFollowing', 'Preceding', 'ModifiedPreceding', 'Unadjusted'])
-QL_DAY_RULE = {'Following': ql.Following, 
-            'ModifiedFollowing': ql.ModifiedFollowing, 
-            'Preceding': ql.Preceding, 
-            'ModifiedPreceding': ql.ModifiedPreceding, 
-            'Unadjusted': ql.Unadjusted}
+QL_DAY_RULE = { 'Following': ql.Following, 
+                'ModifiedFollowing': ql.ModifiedFollowing, 
+                'Preceding': ql.Preceding, 
+                'ModifiedPreceding': ql.ModifiedPreceding, 
+                'Unadjusted': ql.Unadjusted}
 
 # https://docs.djangoproject.com/en/3.2/ref/models/fields/#enumeration-types
 
-QL_CALENDAR = {'NullCalendar': ql.NullCalendar(),
+QL_CALENDAR = { 'NullCalendar': ql.NullCalendar(), 
+                'WeekendsOnly': ql.WeekendsOnly(),
                 'TARGET': ql.TARGET(), 
                 'UnitedStates': ql.UnitedStates(), 
                 'HongKong': ql.HongKong(), 
@@ -63,7 +64,7 @@ class User(AbstractUser):
     pass
 
 class Calendar(models.Model):
-    name = models.CharField(max_length=16)
+    name = models.CharField(max_length=24, primary_key=True)
     def __str__(self):
         return self.name
     def calendar(self):
@@ -373,23 +374,23 @@ class SwapLeg(models.Model):
     spread = models.FloatField(null=True, blank=True)
     reset_freq = models.CharField(max_length=16, validators=[RegexValidator], null=True, blank=True)
     payment_freq = models.CharField(max_length=16, validators=[RegexValidator])
-    calendar = models.ForeignKey(Calendar, SET_DEFAULT, default=ql.NullCalendar())
+    calendar = models.ForeignKey(Calendar, SET_DEFAULT, default=Calendar.objects.first().name)
     day_counter = models.CharField(max_length=16, choices=CHOICE_DAY_COUNTER.choices)
     day_rule = models.CharField(max_length=24, choices=CHOICE_DAY_RULE.choices, default='ModifiedFollowing')
     def get_schedule(self):
         return ql.MakeSchedule(to_qlDate(self.effective_date), 
                             to_qlDate(self.maturity_date), 
                             ql.Period(self.payment_freq), 
+                            rule=QL_DAY_RULE(self.day_rule), 
                             calendar=self.calendar.calendar())
     def leg(self, as_of):
         sch = self.get_schedule()
         dc = QL_DAY_COUNTER[self.day_counter]
-        day_rule = QL_DAY_RULE[self.day_rule]
+        #day_rule = QL_DAY_RULE[self.day_rule]
         if self.index:
             leg_idx = self.index.get_index(ref_date=as_of, eff_date=self.effective_date) # need to fix
             if 'IBOR' in self.index.name:
                 leg = ql.IborLeg([self.notional], sch, leg_idx, dc, 
-                            paymentConvention=day_rule,
                             fixingDays=[leg_idx.fixingDays()], 
                             spreads=[float(self.spread or 0.0)])
                 # temp=pd.DataFrame([{

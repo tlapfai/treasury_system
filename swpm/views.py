@@ -192,7 +192,7 @@ def pricing(request, commit=False):
     if request.method == 'POST':
         as_of = request.POST['as_of']
         as_of_form = AsOfForm(request.POST) #for render back to page
-        ql.Settings.instance().evaluationDate = ql.Date(as_of,'%Y-%m-%d')
+        ql.Settings.instance().evaluationDate = to_qlDate(as_of)
         valuation_message = None
         if request.POST['trade_type'] == 'FX Option':
             fxo_form = FXOForm(request.POST, instance=FXO())
@@ -253,6 +253,9 @@ def pricing(request, commit=False):
                     leg.trade = tr
                     leg_cf.append([(c.date().ISO(), c.amount()) for c in leg.leg(as_of)])
                     leg_sch.append([x[1].ISO() for x in enumerate(leg.get_schedule()) if x[0]>0])
+                    #n = leg.get_schedule()
+                    #for x in enumerate(leg.get_schedule()):
+                    #    if x[0] 
                 if commit and request.POST.get('book') and request.POST.get('counterparty'):
                     tr.input_user = request.user
                     tr.detail = TradeDetail.objects.create()
@@ -274,7 +277,7 @@ def pricing(request, commit=False):
                 result = {'npv': inst.NPV(), 'leg1bpv': inst.legBPS(0), 'leg2bpv': inst.legBPS(1)}
                 result = dict([(x, round(y, 2)) for x, y in result.items()])
                 valuation_form = SwapValuationForm(initial=result)
-            else:
+            else: # invalid swap_form or invalid swap_leg_form_set, return empty valuation_form
                 return trade(request, inst='swap', trade_form=swap_form, as_of_form=as_of_form, trade_forms=swap_leg_form_set, val_form=SwapValuationForm())
             return trade(request, inst='swap', trade_form=swap_form, as_of_form=as_of_form, trade_forms=swap_leg_form_set, 
                 val_form=valuation_form, valuation_message=valuation_message, leg_cf=leg_cf, leg_sch=leg_sch)

@@ -20,3 +20,5 @@ IRTermStructure
 * ql.Cashflows.npv()
 
 https://www.w3schools.com/css/css3_flexbox.asp
+
+combine two dict ==> dict1.update(dict2)
