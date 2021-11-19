@@ -34,3 +34,5 @@ https://github.com/lballabio/QuantLib/blob/d55b8b19a45ac265adff5daa25a6b524a994d
 
 * Composite Quote (for FX etc.)
 https://rkapl123.github.io/QLAnnotatedSource/df/d48/class_quant_lib_1_1_composite_quote.html
+
+* SwapLegForm change to ccy.calendar if calendar is null

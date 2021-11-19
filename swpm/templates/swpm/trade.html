@@ -1,6 +1,7 @@
 {% extends "swpm/layout.html" %}
 {% load static %}
 {% load humanize %}
+{% debug %}
 
 {% block body %}
 <div class="row container-fluid">
@@ -69,17 +70,37 @@
 						<div class="tab-pane fade" id="profile" role="tabpanel" aria-labelledby="profile-tab">
 							<h4>Cashflows</h4>
 								<div class="row container-fluid">
-								{% for leg in leg_cf %}
-									<div class="col-md-6">
-									<table class="cashflow">
-									{% for cf in leg %}
+								{% for key, leg in leg_tables.items %}
+									<h5>{{ key }}</h5>
+									<div class="col-fluid">
+										<table class="cashflow" data-toggle="table">
+											<thead>
+												<tr>
+													<th>Start</th>
+													<th>End</th>
+													<th>Days</th>
+													<th>Year Fraction</th>
+													<th>Paid date</th>
+													<th>Amount</th>
+													<th>Ccy</th>
+												</tr>
+											</thead>
+										{% for cf in leg %}
 										<tr>
-											<th>{{ cf.0 }}</th>
-											<td>{{ cf.1 |floatformat:2 | intcomma}}</td>
+											<td>{{ cf.0 }}</td>
+											<td>{{ cf.1 }}</td>
+											<td>{{ cf.2 }}</td>
+											<td>{{ cf.3 |floatformat:6 }}</td>
+											<td>{{ cf.4 }}</td>
+											<td>{{ cf.5 |floatformat:2 | intcomma}}</td>
+											<td>{{ cf.6 }}</td>
 										</tr>
-									{% endfor %}
-									</table>
+										{% empty %}
+										<tr><td>Nothing</td></tr>
+										{% endfor %}
+										</table>
 									</div> <!-- col-md-6 -->
+									<br>
 								{% endfor %}
 							</div>
 						</div>

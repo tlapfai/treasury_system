@@ -21,7 +21,7 @@ FXO_TYPE = [("EUR", "European"),
     
 FXO_CP = [("C","Call"), ("P","Put")]
 
-SWAP_PAY_REC = [(-1, "Receive"), (1, "Pay")]
+SWAP_PAY_REC = [(ql.VanillaSwap.Receiver, "Receive"), (ql.VanillaSwap.Payer, "Pay")]
 
 BUY_SELL = [("B", "Buy"), ("S", "Sell")]
 
@@ -57,8 +57,14 @@ def validate_positive(value):
 #     def validate(self, value):
 #         super().validate(value)
 
-def to_qlDate(d: datetime.date) -> ql.Date:
-    return ql.Date(d.isoformat(),'%Y-%m-%d')
+def to_qlDate(d) -> ql.Date:
+    try:
+        if isinstance(d, str):
+            return ql.Date(d,'%Y-%m-%d')
+        else:
+            return ql.Date(d.isoformat(),'%Y-%m-%d')
+    except TypeError as e:
+        raise e
 
 class User(AbstractUser):
     pass
@@ -68,14 +74,15 @@ class Calendar(models.Model):
     def __str__(self):
         return self.name
     def calendar(self):
-        return QL_CALENDAR[self.name]
+        return QL_CALENDAR.get(self.name)
 
 class Ccy(models.Model):
     code = models.CharField(max_length=3, blank=False, primary_key=True)
     fixing_days = models.PositiveIntegerField(default=2)
-    cdr = models.ForeignKey(Calendar, DO_NOTHING, related_name="ccys", null=True)
+    calendar = models.ForeignKey(Calendar, DO_NOTHING, related_name="ccys", null=True)
     risk_free_curve = models.CharField(max_length=16, blank=True, null=True) #free text
     foreign_exchange_curve = models.CharField(max_length=16, blank=True, null=True) #free text
+    rate_day_counter = models.CharField(max_length=24, blank=True, null=True, default=None) #free text
     def __str__(self):
         return self.code
 
@@ -83,7 +90,7 @@ class CcyPair(models.Model):
     name = models.CharField(max_length=7, primary_key=True)
     base_ccy = models.ForeignKey(Ccy, CASCADE, related_name="as_base_ccy")
     quote_ccy = models.ForeignKey(Ccy, CASCADE, related_name="as_quote_ccy")
-    cdr = models.ForeignKey(Calendar, DO_NOTHING, related_name="ccy_pairs", null=True)
+    calendar = models.ForeignKey(Calendar, DO_NOTHING, related_name="ccy_pairs", null=True)
     fixing_days = models.PositiveIntegerField(default=2)
     def check_order():
         # check correct order
@@ -93,7 +100,7 @@ class CcyPair(models.Model):
     def get_rate(self, date):
         return self.rates.get(ref_date=date)
     def calendar(self):
-        return self.cdr.calendar()
+        return self.calendar.calendar()
 
 class FxSpotRateQuote(models.Model):
     ref_date = models.DateField()
@@ -378,15 +385,18 @@ class SwapLeg(models.Model):
     calendar = models.ForeignKey(Calendar, SET_NULL, null=True, blank=True, default=None)
     day_counter = models.CharField(max_length=16, choices=CHOICE_DAY_COUNTER.choices)
     day_rule = models.CharField(max_length=24, choices=CHOICE_DAY_RULE.choices, default='ModifiedFollowing')
+    def save(self, *args, **kwargs):
+        if self.day_counter is None:
+            self.day_counter = self.ccy.rate_day_counter
+        if self.calendar is None:
+            self.calendar = self.ccy.calendar
+        super(SwapLeg, self).save(*args, **kwargs)
     def get_schedule(self):
-        if self.calendar:
-            cdr = self.calendar.calendar()
-        else:
-            cdr = ql.WeekendsOnly()
+        cdr = self.calendar.calendar()
         return ql.MakeSchedule(to_qlDate(self.effective_date), 
                             to_qlDate(self.maturity_date), 
                             ql.Period(self.payment_freq), 
-                            rule=QL_DAY_RULE(self.day_rule), 
+                            rule=QL_DAY_RULE[self.day_rule], 
                             calendar=cdr)
     def leg(self, as_of):
         sch = self.get_schedule()

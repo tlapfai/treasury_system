@@ -78,10 +78,12 @@ class SwapLegForm(ModelForm):
             }
         labels = {
             'pay_rec': 'Pay/Receive', 
-            'calendar': 'Payment Calendar'
+            'calendar': 'Payment calendar'
         }
     def clean(self):
         cleaned_data = super().clean()
+        if cleaned_data.get('calendar') is None:
+            cleaned_data['calendar'] = cleaned_data.get('ccy').calendar
         effective_date = cleaned_data.get('effective_date')
         maturity_date = cleaned_data.get('maturity_date')
         fixed_rate = cleaned_data.get('fixed_rate')

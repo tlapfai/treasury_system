@@ -82,18 +82,21 @@ div#mktdata select#id_ccy_pair {
 
 table.cashflow {
   border: solid black 1px;
+  width: 100%;
 }
 
 table.cashflow th {
   text-align: left;
   border: solid black;
   border-collapse: collapse;
-  min-width: 100px;
+  font-size: x-small;
+  padding: 2px;
 }
 
 table.cashflow td {
   text-align: right;
   border: solid black;
   border-collapse: collapse;
-  min-width: 100px;
+  font-size: x-small;
+  padding: 2px;
 }

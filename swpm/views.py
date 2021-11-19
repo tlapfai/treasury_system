@@ -126,7 +126,7 @@ def trade(request, **kwargs):
                 as_of_form = kwargs.get('as_of_form')
                 trade_forms= kwargs.get('trade_forms')
                 val_form = kwargs.get('val_form')
-                leg_cf = kwargs.get('leg_cf')
+                leg_tables = kwargs.get('leg_tables')
             else:
                 val_form = SwapValuationForm()
                 trade_id = kwargs.get('id')
@@ -190,6 +190,8 @@ def load_market_data(request, pricing=False):
 
 def pricing(request, commit=False):
     if request.method == 'POST':
+        # 2 forms for single leg product
+        # 3 forms for multi leg product
         as_of = request.POST['as_of']
         as_of_form = AsOfForm(request.POST) #for render back to page
         ql.Settings.instance().evaluationDate = to_qlDate(as_of)
@@ -247,15 +249,17 @@ def pricing(request, commit=False):
             if swap_form.is_valid() and swap_leg_form_set.is_valid():
                 tr = swap_form.save(commit=False)
                 legs = swap_leg_form_set.save(commit=False)
-                leg_cf = []
-                leg_sch = []
+                leg_tables = {}
                 for leg in legs:
+                    leg_cf = []
                     leg.trade = tr
-                    leg_cf.append([(c.date().ISO(), c.amount()) for c in leg.leg(as_of)])
-                    leg_sch.append([x[1].ISO() for x in enumerate(leg.get_schedule()) if x[0]>0])
-                    #n = leg.get_schedule()
-                    #for x in enumerate(leg.get_schedule()):
-                    #    if x[0] 
+                    sch = leg.get_schedule()
+                    cf = leg.leg(as_of)
+                    dc = QL_DAY_COUNTER[leg.day_counter]
+                    for k in range(len(leg.leg(as_of))):
+                        d2, d1 = sch[k+1], sch[k]
+                        leg_cf.append( (d1.ISO(), d2.ISO(), dc.dayCount(d1, d2), dc.yearFraction(d1, d2), cf[k].date().ISO(), cf[k].amount(), leg.ccy.code) )
+                    leg_tables[leg.pay_rec] = leg_cf
                 if commit and request.POST.get('book') and request.POST.get('counterparty'):
                     tr.input_user = request.user
                     tr.detail = TradeDetail.objects.create()
@@ -280,7 +284,7 @@ def pricing(request, commit=False):
             else: # invalid swap_form or invalid swap_leg_form_set, return empty valuation_form
                 return trade(request, inst='swap', trade_form=swap_form, as_of_form=as_of_form, trade_forms=swap_leg_form_set, val_form=SwapValuationForm())
             return trade(request, inst='swap', trade_form=swap_form, as_of_form=as_of_form, trade_forms=swap_leg_form_set, 
-                val_form=valuation_form, valuation_message=valuation_message, leg_cf=leg_cf, leg_sch=leg_sch)
+                val_form=valuation_form, valuation_message=valuation_message, leg_tables=leg_tables)
 
 @csrf_exempt                    
 def save_ccypair(request):
@@ -327,7 +331,7 @@ def handle_uploaded_file(f=None, text=None):
         temp = [line.split(',') for line in lines]
         df = pd.DataFrame(temp[1:], columns=temp[0])
 
-    if set(df.columns) == {'Instrument', 'Ccy', 'Date', 'Market Rate', 'Curve', 'Term', 'Day Counter'}:
+    if {'Instrument', 'Ccy', 'Date', 'Market Rate', 'Curve', 'Term', 'Day Counter'}.issubset(set(df.columns)):
         for idx, row in df.iterrows():
             arg_ = {'name': row['Curve'], 'ref_date': str2date(row['Date']), 'ccy': Ccy.objects.get(code=row['Ccy'])}
             arg_upd = {}
