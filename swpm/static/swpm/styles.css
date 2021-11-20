@@ -83,20 +83,24 @@ div#mktdata select#id_ccy_pair {
 table.cashflow {
   border: solid black 1px;
   width: 100%;
+  border-spacing: 0;
+  border-collapse: collapse;
 }
 
 table.cashflow th {
   text-align: left;
   border: solid black;
-  border-collapse: collapse;
   font-size: x-small;
   padding: 2px;
 }
 
-table.cashflow td {
+table.cashflow td, table.rate-list td{
   text-align: right;
-  border: solid black;
-  border-collapse: collapse;
   font-size: x-small;
   padding: 2px;
+}
+
+.valuation-table input {
+  float: right;
+  clear: both;
 }

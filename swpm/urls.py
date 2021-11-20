@@ -21,4 +21,5 @@ urlpatterns = [
     path('reval', views.reval, name='reval'), 
     path('market_data_import', views.market_data_import, name='market_data_import'), 
     path('load_market_data', views.load_market_data, name='load_market_data'),
+    #path('tenor2date', views.tenor2date, name='tenor2date'), 
 ]

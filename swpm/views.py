@@ -22,13 +22,27 @@ import datetime
 import json
 import pandas as pd
 
-
-
 def str2date(s):
     if len(s) == 10:
         return datetime.datetime.strptime(s, '%Y-%m-%d')
     elif len(str(s)) == 8:
         return datetime.datetime.strptime(str(s), '%Y%m%d')
+
+# def tenor2date(request):
+#     if request.is_ajax():
+#         effective_date = request.POST.get('effective_date', None)
+#         tenor = request.POST.get('tenor', None)
+#         calendar = request.POST.get('calendar', None)
+#         day_rule = request.POST.get('day_rule', None)
+#         try:
+#             d = to_qlDate(effective_date)
+#             tnr = ql.Period(tenor)
+#             cdr = Calendar.objects.get(name=calendar).calendar()
+#             maturity_date = cdr.advance(d, tnr, QL_DAY_RULE[day_rule])
+#             return JsonResponse({ 'mat': maturity_date.ISO() })
+#         except:
+#             response = { 'mat': effective_date }
+#             return JsonResponse(response)
 
 def index(request):
     mytime = timezone.now()
@@ -91,13 +105,14 @@ def register(request):
 
 
 def trade(request, **kwargs):
-    as_of_form = AsOfForm(initial={'as_of': datetime.date.today()})
-    valuation_message = kwargs.get('valuation_message')
     try:
         inst = kwargs['inst'].upper()
     except KeyError:
         return HttpResponseNotFound('<h1>Product type not found</h1>')
     else:
+        trade_id_form = TradeIDForm()
+        as_of_form = AsOfForm(initial={'as_of': datetime.date.today()})
+        valuation_message = kwargs.get('valuation_message')
         if inst == "FXO":
             trade_type = "FX Option"
             val_form = FXOValuationForm()
@@ -106,6 +121,7 @@ def trade(request, **kwargs):
                 as_of_form = kwargs['as_of_form']
                 val_form = kwargs.get('val_form')
                 market_data_form = kwargs.get('market_data_form')
+                trade_id_form = kwargs.get('trade_id_form')
             else:
                 trade_id = kwargs.get('id')
                 if trade_id:
@@ -115,6 +131,7 @@ def trade(request, **kwargs):
                     except KeyError:
                         return HttpResponseNotFound('<h1>Trade not found</h1>')
                     else:
+                        trade_id_form = TradeIDForm(initial={'loaded_id': trade_id})
                         trade_form = FXOForm(instance=loaded_trade)
                 else:
                     trade_form = FXOForm(initial={'trade_date': datetime.date.today()})
@@ -127,6 +144,7 @@ def trade(request, **kwargs):
                 trade_forms= kwargs.get('trade_forms')
                 val_form = kwargs.get('val_form')
                 leg_tables = kwargs.get('leg_tables')
+                trade_id_form = kwargs.get('trade_id_form')
             else:
                 val_form = SwapValuationForm()
                 trade_id = kwargs.get('id')
@@ -136,12 +154,13 @@ def trade(request, **kwargs):
                     except KeyError:
                         return HttpResponseNotFound('<h1>Trade not found</h1>')
                     else:
+                        trade_id_form = TradeIDForm(initial={'id': trade_id})
                         trade_form = SwapForm(instance=loaded_trade)
                         SwapLegFormSet = modelformset_factory(SwapLeg, SwapLegForm, extra=0)
                         trade_forms = SwapLegFormSet(queryset=SwapLeg.objects.filter(trade=loaded_trade))  # to be fixed
                 else:
                     SwapLegFormSet = modelformset_factory(SwapLeg, SwapLegForm, extra=2)
-                    trade_form = SwapForm(initial={'trade_date': datetime.date.today()})
+                    trade_form = SwapForm(initial={'trade_date': datetime.date.today(), 'id': 1})
                     trade_forms = SwapLegFormSet(queryset=SwapLeg.objects.none(), initial=[{'maturity_date': datetime.date.today()+datetime.timedelta(days=365)}])
         else:
             return HttpResponseNotFound('<h1>Page not found</h1>')
@@ -163,6 +182,7 @@ def trade_list(request):
 def load_market_data(request, pricing=False):
     if request.method == 'POST':
         as_of = request.POST['as_of']
+        trade_id_form = TradeIDForm(request.POST)
         as_of_form = AsOfForm(request.POST)
         ql.Settings.instance().evaluationDate = ql.Date(as_of,'%Y-%m-%d')
         val_form = FXOValuationForm()
@@ -178,13 +198,17 @@ def load_market_data(request, pricing=False):
                 if pricing:
                     return None
                 else:
-                    return trade(request, as_of_form=as_of_form, inst=inst, trade_form=trade_form, val_form=val_form, valuation_message=valuation_message)
+                    return trade(   request, as_of_form=as_of_form, inst=inst, trade_form=trade_form, 
+                                    trade_id_form = trade_id_form, 
+                                    val_form=val_form, valuation_message=valuation_message)
             else:
                 market_data['fx_spot'] = FxSpotRateQuoteForm(instance=fx_spot_quote)
         if pricing:
             return market_data
         else:
-            return trade(request, as_of_form=as_of_form, inst=inst, trade_form=trade_form, val_form=val_form, market_data_form=market_data)
+            return trade(   request, as_of_form=as_of_form, inst=inst, trade_form=trade_form, 
+                            trade_id_form = trade_id_form,  
+                            val_form=val_form, market_data_form=market_data)
             
 
 
@@ -193,6 +217,7 @@ def pricing(request, commit=False):
         # 2 forms for single leg product
         # 3 forms for multi leg product
         as_of = request.POST['as_of']
+        trade_id_form=TradeIDForm()
         as_of_form = AsOfForm(request.POST) #for render back to page
         ql.Settings.instance().evaluationDate = to_qlDate(as_of)
         valuation_message = None
@@ -235,9 +260,12 @@ def pricing(request, commit=False):
                 valuation_form = FXOValuationForm(initial=result)
             else:
                 valuation_form = FXOValuationForm()
-            
+
+            trade_id_form = TradeIDForm(initial={'loaded_id': tr.id}) if tr.id else TradeIDForm()
+
             return trade(request, inst='fxo', 
                         trade_form=fxo_form, 
+                        trade_id_form = trade_id_form, 
                         as_of_form=as_of_form, 
                         val_form=valuation_form, 
                         market_data_form=market_data_form, 
@@ -249,17 +277,29 @@ def pricing(request, commit=False):
             if swap_form.is_valid() and swap_leg_form_set.is_valid():
                 tr = swap_form.save(commit=False)
                 legs = swap_leg_form_set.save(commit=False)
-                leg_tables = {}
-                for leg in legs:
+                leg_tables = []
+                leg_npv = []
+                for leg in legs: # here leg is SwapLeg
                     leg_cf = []
                     leg.trade = tr
                     sch = leg.get_schedule()
-                    cf = leg.leg(as_of)
+                    ql_leg = leg.leg(as_of)
                     dc = QL_DAY_COUNTER[leg.day_counter]
+                    yts = leg.discounting_curve(as_of)
                     for k in range(len(leg.leg(as_of))):
                         d2, d1 = sch[k+1], sch[k]
-                        leg_cf.append( (d1.ISO(), d2.ISO(), dc.dayCount(d1, d2), dc.yearFraction(d1, d2), cf[k].date().ISO(), cf[k].amount(), leg.ccy.code) )
-                    leg_tables[leg.pay_rec] = leg_cf
+                        leg_cf.append( (d1.ISO(), 
+                                        d2.ISO(), 
+                                        dc.dayCount(d1, d2), 
+                                        dc.yearFraction(d1, d2), 
+                                        ql_leg[k].date().ISO(), 
+                                        ql_leg[k].amount(), 
+                                        yts.discount(ql_leg[k].date()), 
+                                        yts.discount(ql_leg[k].date()) * ql_leg[k].amount(), 
+                                        leg.ccy.code
+                                        ) )
+                    leg_tables.append(leg_cf)
+                    leg_npv.append(ql.CashFlows.npv(ql_leg, ql.YieldTermStructureHandle(yts), False))
                 if commit and request.POST.get('book') and request.POST.get('counterparty'):
                     tr.input_user = request.user
                     tr.detail = TradeDetail.objects.create()
@@ -268,6 +308,7 @@ def pricing(request, commit=False):
                     for leg in legs:
                         leg.save()
                     valuation_message = f"Trade is done, ID is {tr.id}."
+                    trade_id_form = TradeIDForm(initial={'loaded_id': tr.id})
                     inst = tr.instrument(as_of)
                     engine = tr.make_pricing_engine(as_of)
                     inst.setPricingEngine(engine)
@@ -275,16 +316,19 @@ def pricing(request, commit=False):
                     leg_inst = [x.leg(as_of=as_of) for x in legs]
                     is_pay = [leg.pay_rec>0 for leg in legs]
                     inst = ql.Swap(leg_inst, is_pay)
-                    yts1 = legs[0].ccy.rf_curve.get(ref_date=as_of).term_structure()
+                    #yts1 = legs[0].ccy.rf_curve.get(ref_date=as_of).term_structure()
+                    yts1 = IRTermStructure.objects.filter(ref_date=as_of, name=legs[0].ccy.risk_free_curve).first().term_structure()
                     inst.setPricingEngine(ql.DiscountingSwapEngine(ql.YieldTermStructureHandle(yts1)))
                     valuation_message = None
-                result = {'npv': inst.NPV(), 'leg1bpv': inst.legBPS(0), 'leg2bpv': inst.legBPS(1)}
+                result = {'npv': inst.NPV(), 'leg1npv': leg_npv[0], 'leg2npv': leg_npv[1], 'leg1bpv': inst.legBPS(0), 'leg2bpv': inst.legBPS(1)}
                 result = dict([(x, round(y, 2)) for x, y in result.items()])
                 valuation_form = SwapValuationForm(initial=result)
             else: # invalid swap_form or invalid swap_leg_form_set, return empty valuation_form
                 return trade(request, inst='swap', trade_form=swap_form, as_of_form=as_of_form, trade_forms=swap_leg_form_set, val_form=SwapValuationForm())
-            return trade(request, inst='swap', trade_form=swap_form, as_of_form=as_of_form, trade_forms=swap_leg_form_set, 
-                val_form=valuation_form, valuation_message=valuation_message, leg_tables=leg_tables)
+            return trade(   request, 
+                            inst='swap', 
+                            trade_form=swap_form, as_of_form=as_of_form, trade_forms=swap_leg_form_set, trade_id_form=trade_id_form, 
+                            val_form=valuation_form, valuation_message=valuation_message, leg_tables=leg_tables)
 
 @csrf_exempt                    
 def save_ccypair(request):
@@ -328,32 +372,38 @@ def handle_uploaded_file(f=None, text=None):
         df = pd.read_csv(f)
     elif text:
         lines = text.split('\r\n')
-        temp = [line.split(',') for line in lines]
+        temp = [line.split(',') for line in lines if len(line)>0]
         df = pd.DataFrame(temp[1:], columns=temp[0])
 
     if {'Instrument', 'Ccy', 'Date', 'Market Rate', 'Curve', 'Term', 'Day Counter'}.issubset(set(df.columns)):
         for idx, row in df.iterrows():
-            arg_ = {'name': row['Curve'], 'ref_date': str2date(row['Date']), 'ccy': Ccy.objects.get(code=row['Ccy'])}
+            #arg_ = {'name': row['Curve'], 'ref_date': str2date(row['Date']), 'ccy': Ccy.objects.get(code=row['Ccy'])}
             arg_upd = {}
-            ccy_ = Ccy.objects.get(code=row['Ccy'])
-            if ccy_.foreign_exchange_curve == row['Curve']:
-                arg_upd['as_fx_curve'] = ccy_
-            if ccy_.risk_free_curve == row['Curve']:
-                arg_upd['as_rf_curve'] = ccy_
-            yts, temp_ = IRTermStructure.objects.update_or_create(**arg_, defaults=arg_upd)
-            if row['Term'][:2] == 'ED':
-                row['Term'] = row['Term'][:4]
-                row['Market Rate'] = 100.0*float(row['Market Rate'])
-            r, temp_ = RateQuote.objects.update_or_create(name=row['Curve']+' '+row['Term'], 
+            try:
+                ccy_ = Ccy.objects.get(code=row['Ccy'])
+                if ccy_.foreign_exchange_curve == row['Curve']:
+                    arg_upd['as_fx_curve'] = ccy_
+                if ccy_.risk_free_curve == row['Curve']:
+                    arg_upd['as_rf_curve'] = ccy_
+                yts, created_ = IRTermStructure.objects.update_or_create(name=row['Curve'], ref_date=str2date(row['Date']), ccy=ccy_, defaults=arg_upd)
+                if created_:
+                    msg.append(f'{yts.name} ({yts.ref_date}) created')
+                if row['Term'][:2] == 'ED':
+                    row['Term'] = row['Term'][:4]
+                    row['Market Rate'] = 100.0*float(row['Market Rate'])
+                r, temp_ = RateQuote.objects.update_or_create(  name=row['Curve']+' '+row['Term'], 
                                                                 ref_date=str2date(row['Date']), 
-                                                                defaults={ 'tenor': row['Term'], 
-                                                                        'instrument': row['Instrument'], 
-                                                                        'ccy': Ccy.objects.get(code=row['Ccy']), 
-                                                                        'day_counter': row['Day Counter'], 
-                                                                        'rate': float(row['Market Rate'])*0.01 }
-                                                            )
-            yts.rates.add(r)
-            msg.append(str(r))
+                                                                defaults={  'tenor': row['Term'], 
+                                                                            'instrument': row['Instrument'], 
+                                                                            'ccy': Ccy.objects.get(code=row['Ccy']), 
+                                                                            'day_counter': row['Day Counter'], 
+                                                                            'rate': float(row['Market Rate'])*0.01 }
+                                                                )
+                yts.rates.add(r)
+            except KeyError as e:
+                msg.append(str(e))
+            else:
+                msg.append(str(r))
     else:
         msg = 'Header is wrong'
     return msg
@@ -388,13 +438,14 @@ def yield_curve(request, curve=None, ref_date=None):
                 rates.append({'id': r.id, 'tenor': r.tenor, 'rate': adj_rate, 'date': dates[i+1].ISO(), 
                 'zero_rate': yts.zeroRate(dates[i+1], ql.Actual365Fixed(), ql.Continuous).rate()*100
                 })
+            ## need to fix: order wrong if the rates are not in chronological order, becoz dates comes from ql
             plt_points = min(len(rates)-1, 14)
             # https://plotly.com/python/px-arguments/
             dataPx = px.line(x=[rr['date'] for rr in rates], y=[rr['zero_rate'] for rr in rates], 
                             range_x=[dates[0].ISO(), rates[plt_points]['date']], 
                             range_y=[0, rates[plt_points]['zero_rate']*1.1], 
                             markers=True, labels={'x': 'Date', 'y': 'Zero Rate'})
-            dataPx.update_layout(plot_bgcolor='#111111', paper_bgcolor='#111111', font_color='skyblue')
+            #dataPx.update_layout(plot_bgcolor='#111111', paper_bgcolor='#111111', font_color='skyblue')
             app = DjangoDash('yts_plot')
             app.layout = html.Div([dcc.Graph(id="yts_plot_id", figure=dataPx)], 
                     className = "yts_plot_class", 

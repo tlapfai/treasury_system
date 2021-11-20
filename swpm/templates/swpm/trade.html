@@ -36,7 +36,8 @@
 							{% endif %}
 							<!-- table for form start -->
 							<table style="width: 100%; border: solid 2px red;">
-								<table style="width: 100%; border: solid 2px black;">{{ as_of_form.as_table }}</table>
+								<table style="width: 100%; ">{{ trade_id_form.as_table }}</table>
+								<table style="width: 100%; ">{{ as_of_form.as_table }}</table>
 								{% if trade_forms %} <!-- has legs -->
 									<table style="width: 100%; border: solid 2px orange;">{{ trade_form }}</table>
 									<table class="swap-legs" style="width:100%; border: solid 2px palevioletred;">
@@ -70,18 +71,20 @@
 						<div class="tab-pane fade" id="profile" role="tabpanel" aria-labelledby="profile-tab">
 							<h4>Cashflows</h4>
 								<div class="row container-fluid">
-								{% for key, leg in leg_tables.items %}
-									<h5>{{ key }}</h5>
+								{% for leg in leg_tables %}
 									<div class="col-fluid">
-										<table class="cashflow" data-toggle="table">
+										<strong>Leg {{ forloop.counter }}</strong>
+										<table class="cashflow" data-toggle="table" data-show-columns="true">
 											<thead>
 												<tr>
 													<th>Start</th>
 													<th>End</th>
 													<th>Days</th>
-													<th>Year Fraction</th>
-													<th>Paid date</th>
+													<th>Year fraction</th>
+													<th>Payment date</th>
 													<th>Amount</th>
+													<th>Discount</th>
+													<th>Discounted amt</th>
 													<th>Ccy</th>
 												</tr>
 											</thead>
@@ -93,7 +96,9 @@
 											<td>{{ cf.3 |floatformat:6 }}</td>
 											<td>{{ cf.4 }}</td>
 											<td>{{ cf.5 |floatformat:2 | intcomma}}</td>
-											<td>{{ cf.6 }}</td>
+											<td>{{ cf.6 |floatformat:6}}</td>
+											<td>{{ cf.7 |floatformat:2 | intcomma}}</td>
+											<td>{{ cf.8 }}</td>
 										</tr>
 										{% empty %}
 										<tr><td>Nothing</td></tr>
@@ -135,12 +140,7 @@
 {% block script %}
 
 <script src="{% static 'swpm/jquery-3.6.0.slim.min.js' %}"></script>
-<!-- <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
-<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/2.4.4/cjs/popper.min.js"></script>
-<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script> -->
-	
 <script src="https://unpkg.com/bootstrap-table@1.18.3/dist/bootstrap-table.min.js"></script>
-
 <script src="{% static 'swpm/index.js' %}"></script>
 
 {% endblock %}

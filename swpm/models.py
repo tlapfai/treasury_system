@@ -99,8 +99,6 @@ class CcyPair(models.Model):
         return f"{self.base_ccy}/{self.quote_ccy}"
     def get_rate(self, date):
         return self.rates.get(ref_date=date)
-    def calendar(self):
-        return self.calendar.calendar()
 
 class FxSpotRateQuote(models.Model):
     ref_date = models.DateField()
@@ -122,7 +120,7 @@ class RateQuote(models.Model):
     ccy = models.ForeignKey(Ccy, CASCADE, related_name="rates")
     day_counter = models.CharField(max_length=16, choices=CHOICE_DAY_COUNTER.choices)
     #index = models.ForeignKey(RateIndex, DO_NOTHING, null=True, blank=True) # RateIndex is not defined yet above this model
-    def helper(self):
+    def helper(self, discount_curve=None):
         q = ql.QuoteHandle(ql.SimpleQuote(self.rate))
         tenor_ = None if self.instrument == "FUT" else ql.Period(self.tenor) 
         if self.instrument == "DEPO":
@@ -135,14 +133,19 @@ class RateQuote(models.Model):
                 return ql.FuturesRateHelper(q, ql.IMM.date(self.tenor[2:4]), ql.USDLibor(ql.Period('3M')))
         elif self.instrument == "SWAP":
             if self.ccy.code == "USD":
+                # https://quant.stackexchange.com/questions/32345/quantlib-python-dual-curve-bootstrapping-example
                 swapIndex = ql.UsdLiborSwapIsdaFixAm(tenor_)
-                return ql.SwapRateHelper(q, swapIndex)
+                if discount_curve:
+                    return ql.SwapRateHelper(q, swapIndex, 0, ql.Period(), discount_curve)
+                else:
+                    return ql.SwapRateHelper(q, swapIndex)
         elif self.instrument == "OIS":
-            overnight_index = ql.OvernightIndex('USD EFFR', 0, ql.USDCurrency(), ql.UnitedStates(), ql.Actual360())
             if self.ccy.code == "USD":
                 if self.tenor == '1D':
+                    return ql.DepositRateHelper(q, tenor_, 0, ql.TARGET(), ql.Following, False, ql.Actual360())
                     return ql.DepositRateHelper(q, overnight_index)
                 else:
+                    overnight_index = ql.OvernightIndex('USD EFFR', 0, ql.USDCurrency(), ql.UnitedStates(), ql.Actual360())
                     settlementDays = 2
                     swapIndex = ql.OvernightIndexedSwapIndex("EFFR", tenor_, settlementDays, ql.USDCurrency(), overnight_index) # not use??
                     return ql.OISRateHelper(2, tenor_, q, overnight_index, paymentLag=0, paymentCalendar=ql.UnitedStates())
@@ -154,13 +157,13 @@ class IRTermStructure(models.Model):
     ref_date = models.DateField()
     ccy = models.ForeignKey(Ccy, CASCADE, related_name="all_curves", null=True, blank=True)
     rates = models.ManyToManyField(RateQuote, related_name="ts")
-    as_fx_curve = models.ForeignKey(Ccy, CASCADE, related_name="fx_curve", null=True)
-    as_rf_curve = models.ForeignKey(Ccy, CASCADE, related_name="rf_curve", null=True)
+    as_fx_curve = models.ForeignKey(Ccy, CASCADE, related_name="fx_curve", null=True, blank=True)
+    as_rf_curve = models.ForeignKey(Ccy, CASCADE, related_name="rf_curve", null=True, blank=True)
     class Meta:
         unique_together = ('name', 'ref_date', 'ccy')
     def term_structure(self):
         day_counter = ql.Actual365Fixed()
-        helpers = [rate.helper() for rate in self.rates.all()]
+        helpers = [rate.helper() for rate in self.rates.all()] # change to helper(ccy.rf_curve.term_structure())
         yts = ql.PiecewiseLogLinearDiscount(to_qlDate(self.ref_date), helpers, day_counter)
         yts.enableExtrapolation()
         return yts
@@ -222,7 +225,7 @@ class FXVolatility(models.Model):
         verbose_name_plural = "FX volatilities"
     def handle(self):
         return ql.BlackVolTermStructureHandle(
-            ql.BlackConstantVol(to_qlDate(self.ref_date), self.ccy_pair.calendar(), self.vol, ql.Actual365Fixed()))
+            ql.BlackConstantVol(to_qlDate(self.ref_date), self.ccy_pair.calendar.calendar(), self.vol, ql.Actual365Fixed()))
     def __str__(self):
         return f"{self.ccy_pair} as of {self.ref_date}"
     
@@ -374,6 +377,7 @@ class SwapLeg(models.Model):
     trade = models.ForeignKey(Swap, CASCADE, null=True, blank=True, related_name="legs")
     ccy = models.ForeignKey(Ccy, CASCADE, related_name="swap_legs")
     effective_date = models.DateField(default=datetime.date.today())
+    tenor = models.CharField(max_length=8, null=True, blank=True)
     maturity_date = models.DateField()
     notional = models.FloatField(default=1e6, validators=[validate_positive])
     pay_rec = models.IntegerField(choices=SWAP_PAY_REC)
@@ -408,16 +412,6 @@ class SwapLeg(models.Model):
                 leg = ql.IborLeg([self.notional], sch, leg_idx, dc, 
                             fixingDays=[leg_idx.fixingDays()], 
                             spreads=[float(self.spread or 0.0)])
-                # temp=pd.DataFrame([{
-                # 'fixingDate': cf.fixingDate().ISO(),
-                # 'accrualStart': cf.accrualStartDate().ISO(),
-                # 'accrualEnd': cf.accrualEndDate().ISO(),
-                # "paymentDate": cf.date().ISO(),
-                # 'gearing': cf.gearing(),
-                # 'forward': cf.indexFixing(),
-                # 'rate': cf.rate(),
-                # "amount": cf.amount()
-                # } for cf in leg])
             elif 'OIS' in self.index.name:
                 leg = ql.OvernightLeg([self.notional], sch, leg_idx, dc, 
                                         BusinessDayConvention=self.day_rule,
@@ -431,6 +425,12 @@ class SwapLeg(models.Model):
 
         return leg
     def make_pricing_engine(self, as_of):
-        discount_curve = self.ccy.rf_curve.get(ref_date=as_of).term_structure()
-        return ql.DiscountingSwapEngine(ql.YieldTermStructureHandle(discount_curve))
+        yts = self.ccy.rf_curve.get(ref_date=as_of).term_structure()
+        return ql.DiscountingSwapEngine(ql.YieldTermStructureHandle(yts))
+    def discounting_curve(self, as_of):
+        #return self.ccy.rf_curve.filter(ref_date=as_of).term_structure()
+        return IRTermStructure.objects.filter(ref_date=as_of, name=self.ccy.risk_free_curve).first().term_structure()
+    def npv(self, as_of, discounting_curve=None):
+        yts = discounting_curve if discounting_curve else self.discounting_curve(as_of)
+        return ql.CashFlows.npv(self.leg(as_of), ql.YieldTermStructureHandle(yts))
 

@@ -13,9 +13,9 @@ hongkong, _ = Calendar.objects.get_or_create(name="HongKong")
 unitedstates, _ = Calendar.objects.get_or_create(name="UnitedStates")
 target, _ = Calendar.objects.get_or_create(name="TARGET")
 
-hkd, _ = Ccy.objects.get_or_create(code="EUR", defaults={'cdr': hongkong})
-eur, _ = Ccy.objects.get_or_create(code="EUR", defaults={'cdr': target})
-usd, _ = Ccy.objects.get_or_create(code="USD", defaults={'cdr': unitedstates})
+hkd, _ = Ccy.objects.get_or_create(code="HKD", defaults={'cdr': hongkong})
+eur, _ = Ccy.objects.get_or_create(code="EUR", defaults={'cdr': target, 'risk_free_curve': 'EUR FOREX', 'foreign_exchange_curve': 'EUR FOREX', 'rate_day_counter': 'Actual360'})
+usd, _ = Ccy.objects.get_or_create(code="USD", defaults={'cdr': unitedstates, 'risk_free_curve': 'USD OIS', 'foreign_exchange_curve': 'USD OIS', 'rate_day_counter': 'Actual360'})
 print("Ccy created")
 
 eurusd, _ = CcyPair.objects.get_or_create(name="EUR/USD", base_ccy=eur, quote_ccy=usd, defaults={'cdr': target})

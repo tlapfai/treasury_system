@@ -1,5 +1,5 @@
 from django.db.models import fields
-from django.forms import ModelForm, modelformset_factory, SelectDateWidget, DateInput, NumberInput, ModelMultipleChoiceField, widgets
+from django.forms import ModelForm, modelformset_factory, SelectDateWidget, DateInput, NumberInput, ModelMultipleChoiceField, widgets, TextInput
 from django import forms
 from django.forms.models import BaseModelFormSet, ModelChoiceField
 from django.utils.translation import gettext as _
@@ -31,8 +31,10 @@ class IRTermStructureForm(ModelForm):
 class FXOForm(ModelForm):
     class Meta:
         model = FXO
-        fields = ['trade_date', 'maturity_date', 'ccy_pair', 'type', 'cp', 'buy_sell', 'strike_price', 'notional_1', 'notional_2', 'book', 'counterparty']
-        #exclude = ['id', 'create_time', 'detail', 'input_user']
+        fields = ['trade_date', 'maturity_date', 'ccy_pair', 'type', 'cp', 'buy_sell', 'strike_price', 'notional_1', 'notional_2', 'book', 'counterparty'] 
+                    # exclude = ['id', 'create_time', 'detail', 'input_user']
+                    # https://stackoverflow.com/questions/43067707/why-doesnt-my-django-template-render-a-modelforms-id-or-pk-field
+                    # The id field automatically has editable=False, which means by default it doesn't show up in any model forms.
         widgets = {
             'trade_date': DateInput(attrs={'type': 'date'}),
             'maturity_date': DateInput(attrs={'type': 'date'}),
@@ -70,7 +72,7 @@ class FXOValuationForm(forms.Form):
 class SwapLegForm(ModelForm):
     class Meta:
         model = SwapLeg
-        fields = ['ccy', 'effective_date', 'maturity_date', 'notional', 'pay_rec', 'fixed_rate', 
+        fields = ['ccy', 'effective_date', 'maturity_date', 'tenor', 'notional', 'pay_rec', 'fixed_rate', 
             'index', 'spread', 'reset_freq', 'payment_freq', 'day_rule', 'calendar', 'day_counter']
         widgets = {
             'effective_date': DateInput(attrs={'type': 'date'}),
@@ -121,6 +123,8 @@ class SwapForm(ModelForm):
         
 class SwapValuationForm(forms.Form):
     npv = forms.FloatField(label="NPV", disabled=True)
+    leg1npv = forms.FloatField(label="Leg 1 NPV", disabled=True)
+    leg2npv = forms.FloatField(label="Leg 2 NPV", disabled=True)
     leg1bpv = forms.FloatField(label="Leg 1 BPV", disabled=True)
     leg2bpv = forms.FloatField(label="Leg 2 BPV", disabled=True)
 
@@ -133,6 +137,9 @@ class TradeDetailForm(ModelForm):
 class AsOfForm(forms.Form):
     as_of = forms.DateField(widget=DateInput(attrs={'type': 'date'}))
 
+class TradeIDForm(forms.Form):
+    loaded_id = forms.IntegerField(label="ID", disabled=True, required=False)
+
 class RevalForm(forms.Form):
     reval_date = forms.DateField(widget=DateInput(attrs={'type': 'date'}))
     books = forms.ModelMultipleChoiceField(Book.objects.all(), required=False)
@@ -140,7 +147,7 @@ class RevalForm(forms.Form):
 
 class UploadFileForm(forms.Form):
     file = forms.FileField(required=False)
-    text = forms.CharField(widget=forms.Textarea, required=False)
+    text = forms.CharField(widget=forms.Textarea(attrs={'width': '100%'}), required=False)
 
 class YieldCurveSearchForm(forms.Form):
     name__contains = forms.CharField(max_length=16, required=False, label='Name')
