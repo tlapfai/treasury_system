@@ -103,4 +103,5 @@ table.cashflow td, table.rate-list td{
 .valuation-table input {
   float: right;
   clear: both;
+  text-align: right
 }

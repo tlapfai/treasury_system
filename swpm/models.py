@@ -3,6 +3,7 @@ from QuantLib.QuantLib import PiecewiseLogLinearDiscount
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.db.models import query_utils
+from django.db.models.base import Model
 from django.db.models.deletion import CASCADE, DO_NOTHING, SET_NULL, SET_DEFAULT
 from django.db.models.fields.related import ForeignKey
 from django.utils import timezone
@@ -267,8 +268,9 @@ class Counterparty(models.Model):
     
 class TradeDetail(models.Model):
     #trade = models.ForeignKey(FXO, CASCADE, related_name="detail")
-    def __str__(self) -> str:
-        return f"ID: {self.trade.id}"
+    # def __str__(self) -> str:
+    #     return f"ID: {self.trade.id}"
+    pass
 
 class TradeMarkToMarket(models.Model):
     as_of = models.DateField()
@@ -287,13 +289,19 @@ class Trade(models.Model):
     active = models.BooleanField(default=True)
     create_time = models.DateTimeField(auto_now_add=True)
     trade_date = models.DateField(null=False)
-    detail = models.OneToOneField(TradeDetail, CASCADE, null=True, related_name="trade")
+    pl_ccy = models.ForeignKey(Ccy, CASCADE, null=True, blank=True)
+    detail = models.OneToOneField(TradeDetail, CASCADE, null=True)
     
     book = models.ForeignKey(Book, SET_NULL, null=True, blank=True, related_name="trades")
     input_user = models.ForeignKey(User, SET_NULL, null=True, related_name='input_trades')
-    counterparty = models.ForeignKey(Counterparty, DO_NOTHING, related_name="trade_set", null=True, blank=True)
+    counterparty = models.ForeignKey(Counterparty, SET_NULL, related_name="trade_set", null=True, blank=True)
+
     def delete(self, *args, **kwargs):
         super().delete(*args, **kwargs)
+        if Swap.objects.filter(trade_ptr=self):
+            Swap.objects.filter(trade_ptr=self).delete()
+        elif FXO.objects.filter(trade_ptr=self):
+            FXO.objects.filter(trade_ptr=self).delete()
         if self.detail:
              self.detail.delete()
          
@@ -307,15 +315,18 @@ class Trade(models.Model):
     #         self.detail = d
     #     super().save(*args, **kwargs)
 
-        
+class CashFlow(models.Model):
+    ccy = models.ForeignKey(Ccy, CASCADE)
+    amount = models.FloatField(default=0)
+    trade = models.ForeignKey(Trade, CASCADE, null=True, blank=True)
 
 class FXO(Trade):
     product_type = models.CharField(max_length=12, default="FXO")
-    maturity_date = models.DateField(null=False, default=datetime.date.today())
+    maturity_date = models.DateField(null=False, default=datetime.date.today)
     buy_sell = models.CharField(max_length=1, choices=BUY_SELL)
     ccy_pair = models.ForeignKey(CcyPair, models.DO_NOTHING, null=False, related_name='options')
     strike_price = models.FloatField(validators=[validate_positive])
-    notional_1 = models.FloatField(validators=[validate_positive])
+    notional_1 = models.FloatField(default=1e6, validators=[validate_positive])
     notional_2 = models.FloatField(validators=[validate_positive])
     type = models.CharField(max_length=5, choices=FXO_TYPE)
     cp = models.CharField(max_length=1, choices=FXO_CP)
@@ -345,8 +356,8 @@ class FXO(Trade):
         if self.active:
             spot_rate = self.ccy_pair.rates.get(ref_date=as_of)
             v = self.ccy_pair.vol.get(ref_date=as_of).handle()
-            q = IRTermStructure.objects.get(ref_date=as_of, as_fx_curve=self.ccy_pair.base_ccy).term_structure()
-            r = IRTermStructure.objects.get(ref_date=as_of, as_fx_curve=self.ccy_pair.quote_ccy).term_structure()
+            q = IRTermStructure.objects.filter(ref_date=as_of, as_fx_curve=self.ccy_pair.base_ccy).first().term_structure()
+            r = IRTermStructure.objects.filter(ref_date=as_of, as_fx_curve=self.ccy_pair.quote_ccy).first().term_structure()
             process = ql.BlackScholesMertonProcess(spot_rate.handle(), ql.YieldTermStructureHandle(q), ql.YieldTermStructureHandle(r), v)
             return ql.AnalyticEuropeanEngine(process)
 
@@ -364,10 +375,10 @@ class Swap(Trade):
         return ql.Swap(legs, is_pay)
     def make_pricing_engine(self, as_of):
         leg = self.legs.get(pay_rec=-1)
-        yts1 = leg.ccy.rf_curve.get(ref_date=as_of).term_structure()
+        yts1 = leg.ccy.rf_curve.filter(ref_date=as_of).first().term_structure()
         return ql.DiscountingSwapEngine(ql.YieldTermStructureHandle(yts1))
     def __str__(self):
-        return f"Swap ID: {self.id}, Notional={self.legs.first().notional:.0f} & {self.legs.last().notional:.0f}"
+        return f"Swap ID: {self.id}, Notional={self.legs.first().notional:.0f} {self.legs.first().ccy} vs {self.legs.last().notional:.0f} {self.legs.last().ccy}"
     def delete(self, *args, **kwargs):
         super().delete(*args, **kwargs)
         if self.detail:
@@ -375,8 +386,8 @@ class Swap(Trade):
 
 class SwapLeg(models.Model):
     trade = models.ForeignKey(Swap, CASCADE, null=True, blank=True, related_name="legs")
-    ccy = models.ForeignKey(Ccy, CASCADE, related_name="swap_legs")
-    effective_date = models.DateField(default=datetime.date.today())
+    ccy = models.ForeignKey(Ccy, CASCADE)
+    effective_date = models.DateField(default=datetime.date.today)
     tenor = models.CharField(max_length=8, null=True, blank=True)
     maturity_date = models.DateField()
     notional = models.FloatField(default=1e6, validators=[validate_positive])

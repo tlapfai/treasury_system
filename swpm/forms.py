@@ -18,6 +18,7 @@ class FxSpotRateQuoteForm(ModelForm):
         model = FxSpotRateQuote
         fields = ['ccy_pair', 'rate']
         widgets = {
+            'ccy_pair': TextInput(attrs={'readonly': 'readonly'})
         }
         
 class IRTermStructureForm(ModelForm):
@@ -135,10 +136,10 @@ class TradeDetailForm(ModelForm):
     #    fields = ['book']
 
 class AsOfForm(forms.Form):
-    as_of = forms.DateField(widget=DateInput(attrs={'type': 'date'}))
+    as_of = forms.DateField(widget=DateInput(attrs={'type': 'date', 'default': datetime.date.today()}))
 
 class TradeIDForm(forms.Form):
-    loaded_id = forms.IntegerField(label="ID", disabled=True, required=False)
+    loaded_id = forms.IntegerField(label="ID", required=False, widget=TextInput(attrs={'readonly': 'readonly'}))
 
 class RevalForm(forms.Form):
     reval_date = forms.DateField(widget=DateInput(attrs={'type': 'date'}))

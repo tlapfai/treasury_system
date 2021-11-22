@@ -1,3 +1,4 @@
+from QuantLib.QuantLib import as_fixed_rate_coupon
 from django.contrib.auth import REDIRECT_FIELD_NAME, authenticate, login, logout
 from django.db.models.query import RawQuerySet
 from django.shortcuts import redirect, render
@@ -9,6 +10,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.core.serializers import serialize
 from django.template import Context
 from django.forms import modelformset_factory
+from django.views import View
 
 from django_plotly_dash import DjangoDash
 import dash_core_components as dcc
@@ -103,48 +105,128 @@ def register(request):
     else:
         return render(request, "swpm/register.html")
 
+class TradeView(View):
+    def make_models_forms(self, inst):
+        if inst == 'FXO':
+            return ("FX Option", FXO, FXOForm, None, None, FXOValuationForm)
+        elif inst == 'SWAP':
+            return ("Swap", Swap, SwapForm, SwapLeg, SwapLegForm, SwapValuationForm)
+    
+    def get(self, request, **kwargs):
+        try:
+            inst = kwargs['inst'].upper()
+        except KeyError:
+            return HttpResponseNotFound('<h1>Product type not found</h1>')
+        else:
+            trade_id = kwargs.get('id')
+            trade_type, inst_model, inst_form, leg_model, leg_form, val_form_ = self.make_models_forms(inst)
+            # common forms
+            val_form = val_form_()
+            as_of_form = AsOfForm(initial={'as_of': datetime.date.today()})
+            if trade_id:
+                try:
+                    loaded_trade = inst_model.objects.get(id=trade_id)
+                except KeyError:
+                    return HttpResponseNotFound('<h1>Trade not found</h1>')
+                else:
+                    trade_id_form = TradeIDForm(initial={'loaded_id': trade_id})
+                    trade_form = inst_form(instance=loaded_trade)
+                    if leg_model:
+                        leg_form_set = modelformset_factory(leg_model, leg_form, extra=2)
+                        trade_form = SwapForm(initial={'trade_date': datetime.date.today()})
+                        trade_forms = leg_form_set(queryset=leg_model.objects.none(), initial=[{'maturity_date': datetime.date.today()+datetime.timedelta(days=365)}])
+            else:
+                trade_id_form = TradeIDForm()
+                trade_form = inst_form()
+                if leg_model:
+                    leg_form_set = modelformset_factory(leg_model, leg_form, extra=2)
+                    trade_form = inst_form(initial={'trade_date': datetime.date.today()})
+                    trade_forms = leg_form_set(queryset=leg_model.objects.none(), initial=[{'maturity_date': datetime.date.today()+datetime.timedelta(days=365)}])
+
+        return render(request, "swpm/trade.html", locals())
+    
 
 def trade(request, **kwargs):
-    try:
-        inst = kwargs['inst'].upper()
-    except KeyError:
-        return HttpResponseNotFound('<h1>Product type not found</h1>')
-    else:
-        trade_id_form = TradeIDForm()
-        as_of_form = AsOfForm(initial={'as_of': datetime.date.today()})
-        valuation_message = kwargs.get('valuation_message')
-        if inst == "FXO":
-            trade_type = "FX Option"
-            val_form = FXOValuationForm()
-            if kwargs.get('trade_form'):
-                trade_form = kwargs['trade_form']
-                as_of_form = kwargs['as_of_form']
-                val_form = kwargs.get('val_form')
-                market_data_form = kwargs.get('market_data_form')
-                trade_id_form = kwargs.get('trade_id_form')
-            else:
-                trade_id = kwargs.get('id')
-                if trade_id:
-                    #trade_form = FXOForm(initial={'trade_date': datetime.date.today()})
-                    try:
-                        loaded_trade = FXO.objects.get(id=trade_id)
-                    except KeyError:
-                        return HttpResponseNotFound('<h1>Trade not found</h1>')
-                    else:
-                        trade_id_form = TradeIDForm(initial={'loaded_id': trade_id})
-                        trade_form = FXOForm(instance=loaded_trade)
+    def make_models_forms(inst):
+        if inst == 'FXO':
+            return ("FX Option", FXO, FXOForm, None, None, FXOValuationForm)
+        elif inst == 'SWAP':
+            return ("Swap", Swap, SwapForm, SwapLeg, SwapLegForm, SwapValuationForm)
+
+    if request.method == 'GET':
+        try:
+            inst = kwargs['inst'].upper()
+        except KeyError:
+            return HttpResponseNotFound('<h1>Product type not found</h1>')
+        else:
+            trade_id = kwargs.get('id')
+            trade_type, inst_model, inst_form, leg_model, leg_form, val_form_ = make_models_forms(inst)
+            # common forms
+            val_form = val_form_()
+            as_of_form = AsOfForm(initial={'as_of': datetime.date.today()})
+            if trade_id:
+                try:
+                    loaded_trade = inst_model.objects.get(id=trade_id)
+                except KeyError:
+                    return HttpResponseNotFound('<h1>Trade not found</h1>')
                 else:
-                    trade_form = FXOForm(initial={'trade_date': datetime.date.today()})
+                    trade_id_form = TradeIDForm(initial={'loaded_id': trade_id})
+                    trade_form = inst_form(instance=loaded_trade)
+                    if leg_model:
+                        leg_form_set = modelformset_factory(leg_model, leg_form, extra=2)
+                        trade_form = SwapForm(initial={'trade_date': datetime.date.today()})
+                        trade_forms = leg_form_set(queryset=leg_model.objects.none(), initial=[{'maturity_date': datetime.date.today()+datetime.timedelta(days=365)}])
+            else:
+                trade_id_form = TradeIDForm()
+                trade_form = inst_form()
+                if leg_model:
+                    leg_form_set = modelformset_factory(leg_model, leg_form, extra=2)
+                    trade_form = inst_form(initial={'trade_date': datetime.date.today()})
+                    trade_forms = leg_form_set(queryset=leg_model.objects.none(), initial=[{'maturity_date': datetime.date.today()+datetime.timedelta(days=365)}])
+
+        return render(request, "swpm/trade.html", locals())
+    elif request.method == 'POST': # from clicked price key
+        inst = kwargs['inst'].upper()
+        as_of_form = request.POST.get('as_of_form')
+        valuation_message = kwargs.get('valuation_message')
+        trade_id = kwargs.get('id')
+        trade_type, inst_model, inst_form, leg_model, leg_form, val_form_ = make_models_forms(inst)
+        trade_id_form = TradeIDForm(initial={'loaded_id': trade_id})
+        val_form = val_form_()
+        if kwargs.get('trade_form'): # trade_from comes from def pricing()
+            trade_form = kwargs['trade_form']
+            as_of_form = kwargs['as_of_form']
+            val_form = kwargs.get('val_form')
+            market_data_form = kwargs.get('market_data_form')
+            trade_id_form = kwargs.get('trade_id_form')
+            if leg_model:
+                trade_forms= kwargs.get('trade_forms')
+                leg_tables = kwargs.get('leg_tables')
+
+        if inst == "FXO":
+            pass
+            # else:
+            #     trade_id = kwargs.get('id')
+            #     if trade_id:
+            #         try:
+            #             loaded_trade = inst_model.objects.get(id=trade_id)
+            #         except KeyError:
+            #             return HttpResponseNotFound('<h1>Trade not found</h1>')
+            #         else:
+            #             trade_id_form = TradeIDForm(initial={'loaded_id': trade_id})
+            #             trade_form = inst_form(instance=loaded_trade)
+            #     else:
+            #         trade_form = inst_form(initial={'trade_date': datetime.date.today()})
         elif inst == 'SWAP':
             trade_type = "Swap"
             if kwargs.get('trade_form'):
-                # locals().update(kwargs)
-                trade_form = kwargs.get('trade_form')
-                as_of_form = kwargs.get('as_of_form')
-                trade_forms= kwargs.get('trade_forms')
-                val_form = kwargs.get('val_form')
-                leg_tables = kwargs.get('leg_tables')
-                trade_id_form = kwargs.get('trade_id_form')
+                pass
+                # trade_form = kwargs.get('trade_form')
+                # as_of_form = kwargs.get('as_of_form')
+                # trade_forms= kwargs.get('trade_forms')
+                # val_form = kwargs.get('val_form')
+                # leg_tables = kwargs.get('leg_tables')
+                # trade_id_form = kwargs.get('trade_id_form')
             else:
                 val_form = SwapValuationForm()
                 trade_id = kwargs.get('id')
@@ -160,7 +242,7 @@ def trade(request, **kwargs):
                         trade_forms = SwapLegFormSet(queryset=SwapLeg.objects.filter(trade=loaded_trade))  # to be fixed
                 else:
                     SwapLegFormSet = modelformset_factory(SwapLeg, SwapLegForm, extra=2)
-                    trade_form = SwapForm(initial={'trade_date': datetime.date.today(), 'id': 1})
+                    trade_form = SwapForm(initial={'trade_date': datetime.date.today()})
                     trade_forms = SwapLegFormSet(queryset=SwapLeg.objects.none(), initial=[{'maturity_date': datetime.date.today()+datetime.timedelta(days=365)}])
         else:
             return HttpResponseNotFound('<h1>Page not found</h1>')
@@ -217,7 +299,8 @@ def pricing(request, commit=False):
         # 2 forms for single leg product
         # 3 forms for multi leg product
         as_of = request.POST['as_of']
-        trade_id_form=TradeIDForm()
+        trade_id_form=TradeIDForm(request.POST)
+        #trade_id_form=request.POST.get('trade_id_form', TradeIDForm())
         as_of_form = AsOfForm(request.POST) #for render back to page
         ql.Settings.instance().evaluationDate = to_qlDate(as_of)
         valuation_message = None
@@ -246,6 +329,7 @@ def pricing(request, commit=False):
                     tr.detail = TradeDetail.objects.create()
                     tr.save()
                     valuation_message = f"Trade is done, ID is {tr.id}."
+                    trade_id_form = TradeIDForm(initial={'loaded_id': str(tr.id)})
     
                 result = {'npv': inst.NPV(), 
                             'delta': inst.delta(),
@@ -260,9 +344,7 @@ def pricing(request, commit=False):
                 valuation_form = FXOValuationForm(initial=result)
             else:
                 valuation_form = FXOValuationForm()
-
-            trade_id_form = TradeIDForm(initial={'loaded_id': tr.id}) if tr.id else TradeIDForm()
-
+            
             return trade(request, inst='fxo', 
                         trade_form=fxo_form, 
                         trade_id_form = trade_id_form, 

@@ -12,6 +12,7 @@ admin.site.register(FXVolatility)
 admin.site.register(FxSpotRateQuote)
 
 admin.site.register(Trade)
+admin.site.register(CashFlow)
 admin.site.register(FXO)
 admin.site.register(Swap)
 admin.site.register(SwapLeg)
