@@ -32,6 +32,7 @@ ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
     'swpm', 
+    'rest_framework',
     'frontend', 
     'django.contrib.admin',
     'django.contrib.auth',

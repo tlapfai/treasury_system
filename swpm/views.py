@@ -20,6 +20,8 @@ import plotly.express as px
 
 from .models import *
 from .forms import *
+from .serializers import *
+from rest_framework import viewsets
 import datetime
 import json
 import pandas as pd
@@ -539,3 +541,8 @@ def yield_curve(request, curve=None, ref_date=None):
             return render(request, 'swpm/yield_curve.html', {'form': YieldCurveSearchForm()})
     else:
         return JsonResponse({"error": "GET or PUT request required."}, status=400)
+
+
+class CalendarViewSet(viewsets.ModelViewSet):
+    queryset = Calendar.objects.all()
+    serializer_class = CalendarSerializer

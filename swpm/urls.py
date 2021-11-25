@@ -1,5 +1,9 @@
-from django.urls import path, re_path
+from django.urls import path, re_path, include
 from . import views
+from rest_framework.routers import DefaultRouter
+
+router = DefaultRouter()
+router.register(r'calendar', views.CalendarViewSet)
 
 urlpatterns = [
     path("", views.index, name="index"),
@@ -23,5 +27,6 @@ urlpatterns = [
     path('reval', views.reval, name='reval'), 
     path('market_data_import', views.market_data_import, name='market_data_import'), 
     path('load_market_data', views.load_market_data, name='load_market_data'),
+    path(r'^api/', include(router.urls)), 
     #path('tenor2date', views.tenor2date, name='tenor2date'), 
 ]
