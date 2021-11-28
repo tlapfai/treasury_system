@@ -1,5 +1,3 @@
-
-
 .alert-danger {
   color: red;
 }
@@ -12,14 +10,14 @@
 } */
 
 .main-body {
-	padding: 1px;
+  padding: 1px;
 }
 
 .flex-container {
-	display: flex;
-	flex-flow: row wrap;
-	column-gap: 2px;
-	justify-content: space-evenly
+  display: flex;
+  flex-flow: row wrap;
+  column-gap: 2px;
+  justify-content: space-evenly;
 }
 
 .flex-item {
@@ -27,8 +25,6 @@
   margin-top: 10px;
   border: solid rgba(52, 122, 250, 0.699);
 }
-
-
 
 .loader {
   border: 16px solid #f3f3f3; /* Light grey */
@@ -40,39 +36,45 @@
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .full-screen {
-    position: fixed;
-    top:0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 10;
-    background: rgba(0,0,0,0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
-.interest-rate-data, .search-result {
+.interest-rate-data,
+.search-result {
   font-size: x-small;
 }
 
 /* trade */
 .valuation-table + th {
-	text-align: left;
-	border: solid skyblue;
+  text-align: left;
+  border: solid skyblue;
 }
 
 .valuation-table + td {
-	text-align: right;
-	border: solid skyblue;
+  text-align: right;
+  border: solid skyblue;
 }
 
-input:invalid, select:invalid {
+input:invalid,
+select:invalid {
   border: 2px solid red;
 }
 
@@ -94,7 +96,8 @@ table.cashflow th {
   padding: 2px;
 }
 
-table.cashflow td, table.rate-list td{
+table.cashflow td,
+table.rate-list td {
   text-align: right;
   font-size: x-small;
   padding: 2px;
@@ -103,5 +106,19 @@ table.cashflow td, table.rate-list td{
 .valuation-table input {
   float: right;
   clear: both;
-  text-align: right
+  text-align: right;
+}
+
+table.trade-form th,
+table.trade-form td {
+  border: 1px solid black;
+}
+
+table.trade-form {
+  width: 100%;
+  border: solid 2px orange;
+}
+
+input.form-control {
+  width: auto;
 }

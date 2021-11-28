@@ -1,5 +1,8 @@
-{% extends "swpm/layout.html" %} {% load static %} {% load humanize %} {% debug
-%} {% block body %}
+{% extends "swpm/layout.html" %}
+{% load static %}
+{% load humanize %} 
+{% debug%} 
+{% block body %}
 <div class="row container-fluid">
   <div
     class="trade-ticket col-md-8"
@@ -93,7 +96,7 @@
                 </table>
                 {% if trade_forms %}
                 <!-- has legs -->
-                <table style="width: 100%; border: solid 2px orange">
+                <table class="trade-form" style="width: 100%; border: solid 2px orange">
                   {{ trade_form }}
                 </table>
                 <table
@@ -117,7 +120,7 @@
                   </tbody>
                 </table>
                 {% else %}
-                <table style="width: 100%; border: solid 2px orange">
+                <table class="trade-form">
                   {{ trade_form.as_table }}
                 </table>
                 {% endif %}
@@ -218,7 +221,8 @@
 </div>
 <!-- end of class="row"-->
 
-{% endblock %} {% block script %}
+{% endblock %}
+{% block script %}
 
 <script src="{% static 'swpm/jquery-3.6.0.slim.min.js' %}"></script>
 <script src="https://unpkg.com/bootstrap-table@1.18.3/dist/bootstrap-table.min.js"></script>

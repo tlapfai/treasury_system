@@ -1,41 +1,50 @@
 {% extends "swpm/layout.html" %}
 {% load static %}
 {% load humanize %}
-
 {% block body %}
 <div class="container-fluid">
 	<div class="row">
 		<div class="col-lg-6">
-			<table class='app-list'  data-toggle="table">
-				<thead><tr>
-					<th data-field="application" data-sortable="true">Application</th>
-					<th data-field="category" data-sortable="true">Category</th>
-					<th data-field="user" data-sortable="true">User</th>
-				</tr></thead>
+			<table class="app-list" data-toggle="table">
+				<thead>
+					<tr>
+						<th data-field="application" data-sortable="true">Application</th>
+						<th data-field="category" data-sortable="true">Category</th>
+						<th data-field="user" data-sortable="true">User</th>
+					</tr>
+				</thead>
 				<tbody>
-					<tr><td><a href="{% url 'trade' inst='fxo' %}">FX Option</a></td><td>Trade</td><td>---</td></tr>
-					<tr><td><a href="{% url 'trade' inst='swap' %}">Swap</a></td><td>Trade</td><td>---</td></tr>
+					<tr>
+						<td><a href="{% url 'trade' inst='fxo' %}">FX Option</a></td>
+						<td>Trade</td>
+						<td>---</td>
+					</tr>
+					<tr>
+						<td><a href="{% url 'trade' inst='swap' %}">Swap</a></td>
+						<td>Trade</td>
+						<td>---</td>
+					</tr>
 				</tbody>
 			</table>
 		</div>
-		<div class="col-lg-6">
-			<table><h1>Table2</h1></table>
+		<div id="root" class="col-lg-6">
+			<!-- React will load here -->
 		</div>
 	</div>
 </div>
-<br>
-{% endblock %}
-
+<br />
+<script src="{% static 'swpm/main.js' %}"></script>
+{% endblock %} 
 
 {% block script %}
 
-	<!-- BOOTSTRAP TABLE START -->
-    <!-- Latest compiled and minified CSS -->
-	<link rel="stylesheet" href="https://unpkg.com/bootstrap-table@1.19.1/dist/bootstrap-table.min.css">
-	<!-- Latest compiled and minified JavaScript -->
-	<script src="https://unpkg.com/bootstrap-table@1.19.1/dist/bootstrap-table.min.js"></script>
-	<!-- Latest compiled and minified Locales -->
-	<script src="https://unpkg.com/bootstrap-table@1.19.1/dist/locale/bootstrap-table-zh-CN.min.js"></script>
-	<!-- BOOTSTRAP TABLE END -->
+<!-- BOOTSTRAP TABLE START -->
+<!-- Latest compiled and minified CSS -->
+<link rel="stylesheet" href="https://unpkg.com/bootstrap-table@1.19.1/dist/bootstrap-table.min.css" />
+<!-- Latest compiled and minified JavaScript -->
+<script src="https://unpkg.com/bootstrap-table@1.19.1/dist/bootstrap-table.min.js"></script>
+<!-- Latest compiled and minified Locales -->
+<script src="https://unpkg.com/bootstrap-table@1.19.1/dist/locale/bootstrap-table-zh-CN.min.js"></script>
+<!-- BOOTSTRAP TABLE END -->
 
 {% endblock %}

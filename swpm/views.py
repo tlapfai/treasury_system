@@ -18,6 +18,12 @@ import dash_html_components as html
 from dash.dependencies import Input, Output
 import plotly.express as px
 
+from django.shortcuts import get_object_or_404
+from rest_framework.renderers import TemplateHTMLRenderer
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.generics import ListAPIView
+
 from .models import *
 from .forms import *
 from .serializers import *
@@ -141,7 +147,7 @@ class TradeView(View):
                     if leg_model:
                         leg_form_set = modelformset_factory(
                             leg_model, leg_form, extra=2)
-                        trade_form = SwapForm(
+                        trade_form = inst_form(
                             initial={'trade_date': datetime.date.today()})
                         trade_forms = leg_form_set(queryset=leg_model.objects.none(), initial=[
                                                    {'maturity_date': datetime.date.today()+datetime.timedelta(days=365)}])
@@ -597,6 +603,40 @@ class CalendarViewSet(viewsets.ModelViewSet):
     queryset = Calendar.objects.all()
     serializer_class = CalendarSerializer
 
+
 class FXOViewSet(viewsets.ModelViewSet):
     queryset = FXO.objects.all()
     serializer_class = FXOSerializer
+
+
+class CalendarDetail(APIView):
+    renderer_classes = [TemplateHTMLRenderer]
+    template_name = 'swpm/calendar.html'
+
+    def get(self, request, name):
+        calendar = get_object_or_404(Calendar, name=name)
+        serializer = CalendarSerializer(calendar)
+        return Response(locals())
+
+    def post(self, request, name):
+        calendar = get_object_or_404(Calendar, name=name)
+        serializer = CalendarSerializer(calendar, data=request.data)
+        if not serializer.is_valid():
+            return Response({'serializer': serializer, 'profile': calendar})
+        serializer.save()
+        return redirect('profile-list')
+
+
+class CalendarList(ListAPIView):  # only a API view
+    serializer_class = CalendarSerializer
+    queryset = Calendar.objects.all()
+
+
+class FXODetail(APIView):
+    renderer_classes = [TemplateHTMLRenderer]
+    template_name = 'swpm/fxo.html'
+
+    def get(self, request, id):
+        trade = get_object_or_404(FXO, id=id)
+        serializer = FXOSerializer(trade)
+        return Response(locals())

@@ -22,6 +22,9 @@ urlpatterns = [
     #path('trade/<str:inst>/<int:id>', views.trade, name='trade'),
     path('trade/<str:inst>', views.TradeView.as_view(), name='trade'),
     path('trade/<str:inst>/<int:id>', views.TradeView.as_view(), name='trade'),
+    path('calendar', views.CalendarList.as_view(), name='calendar'),
+    path('calendar/<str:name>', views.CalendarDetail.as_view(), name='calendar'),
+    path('fxodetail/<int:id>', views.FXODetail.as_view(), name='fxodetail'),
 
     path('yield_curve/search', views.yield_curve, name='yield_curve_search'),
     re_path(

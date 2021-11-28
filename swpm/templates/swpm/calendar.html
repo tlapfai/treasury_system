@@ -1,0 +1,16 @@
+{% extends "swpm/layout.html" %}
+{% load static %}
+{% load rest_framework %}
+{% block body %}
+<h4>Calendar - {{ calendar.name }}</h4>
+
+<form class="form-horizontal" action="{% url 'calendar' name=calendar.name %}" method="POST">
+    {% csrf_token %}
+    {% render_form serializer %}
+    <input type="submit" value="Save">
+</form>
+{% endblock %}
+
+{% block script %}
+<script src="{% static 'swpm/jquery-3.6.0.slim.min.js' %}"></script>
+{% endblock %}
