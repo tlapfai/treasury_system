@@ -1,4 +1,4 @@
-import React, { Component } from "react";
+import React, { Component, useState } from "react";
 import { render } from "react-dom";
 
 class App extends Component {
@@ -7,13 +7,13 @@ class App extends Component {
     this.state = {
       data: [],
       loaded: false,
-      placeholder: "Loading"
+      placeholder: "Loading",
     };
   }
 
   componentDidMount() {
-    fetch("api/calendar")
-      .then(response => {
+    fetch("swpm/api/calendar")
+      .then((response) => {
         if (response.status > 400) {
           return this.setState(() => {
             return { placeholder: "Something went wrong!" };
@@ -21,11 +21,11 @@ class App extends Component {
         }
         return response.json();
       })
-      .then(data => {
+      .then((data) => {
         this.setState(() => {
           return {
             data,
-            loaded: true
+            loaded: true,
           };
         });
       });
@@ -34,12 +34,8 @@ class App extends Component {
   render() {
     return (
       <ul>
-        {this.state.data.map(contact => {
-          return (
-            <li key={contact.id}>
-              {contact.name} - {contact.email}
-            </li>
-          );
+        {this.state.data.map((cal) => {
+          return <li key={cal.id}>{cal.name}</li>;
         })}
       </ul>
     );
@@ -48,5 +44,5 @@ class App extends Component {
 
 export default App;
 
-const container = document.getElementById("app");
+const container = document.getElementById("app-div");
 render(<App />, container);

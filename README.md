@@ -19,6 +19,9 @@ IRTermStructure
 -ModelMultipleChoiceField
 * ql.Cashflows.npv()
 
+https://react-hook-form.com/
+https://www.valentinog.com/blog/drf/#django-and-react-together
+
 https://www.w3schools.com/css/css3_flexbox.asp
 
 combine two dict ==> dict1.update(dict2)

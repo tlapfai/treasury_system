@@ -7,3 +7,9 @@ class CalendarSerializer(serializers.ModelSerializer):
         model = Calendar
         fields = '__all__'
         #fields = ('id', 'song', 'singer', 'last_modify_date', 'created')
+
+
+class FXOSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FXO
+        fields = '__all__'
