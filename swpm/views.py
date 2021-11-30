@@ -337,20 +337,12 @@ def pricing(request, commit=False):
         # 3 forms for multi leg product
         as_of = request.POST['as_of']
         trade_id_form = TradeIDForm(request.POST)
-        #trade_id_form=request.POST.get('trade_id_form', TradeIDForm())
         as_of_form = AsOfForm(request.POST)  # for render back to page
         ql.Settings.instance().evaluationDate = to_qlDate(as_of)
         valuation_message = None
         if request.POST['trade_type'] == 'FX Option':
             fxo_form = FXOForm(request.POST, instance=FXO())
             market_data_form = load_market_data(request, pricing=True)
-            if market_data_form == None:
-                return trade(request, inst='fxo',
-                             trade_form=fxo_form,
-                             as_of_form=as_of_form,
-                             val_form=FXOValuationForm(),
-                             valuation_message="Market data is not sufficient")
-
             if fxo_form.is_valid():
                 tr = fxo_form.save(commit=False)
                 inst = tr.instrument()
@@ -456,6 +448,17 @@ def pricing(request, commit=False):
                          inst='swap',
                          trade_form=swap_form, as_of_form=as_of_form, trade_forms=swap_leg_form_set, trade_id_form=trade_id_form,
                          val_form=valuation_form, valuation_message=valuation_message, leg_tables=leg_tables)
+
+
+def price(request):  # for API
+    if request.method == 'POST':
+        as_of = request.POST['as_of']
+        trade_id_form = TradeIDForm(request.POST)
+        as_of_form = AsOfForm(request.POST)  # for render back to page
+        ql.Settings.instance().evaluationDate = to_qlDate(as_of)
+        valuation_message = None
+        if request.POST['trade_type'] == 'FX Option':
+            pass
 
 
 @csrf_exempt
@@ -640,3 +643,8 @@ class FXODetail(APIView):
         trade = get_object_or_404(FXO, id=id)
         serializer = FXOSerializer(trade)
         return Response(locals())
+
+
+def fxo_detail(request):
+    if request.method == 'GET':
+        return JsonResponse({'form': FXOForm().as_table()})

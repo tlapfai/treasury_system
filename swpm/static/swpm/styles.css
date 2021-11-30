@@ -112,11 +112,13 @@ table.rate-list td {
 table.trade-form th,
 table.trade-form td {
   border: 1px solid black;
+  font-size: smaller;
 }
 
 table.trade-form {
   width: 100%;
   border: solid 2px orange;
+  font-size: smaller;
 }
 
 input.form-control {
