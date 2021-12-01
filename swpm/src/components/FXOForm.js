@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
+import AsOfForm from "./AsOfForm";
 
-function FXOForm() {
+function FXOForm(props) {
   const [form, setForm] = useState("");
   useEffect(() => {
     fetch("fxodetail")
@@ -9,7 +10,15 @@ function FXOForm() {
   });
 
   return (
-    <table className="trade-form" dangerouslySetInnerHTML={{ __html: form }} />
+    <form action="{% url 'pricing' %}" method="post">
+      <button className="btn btn-primary">Price</button>
+      <br />
+      <AsOfForm />
+      <table
+        className="trade-form"
+        dangerouslySetInnerHTML={{ __html: form }}
+      />
+    </form>
   );
 }
 

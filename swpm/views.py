@@ -450,15 +450,34 @@ def pricing(request, commit=False):
                          val_form=valuation_form, valuation_message=valuation_message, leg_tables=leg_tables)
 
 
-def price(request):  # for API
+def fxo_price(request):  # for API
     if request.method == 'POST':
         as_of = request.POST['as_of']
         trade_id_form = TradeIDForm(request.POST)
         as_of_form = AsOfForm(request.POST)  # for render back to page
         ql.Settings.instance().evaluationDate = to_qlDate(as_of)
         valuation_message = None
-        if request.POST['trade_type'] == 'FX Option':
-            pass
+        fxo_form = FXOForm(request.POST, instance=FXO())
+        if fxo_form.is_valid():
+            tr = fxo_form.save(commit=False)
+            inst = tr.instrument()
+            engine = tr.make_pricing_engine(as_of)
+            inst.setPricingEngine(engine)
+            side = 1.0 if tr.buy_sell == "B" else -1.0
+            spot = tr.ccy_pair.rates.get(ref_date=as_of).rate
+        result = {'npv': inst.NPV(),
+                  'delta': inst.delta(),
+                  'gamma': inst.gamma()*0.01/spot,
+                  'vega': inst.vega()*0.01,
+                  'theta': inst.thetaPerDay(),
+                  'rho': inst.rho()*0.01,
+                  'dividendRho': inst.dividendRho()*0.01,
+                  'itmCashProbability': inst.itmCashProbability()/side/tr.notional_1,
+                  }
+        result = dict([(x, round(y*side*tr.notional_1, 2))
+                      for x, y in result.items()])
+        valuation_form = FXOValuationForm(initial=result)
+        return JsonResponse({'result': valuation_form})
 
 
 @csrf_exempt
