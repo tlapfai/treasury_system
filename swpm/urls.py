@@ -14,6 +14,7 @@ urlpatterns = [
     path("logout", views.logout_view, name="logout"),
     path("register", views.register, name="register"),
 
+    path('new_trade', views.new_trade),
     path('pricing', views.pricing, name='pricing'),
     path('pricing/do', views.pricing, {'commit': True}, name='pricing-do'),
     path('ccypair', views.save_ccypair, name='ccypair'),
@@ -37,4 +38,5 @@ urlpatterns = [
     #path('tenor2date', views.tenor2date, name='tenor2date'),
     re_path(r'api/', include(router.urls)),
     path('api-auth/', include('rest_framework.urls', namespace='rest_framework')),
+    path('fxo_price', views.fxo_price, name='fxo_price'),
 ]

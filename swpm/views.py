@@ -165,6 +165,10 @@ class TradeView(View):
         return render(request, "swpm/trade.html", locals())
 
 
+def new_trade(request):
+    return render(request, "swpm/new_trade.html")
+
+
 def trade(request, **kwargs):
     def make_models_forms(inst):
         if inst == 'FXO':
@@ -477,7 +481,7 @@ def fxo_price(request):  # for API
         result = dict([(x, round(y*side*tr.notional_1, 2))
                       for x, y in result.items()])
         valuation_form = FXOValuationForm(initial=result)
-        return JsonResponse({'result': valuation_form})
+        return JsonResponse({'result': valuation_form, 'valuation_message': valuation_message})
 
 
 @csrf_exempt

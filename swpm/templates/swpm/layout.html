@@ -1,4 +1,5 @@
-{% load static %} {% load plotly_dash %}
+{% load static %}
+{% load plotly_dash %}
 
 <!DOCTYPE html>
 <html lang="en">
@@ -229,5 +230,6 @@
 		</div> -->
 </body>
 {% plotly_footer %}
-
+{% block footer %}
+{% endblock %}
 </html>

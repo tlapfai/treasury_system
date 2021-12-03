@@ -1,17 +1,34 @@
 import React, { useState, useEffect } from "react";
+import ReactDOM from "react-dom";
+import axios from "axios";
 import AsOfForm from "./AsOfForm";
 
 function FXOForm(props) {
   const [form, setForm] = useState("");
+  const [valForm, setValForm] = useState("");
   useEffect(() => {
-    fetch("fxodetail")
+    axios.get("fxodetail").then((response) => {
+      setForm(response.data.form);
+    });
+  }, []);
+
+  const handleClick = (e) => {
+    e.preventDefault();
+    axios
+      .post("fxo_price", { formdata: 123 })
       .then((response) => response.json())
-      .then((data) => setForm(data.form));
-  });
+      .then((data) => setValForm(data.valuation_message));
+    ReactDOM.render(
+      <div>{valForm}</div>,
+      document.querySelector(".valuation-form")
+    );
+  };
 
   return (
-    <form action="{% url 'pricing' %}" method="post">
-      <button className="btn btn-primary">Price</button>
+    <form className="fxo-form" method="post">
+      <button className="btn btn-primary" onClick={handleClick}>
+        Price
+      </button>
       <br />
       <AsOfForm />
       <table

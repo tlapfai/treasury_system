@@ -396,6 +396,23 @@ class CashFlow(models.Model):
     trade = models.ForeignKey(Trade, CASCADE, null=True, blank=True)
 
 
+def has_make_pricing_engine(trade):
+    def make_pricing_engine(self, as_of):
+        if self.active:
+            spot_rate = self.ccy_pair.rates.get(ref_date=as_of)
+            v = self.ccy_pair.vol.get(ref_date=as_of).handle()
+            q = IRTermStructure.objects.filter(
+                ref_date=as_of, as_fx_curve=self.ccy_pair.base_ccy).first().term_structure()
+            r = IRTermStructure.objects.filter(
+                ref_date=as_of, as_fx_curve=self.ccy_pair.quote_ccy).first().term_structure()
+            process = ql.BlackScholesMertonProcess(spot_rate.handle(
+            ), ql.YieldTermStructureHandle(q), ql.YieldTermStructureHandle(r), v)
+            return ql.AnalyticEuropeanEngine(process)
+    trade.make_pricing_engine = make_pricing_engine
+    return trade
+
+
+@has_make_pricing_engine
 class FXO(Trade):
     product_type = models.CharField(max_length=12, default="FXO")
     maturity_date = models.DateField(null=False, default=datetime.date.today)
@@ -428,18 +445,6 @@ class FXO(Trade):
         exercise = ql.EuropeanExercise(to_qlDate(self.maturity_date))
         inst = ql.VanillaOption(payoff, exercise)
         return inst
-
-    def make_pricing_engine(self, as_of):
-        if self.active:
-            spot_rate = self.ccy_pair.rates.get(ref_date=as_of)
-            v = self.ccy_pair.vol.get(ref_date=as_of).handle()
-            q = IRTermStructure.objects.filter(
-                ref_date=as_of, as_fx_curve=self.ccy_pair.base_ccy).first().term_structure()
-            r = IRTermStructure.objects.filter(
-                ref_date=as_of, as_fx_curve=self.ccy_pair.quote_ccy).first().term_structure()
-            process = ql.BlackScholesMertonProcess(spot_rate.handle(
-            ), ql.YieldTermStructureHandle(q), ql.YieldTermStructureHandle(r), v)
-            return ql.AnalyticEuropeanEngine(process)
 
 
 # class SwapManager():

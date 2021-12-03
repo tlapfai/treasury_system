@@ -1,0 +1,166 @@
+{% extends "swpm/layout.html" %}
+{% load static %}
+{% load humanize %} 
+{% debug%} 
+{% block body %}
+<div class="row container-fluid">
+  <div
+    class="trade-ticket col-md-8"
+    style="border: skyblue; border-style: solid"
+  >
+    <form action="{% url 'pricing' %}" method="post">
+      {% csrf_token %}
+      <fieldset>
+        <legend>{{ trade_type }}</legend>
+        {% if valuation_message %}
+        <div class="callout"><span>{{ valuation_message }}</span></div>
+        {% endif %}
+        <!-- tab set start -->
+        <nav>
+          <ul class="nav nav-tabs" id="ticketTab" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button
+                class="nav-link active"
+                id="terms-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#terms"
+                type="button"
+                role="tab"
+                aria-controls="terms"
+                aria-selected="true"
+              >
+                Terms
+              </button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button
+                class="nav-link"
+                id="profile-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#profile"
+                type="button"
+                role="tab"
+                aria-controls="profile"
+                aria-selected="false"
+              >
+                Profile
+              </button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button
+                class="nav-link"
+                id="mktdata-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#mktdata"
+                type="button"
+                role="tab"
+                aria-controls="mktdata"
+                aria-selected="false"
+              >
+                Market Data
+              </button>
+            </li>
+          </ul>
+          <div class="tab-content" ifd="ticketTabContent">
+            <!-- terms contents start -->
+            <div
+            class="tab-pane fade show active"
+            id="terms"
+            role="tabpanel"
+            aria-labelledby="terms-tab"
+            >
+            <div id="new-trade-ticket">
+            </div>
+            <!-- terms contents end   -->
+            <div
+              class="tab-pane fade"
+              id="profile"
+              role="tabpanel"
+              aria-labelledby="profile-tab"
+            >
+              <h4>Cashflows</h4>
+              <div class="row container-fluid">
+                {% for leg in leg_tables %}
+                <div class="col-fluid">
+                  <strong>Leg {{ forloop.counter }}</strong>
+                  <table
+                    class="cashflow"
+                    data-toggle="table"
+                    data-show-columns="true"
+                  >
+                    <thead>
+                      <tr>
+                        <th>Start</th>
+                        <th>End</th>
+                        <th>Days</th>
+                        <th>Year fraction</th>
+                        <th>Payment date</th>
+                        <th>Amount</th>
+                        <th>Discount</th>
+                        <th>Discounted amt</th>
+                        <th>Ccy</th>
+                      </tr>
+                    </thead>
+                    {% for cf in leg %}
+                    <tr>
+                      <td>{{ cf.0 }}</td>
+                      <td>{{ cf.1 }}</td>
+                      <td>{{ cf.2 }}</td>
+                      <td>{{ cf.3 |floatformat:6 }}</td>
+                      <td>{{ cf.4 }}</td>
+                      <td>{{ cf.5 |floatformat:2 | intcomma}}</td>
+                      <td>{{ cf.6 |floatformat:6}}</td>
+                      <td>{{ cf.7 |floatformat:2 | intcomma}}</td>
+                      <td>{{ cf.8 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                      <td>Nothing</td>
+                    </tr>
+                    {% endfor %}
+                  </table>
+                </div>
+                <!-- col-md-6 -->
+                <br />
+                {% endfor %}
+              </div>
+            </div>
+            <div
+              class="tab-pane fade"
+              id="mktdata"
+              role="tabpanel"
+              aria-labelledby="mktdata-tab"
+            >
+              <table>
+                {{ market_data_form.fx_spot.as_table }}
+              </table>
+            </div>
+          </div>
+          <!-- tab set end  -->
+        </nav>
+      </fieldset>
+    </form>
+  </div>
+  <!--End of class="trade-ticket">-->
+
+  <div class="valuation col-md-4" style="border: skyblue; border-style: solid">
+    <table class="valuation-table" style="width: 100%">
+      <fieldset>
+        <legend>Valuation</legend>
+        <div class="valuation-form"></div>
+      </fieldset>
+    </table>
+  </div>
+  <!-- end of class='valuation'-->
+</div>
+<!-- end of class="row"-->
+{% endblock %}
+
+{% block script %}
+<script src="{% static 'swpm/jquery-3.6.0.slim.min.js' %}"></script>
+<script src="https://unpkg.com/bootstrap-table@1.18.3/dist/bootstrap-table.min.js"></script>
+{% endblock %}
+
+{% block footer %}
+<script src="{% static 'swpm/main.js' %}"></script>
+{% endblock %}
