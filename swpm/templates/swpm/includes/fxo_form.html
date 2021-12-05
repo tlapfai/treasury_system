@@ -14,6 +14,22 @@
 
 <div class="row container-fluid" style="border: solid black 2px">
     <div class="form-group col-4">
+        <label for="{{ form.buy_sell.id_for_label }}">{{ form.buy_sell.label }}</label>        
+        {% if form.is_bound %}
+            {% if form.buy_sell.errors %}
+                {% render_field form.buy_sell class+="is-invalid" %}
+                {% for error in form.buy_sell.errors %}
+                    <span class="help-block">{{ error }}</span>
+                {% endfor %}
+            {% else %}
+                {% render_field form.buy_sell class+="is-valid" %}
+            {% endif %}
+        {% else %}
+            {% render_field form.buy_sell %}
+        {% endif %}
+    </div>
+
+    <div class="form-group col-4">
         <label for="{{ form.ccy_pair.id_for_label }}">{{ form.ccy_pair.label }}</label>        
         {% if form.is_bound %}
             {% if form.ccy_pair.errors %}
@@ -28,6 +44,7 @@
             {% render_field form.ccy_pair class+="form-control" %}
         {% endif %}
     </div>
+
     <div class="form-group col-4">
         <label for="{{ form.notional_1.id_for_label }}">{{ form.notional_1.label }}</label>
         {% if form.is_bound %}
@@ -45,7 +62,7 @@
     </div>
 
     {% for field in form.visible_fields %}
-        {% if not field.name in "notional_1, ccy_pair" %}
+        {% if not field.name in "buy_sell, notional_1, ccy_pair" %}
             <div class="form-group col-6">
                 {% render_field field.label_tag %}
                 {% if form.is_bound %}
