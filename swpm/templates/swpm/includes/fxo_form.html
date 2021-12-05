@@ -13,7 +13,7 @@
 {% endif %}
 
 <div class="row container-fluid" style="border: solid black 2px">
-    <div class="form-group col-4">
+    <div class="form-group col-3">
         <label for="{{ form.buy_sell.id_for_label }}">{{ form.buy_sell.label }}</label>        
         {% if form.is_bound %}
             {% if form.buy_sell.errors %}
@@ -29,36 +29,36 @@
         {% endif %}
     </div>
 
-    <div class="form-group col-4">
+    <div class="form-group col-3">
         <label for="{{ form.ccy_pair.id_for_label }}">{{ form.ccy_pair.label }}</label>        
         {% if form.is_bound %}
             {% if form.ccy_pair.errors %}
-                {% render_field form.ccy_pair class+="form-control is-invalid" %}
+                {% render_field form.ccy_pair class+="form-control-sm is-invalid" %}
                 {% for error in form.ccy_pair.errors %}
                     <span class="help-block">{{ error }}</span>
                 {% endfor %}
             {% else %}
-                {% render_field form.ccy_pair class+="form-control is-valid" %}
+                {% render_field form.ccy_pair class+="form-control-sm is-valid" %}
             {% endif %}
         {% else %}
-            {% render_field form.ccy_pair class+="form-control" %}
+            {% render_field form.ccy_pair class+="form-control-sm" %}
         {% endif %}
     </div>
 
-    <div class="form-group col-4">
-        <label for="{{ form.notional_1.id_for_label }}">{{ form.notional_1.label }}</label>
+    <div class="form-group col-3 form-floating">
         {% if form.is_bound %}
             {% if form.notional_1.errors %}
-                {% render_field form.notional_1 class+="form-control is-invalid" %}
+                {% render_field form.notional_1 class+="form-control-sm is-invalid" %}
                 {% for error in form.notional_1.errors %}
                     <div class="invalid-feedback">{{ error }}</div>
                 {% endfor %}
             {% else %}
-                {% render_field form.notional_1 class+="form-control is-valid" %}
+                {% render_field form.notional_1 class+="form-control-sm is-valid" %}
             {% endif %}
         {% else %}
             {% render_field form.notional_1 class+="form-control" %}
         {% endif %}
+        <label for="{{ form.notional_1.id_for_label }}">{{ form.notional_1.label }}</label>
     </div>
 
     {% for field in form.visible_fields %}
