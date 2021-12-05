@@ -56,7 +56,7 @@ QL_CALENDAR = {'NullCalendar': ql.NullCalendar(),
 def validate_positive(value):
     if value <= 0:
         raise ValidationError(
-            _('Amount must be positive'), code='non_positive')
+            _('Must be positive'), code='non_positive')
 
 # class PositiveFloatField(models.Field):
 #     default_validators = [validate_positive]
@@ -359,10 +359,9 @@ class Trade(models.Model):
     id = models.BigAutoField(primary_key=True)
     active = models.BooleanField(default=True)
     create_time = models.DateTimeField(auto_now_add=True)
-    trade_date = models.DateField(null=False)
+    trade_date = models.DateField(null=False, default=datetime.date.today)
     pl_ccy = models.ForeignKey(Ccy, CASCADE, null=True, blank=True)
     detail = models.OneToOneField(TradeDetail, CASCADE, null=True)
-
     book = models.ForeignKey(Book, SET_NULL, null=True,
                              blank=True, related_name="trades")
     input_user = models.ForeignKey(
@@ -416,7 +415,8 @@ def has_make_pricing_engine(trade):
 class FXO(Trade):
     product_type = models.CharField(max_length=12, default="FXO")
     maturity_date = models.DateField(null=False, default=datetime.date.today)
-    buy_sell = models.CharField(max_length=1, choices=BUY_SELL)
+    buy_sell = models.CharField(
+        max_length=1, choices=BUY_SELL, null=False, blank=False, default='B')
     ccy_pair = models.ForeignKey(
         CcyPair, models.DO_NOTHING, null=False, related_name='options')
     strike_price = models.FloatField(validators=[validate_positive])

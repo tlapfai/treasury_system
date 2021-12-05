@@ -454,6 +454,7 @@ def pricing(request, commit=False):
                          val_form=valuation_form, valuation_message=valuation_message, leg_tables=leg_tables)
 
 
+@csrf_exempt
 def fxo_price(request):  # for API
     if request.method == 'POST':
         as_of = request.POST['as_of']

@@ -31,17 +31,18 @@ ALLOWED_HOSTS = ['*']
 # Application definition
 
 INSTALLED_APPS = [
-    'swpm', 
+    'swpm',
     'rest_framework',
-    'frontend', 
+    'frontend',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'django.contrib.humanize', 
+    'django.contrib.humanize',
     'django_plotly_dash.apps.DjangoPlotlyDashConfig',
+    'widget_tweaks',
 ]
 
 MIDDLEWARE = [

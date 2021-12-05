@@ -1,11 +1,11 @@
 {% extends "swpm/layout.html" %}
 {% load static %}
 {% load humanize %} 
-{% debug%} 
+{% debug %} 
 {% block body %}
 <div class="row container-fluid">
   <div
-    class="trade-ticket col-md-8"
+    class="trade-ticket col-md-9"
     style="border: skyblue; border-style: solid"
   >
     <form action="{% url 'pricing' %}" method="post">
@@ -78,13 +78,7 @@
               </button>
               <button type="submit" class="btn btn-primary">Price</button>
               {% if user.is_authenticated %}
-              <button
-                type="submit"
-                class="btn btn-primary"
-                formaction="{% url 'pricing-do' %}"
-              >
-                Do
-              </button>
+                <button type="submit" class="btn btn-primary" formaction="{% url 'pricing-do' %}">Do</button>
               {% endif %}
               <!-- table for form start -->
               <table style="width: 100%; border: solid 2px red">
@@ -120,20 +114,10 @@
                   </tbody>
                 </table>
                 {% else %}
-                <table class="trade-form">
-                  {{ trade_form.as_table }}
-                </table>
+                  {% include 'swpm/includes/fxo_form.html' with form=trade_form %}
                 {% endif %}
-                <input
-                  type="hidden"
-                  name="trade_type"
-                  value="{{ trade_type }}"
-                />
-                <input
-                  type="hidden"
-                  name="origin_page"
-                  value="{{ request.path }}"
-                />
+                <input type="hidden" name="trade_type" value="{{ trade_type }}" />
+                <input type="hidden" name="origin_page" value="{{ request.path }}" />
               </table>
               <!-- table for form end   -->
             </div>
@@ -209,7 +193,7 @@
   </div>
   <!--End of class="trade-ticket">-->
 
-  <div class="valuation col-md-4" style="border: skyblue; border-style: solid">
+  <div class="valuation col-md-3" style="border: skyblue; border-style: solid">
     <table class="valuation-table" style="width: 100%">
       <fieldset>
         <legend>Valuation</legend>

@@ -1,12 +1,18 @@
 from django.db.models import fields
-from django.forms import ModelForm, modelformset_factory, SelectDateWidget, DateInput, NumberInput, ModelMultipleChoiceField, widgets, TextInput
+from django.forms import ModelForm, modelformset_factory, SelectDateWidget, DateInput, NumberInput, RadioSelect, ModelMultipleChoiceField, widgets, TextInput
 from django import forms
 from django.forms.models import BaseModelFormSet, ModelChoiceField
 from django.utils.translation import gettext as _
+from django.utils.safestring import mark_safe
+from django.forms import Widget
 import datetime
 
 from django_plotly_dash.dash_wrapper import wid2str
 from .models import *
+
+
+class HorizontalRadioSelect(RadioSelect):
+    template_name = 'swpm/includes/horizontal_multiple_input.html'
 
 
 class CcyPairForm(ModelForm):
@@ -36,14 +42,16 @@ class IRTermStructureForm(ModelForm):
 class FXOForm(ModelForm):
     class Meta:
         model = FXO
-        fields = ['trade_date', 'maturity_date', 'ccy_pair', 'type', 'cp', 'buy_sell',
+        fields = ['buy_sell', 'trade_date', 'maturity_date', 'ccy_pair', 'type', 'cp',
                   'strike_price', 'notional_1', 'notional_2', 'book', 'counterparty']
         # exclude = ['id', 'create_time', 'detail', 'input_user']
         # https://stackoverflow.com/questions/43067707/why-doesnt-my-django-template-render-a-modelforms-id-or-pk-field
         # The id field automatically has editable=False, which means by default it doesn't show up in any model forms.
         widgets = {
-            'trade_date': DateInput(attrs={'type': 'date'}),
+            'buy_sell': HorizontalRadioSelect(attrs={'class': "form-check-input"}),
+            'trade_date': DateInput(attrs={'type': 'date', 'class': "form-control"}),
             'maturity_date': DateInput(attrs={'type': 'date'}),
+            'notional_1': NumberInput(attrs={'class': "form-control"})
         }
         labels = {
             'buy_sell': 'Buy/Sell',
@@ -54,14 +62,17 @@ class FXOForm(ModelForm):
         }
 
     def clean(self):
-        cleaned_data = super().clean()
-        strike_price = cleaned_data.get('strike_price')
-        notional_1 = cleaned_data.get('notional_1')
-        notional_2 = cleaned_data.get('notional_2')
-        option_type = cleaned_data.get('type')
-        if option_type == "EUR" and abs(strike_price*notional_1 - notional_2) > 0.1:
-            raise ValidationError(
-                _('Strike and notionals do not match.'), code='unmatch1')
+        try:
+            cleaned_data = super().clean()
+            option_type = cleaned_data.get('type')
+            if option_type == "EUR" and abs(cleaned_data.get('strike_price')*cleaned_data.get('notional_1') - cleaned_data.get('notional_2')) > 0.1:
+                raise ValidationError(
+                    _('Strike and notionals do not match.'), code='unmatch1')
+            if cleaned_data.get('maturity_date') < cleaned_data.get('trade_date'):
+                raise ValidationError(
+                    _('Maturity date must be not earlier than trade date.'), code='unmatch1')
+        except KeyError:
+            raise ValidationError(_('Fields not completed.'), code=KeyError)
 
     # def __init__(self, *args, **kwargs):
     #    super().__init__(*args, **kwargs)

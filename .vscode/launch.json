@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Runserer Django",
+            "name": "Run Server Django",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}\\manage.py",
@@ -13,7 +13,13 @@
                 "runserver"
             ],
             "django": true,
-            "justMyCode": false
+            "justMyCode": false,
+            "debugOptions": [
+                "WaitOnAbnormalExit",
+                "WaitOnNormalExit",
+                "RedirectOutput",
+                "DjangoDebugging"
+            ]
         }, 
         {
             "name": "Test Django",
@@ -25,6 +31,15 @@
             ],
             "django": true,
             "justMyCode": false
+        },
+        {
+            "name": "Extension",
+            "type": "extensionHost",
+            "request": "launch",
+            "runtimeExecutable": "${execPath}",
+            "args": [
+              "--extensionDevelopmentPath=${workspaceFolder}"
+            ]
         }
     ]
 }
