@@ -132,9 +132,10 @@ class TradeView(View):
             trade_id = kwargs.get('id')
             trade_type, inst_model, inst_form, leg_model, leg_form, val_form_ = self.make_models_forms(
                 inst)
-            # common forms
+            # common forms --- start
             val_form = val_form_()
             as_of_form = AsOfForm(initial={'as_of': datetime.date.today()})
+            # common forms --- end
             if trade_id:
                 try:
                     loaded_trade = inst_model.objects.get(id=trade_id)

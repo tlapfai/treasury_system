@@ -63,19 +63,9 @@
           </ul>
           <div class="tab-content" ifd="ticketTabContent">
             <!-- terms contents start -->
-            <div
-              class="tab-pane fade show active"
-              id="terms"
-              role="tabpanel"
-              aria-labelledby="terms-tab"
-            >
-              <button
-                type="submit"
-                class="btn btn-primary"
-                formaction="{% url 'load_market_data' %}"
-              >
-                Load Market Data
-              </button>
+            <div class="tab-pane fade show active" id="terms" role="tabpanel" aria-labelledby="terms-tab">
+              <button type="submit" class="btn btn-primary" formaction="{% url 'load_market_data' %}">Load Market Data</button>
+              <button type="submit" class="btn btn-primary" formaction="">Auto Fill</button>
               <button type="submit" class="btn btn-primary">Price</button>
               {% if user.is_authenticated %}
                 <button type="submit" class="btn btn-primary" formaction="{% url 'pricing-do' %}">Do</button>
@@ -109,7 +99,8 @@
                           {{ f.as_table }}
                         </table>
                       </td>
-                      {% endfor %} {{ trade_forms.management_form }}
+                      {% endfor %}
+                      {{ trade_forms.management_form }}
                     </tr>
                   </tbody>
                 </table>
@@ -122,12 +113,7 @@
               <!-- table for form end   -->
             </div>
             <!-- terms contents end   -->
-            <div
-              class="tab-pane fade"
-              id="profile"
-              role="tabpanel"
-              aria-labelledby="profile-tab"
-            >
+            <div class="tab-pane fade" id="profile" role="tabpanel" aria-labelledby="profile-tab">
               <h4>Cashflows</h4>
               <div class="row container-fluid">
                 {% for leg in leg_tables %}
@@ -165,7 +151,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                      <td>Nothing</td>
+                      <td>Not Applicable</td>
                     </tr>
                     {% endfor %}
                   </table>
