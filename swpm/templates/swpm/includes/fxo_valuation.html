@@ -1,0 +1,42 @@
+{% load humanize %}
+
+<style>
+    table.valuation td {
+        text-align: right;
+    }
+</style>
+
+<table class="valuation table table-striped">
+    <tr>
+        <th>{{ form.fields.npv.label }}</th>
+        <td>{{ form.initial.npv }}</td>
+    </tr>
+    <tr>
+        <th>Delta</th>
+        <td>{{ form.initial.delta }}</td>
+    </tr>
+    <tr>
+        <th>Gamma</th>
+        <td>{{ form.initial.gamma |floatformat:0 | intcomma }}</td>
+    </tr>
+    <tr>
+        <th>Vega</th>
+        <td>{{ form.initial.vega }}</td>
+    </tr>
+    <tr>
+        <th>Theta</th>
+        <td></td>
+    </tr>
+    <tr>
+        <th>Ccy1 Rho</th>
+        <td></td>
+    </tr>
+    <tr>
+        <th>Ccy2 Rho</th>
+        <td></td>
+    </tr>
+    <tr>
+        <th>ITM Probability</th>
+        <td></td>
+    </tr>
+</table>

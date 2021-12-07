@@ -161,12 +161,7 @@
                 {% endfor %}
               </div>
             </div>
-            <div
-              class="tab-pane fade"
-              id="mktdata"
-              role="tabpanel"
-              aria-labelledby="mktdata-tab"
-            >
+            <div class="tab-pane fade" id="mktdata" role="tabpanel" aria-labelledby="mktdata-tab">
               <table>
                 {{ market_data_form.fx_spot.as_table }}
               </table>
@@ -186,6 +181,7 @@
         {{ val_form.as_table }}
       </fieldset>
     </table>
+    {% include 'swpm/includes/fxo_valuation.html' with form=val_form %}
   </div>
   <!-- end of class='valuation'-->
 </div>

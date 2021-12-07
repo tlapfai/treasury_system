@@ -13,7 +13,7 @@
 {% endif %}
 
 <div class="row container-fluid" style="border: solid black 2px">
-    <div class="form-group col-3">
+    <div class="form-group col-sm-3 col-xs-12>
         <label for="{{ form.buy_sell.id_for_label }}">{{ form.buy_sell.label }}</label>        
         {% if form.is_bound %}
             {% if form.buy_sell.errors %}
@@ -29,8 +29,8 @@
         {% endif %}
     </div>
 
-    <div class="form-group col-3">
-        <label for="{{ form.ccy_pair.id_for_label }}">{{ form.ccy_pair.label }}</label>        
+    <div class="form-group col-sm-3 col-xs-12">
+        <label for="{{ form.ccy_pair.id_for_label }}">{{ form.ccy_pair.label }}</label>
         {% if form.is_bound %}
             {% if form.ccy_pair.errors %}
                 {% render_field form.ccy_pair class+="form-control-sm is-invalid" %}
@@ -45,7 +45,8 @@
         {% endif %}
     </div>
 
-    <div class="form-group col-3 form-floating">
+    <div class="form-group col-sm-3 col-xs-12">
+        <label for="{{ form.notional_1.id_for_label }}">{{ form.notional_1.label }}</label>
         {% if form.is_bound %}
             {% if form.notional_1.errors %}
                 {% render_field form.notional_1 class+="form-control-sm is-invalid" %}
@@ -58,11 +59,26 @@
         {% else %}
             {% render_field form.notional_1 class+="form-control" %}
         {% endif %}
-        <label for="{{ form.notional_1.id_for_label }}">{{ form.notional_1.label }}</label>
+    </div>
+
+    <div class="form-group col-sm-3 col-xs-12">
+        <label for="{{ form.notional_2.id_for_label }}">{{ form.notional_2.label }}</label>
+        {% if form.is_bound %}
+            {% if form.notional_2.errors %}
+                {% render_field form.notional_2 class+="form-control-sm is-invalid" %}
+                {% for error in form.notional_2.errors %}
+                    <div class="invalid-feedback">{{ error }}</div>
+                {% endfor %}
+            {% else %}
+                {% render_field form.notional_2 class+="form-control-sm is-valid" %}
+            {% endif %}
+        {% else %}
+            {% render_field form.notional_2 class+="form-control" %}
+        {% endif %}
     </div>
 
     {% for field in form.visible_fields %}
-        {% if not field.name in "buy_sell, notional_1, ccy_pair" %}
+        {% if not field.name in "buy_sell, notional_1, notional_2, ccy_pair" %}
             <div class="form-group col-6">
                 {% render_field field.label_tag %}
                 {% if form.is_bound %}
