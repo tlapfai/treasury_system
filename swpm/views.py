@@ -11,6 +11,9 @@ from django.core.serializers import serialize
 from django.template import Context
 from django.forms import modelformset_factory
 from django.views import View
+from django.views.generic.detail import DetailView
+from django.views.generic.edit import CreateView, UpdateView
+from django.views.generic.list import ListView
 
 from django_plotly_dash import DjangoDash
 import dash_core_components as dcc
@@ -116,7 +119,25 @@ def register(request):
         return render(request, "swpm/register.html")
 
 
-class TradeView(View):
+class FXOCreateView(CreateView):
+    # the rendering form must be named as "form"
+    form_class = FXOForm
+    model = FXO
+    template_name = "swpm/fxo_create.html"
+    make_models_forms = ("FX Option", FXO, FXOForm,
+                         None, None, FXOValuationForm)
+
+
+class FXOUpdateView(UpdateView):
+    # the rendering form must be named as "form"
+    form_class = FXOForm
+    model = FXO
+    template_name = "swpm/fxo_create.html"
+    make_models_forms = ("FX Option", FXO, FXOForm,
+                         None, None, FXOValuationForm)
+
+
+class TradeView(CreateView):
     def make_models_forms(self, inst):
         if inst == 'FXO':
             return ("FX Option", FXO, FXOForm, None, None, FXOValuationForm)
@@ -673,3 +694,8 @@ class FXODetail(APIView):
 def fxo_detail(request):
     if request.method == 'GET':
         return JsonResponse({'form': FXOForm().as_table()})
+
+
+class FXODetailView(DetailView):
+    model = FXO
+    template_name = 'swpm/trade.html'
