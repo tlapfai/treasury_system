@@ -2,13 +2,12 @@ document.getElementById("btn-price").addEventListener("click", (event) => {
   event.preventDefault();
   console.log(event);
   alert("hi");
-  let myForm = document.getElementsByClassName("trade-form");
-  alert("hi");
+  let myForm = document.querySelector(".trade-form");
   let fd = new FormData(myForm);
 
   axios({
     method: "post",
-    url: "pricing",
+    url: "../pricing",
     data: fd,
     headers: { "Content-Type": "multipart/form-data" },
   })
