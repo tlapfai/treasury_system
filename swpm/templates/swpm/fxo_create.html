@@ -4,11 +4,8 @@
 {% debug %} 
 {% block body %}
 <div class="row container-fluid">
-  <div
-    class="trade-ticket col-md-9"
-    style="border: skyblue; border-style: solid"
-  >
-    <form action="{% url 'pricing' %}" method="post">
+  <div class="trade-ticket col-md-9" style="border: skyblue; border-style: solid">
+    <form class="trade-form">
       {% csrf_token %}
       <input type="date" name="as_of" value="2021-12-07" default="2021-12-07" required id="id_as_of">
       <fieldset>
@@ -20,10 +17,7 @@
         <nav>
           <ul class="nav nav-tabs" id="ticketTab" role="tablist">
             <li class="nav-item" role="presentation">
-              <button
-                class="nav-link active"
-                id="terms-tab"
-                data-bs-toggle="tab"
+              <button class="nav-link active" id="terms-tab" data-bs-toggle="tab"
                 data-bs-target="#terms"
                 type="button"
                 role="tab"
@@ -48,16 +42,8 @@
               </button>
             </li>
             <li class="nav-item" role="presentation">
-              <button
-                class="nav-link"
-                id="mktdata-tab"
-                data-bs-toggle="tab"
-                data-bs-target="#mktdata"
-                type="button"
-                role="tab"
-                aria-controls="mktdata"
-                aria-selected="false"
-              >
+              <button class="nav-link" id="mktdata-tab" data-bs-toggle="tab" data-bs-target="#mktdata"
+                type="button" role="tab" aria-controls="mktdata" aria-selected="false">
                 Market Data
               </button>
             </li>
@@ -67,10 +53,11 @@
             <div class="tab-pane fade show active" id="terms" role="tabpanel" aria-labelledby="terms-tab">
               <button type="submit" class="btn btn-primary" formaction="{% url 'load_market_data' %}">Load Market Data</button>
               <button type="submit" class="btn btn-primary" formaction="">Auto Fill</button>
-              <button type="submit" class="btn btn-primary">Price</button>
+              <button id="btn-price" type="submit" class="btn btn-primary">Price</button>
               {% if user.is_authenticated %}
                 <button type="submit" class="btn btn-primary" formaction="{% url 'pricing-do' %}">Do</button>
               {% endif %}
+
               <!-- table for form start -->
               <table style="width: 100%; border: solid 2px red">
                 <table style="width: 100%">
@@ -183,11 +170,12 @@
 </div>
 <!-- end of class="row"-->
 
+<script src="{% static 'swpm/fxo.js' %}"></script>
+
 {% endblock %}
 {% block script %}
 
 <script src="{% static 'swpm/jquery-3.6.0.slim.min.js' %}"></script>
 <script src="https://unpkg.com/bootstrap-table@1.18.3/dist/bootstrap-table.min.js"></script>
-<script src="{% static 'swpm/index.js' %}"></script>
 
 {% endblock %}

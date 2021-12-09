@@ -26,9 +26,10 @@ urlpatterns = [
     path('calendar', views.CalendarList.as_view(), name='calendar'),
     path('calendar/<str:name>', views.CalendarDetail.as_view(), name='calendar'),
     path('fxoapi/<int:id>', views.FXODetail.as_view(), name='fxoapi'),
-    path('fxo/<int:pk>/update', views.FXOUpdateView.as_view(), name='fxo_update'),
+
     path('fxodetail', views.fxo_detail, name='fxodetail'),
     path('fxo/create', views.FXOCreateView.as_view(), name='fxo_create'),
+    path('fxo/<int:pk>', views.FXOUpdateView.as_view(), name='fxo_update'),
 
     path('yield_curve/search', views.yield_curve, name='yield_curve_search'),
     re_path(
