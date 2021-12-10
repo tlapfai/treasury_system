@@ -6,26 +6,30 @@
     }
 </style>
 
+<div class="alert alert-secondary" role="alert">
+</div>
+
 <table class="valuation table table-striped">
+    <tbody>
     <tr>
-        <th>{{ form.fields.npv.label }}</th>
-        <td>{{ form.initial.npv }}</td>
+        <th id="label-npv">NPV</th>
+        <td id="val-npv">{{ form.initial.npv }}</td>
     </tr>
     <tr>
-        <th>Delta</th>
-        <td>{{ form.initial.delta }}</td>
+        <th id="label-delta">Delta</th>
+        <td id="val-delta">{{ form.initial.delta }}</td>
     </tr>
     <tr>
         <th>Gamma</th>
-        <td>{{ form.initial.gamma |floatformat:0 | intcomma }}</td>
+        <td id="val-gamma">{{ form.initial.gamma |floatformat:0 | intcomma }}</td>
     </tr>
     <tr>
         <th>Vega</th>
-        <td>{{ form.initial.vega }}</td>
+        <td id="val-vega">{{ form.initial.vega }}</td>
     </tr>
     <tr>
         <th>Theta</th>
-        <td></td>
+        <td id="val-theta"></td>
     </tr>
     <tr>
         <th>Ccy1 Rho</th>
@@ -33,10 +37,11 @@
     </tr>
     <tr>
         <th>Ccy2 Rho</th>
-        <td></td>
+        <td id="val-rho"></td>
     </tr>
     <tr>
         <th>ITM Probability</th>
         <td></td>
     </tr>
+</tbody>
 </table>

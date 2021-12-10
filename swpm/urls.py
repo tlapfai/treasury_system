@@ -30,6 +30,7 @@ urlpatterns = [
     path('fxodetail', views.fxo_detail, name='fxodetail'),
     path('fxo/create', views.FXOCreateView.as_view(), name='fxo_create'),
     path('fxo/<int:pk>', views.FXOUpdateView.as_view(), name='fxo_update'),
+    path('fxo/price', views.fxo_price, name='fxo_price'),
 
     path('yield_curve/search', views.yield_curve, name='yield_curve_search'),
     re_path(

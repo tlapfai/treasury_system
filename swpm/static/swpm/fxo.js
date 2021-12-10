@@ -1,20 +1,22 @@
 document.getElementById("btn-price").addEventListener("click", (event) => {
   event.preventDefault();
-  console.log(event);
-  alert("hi");
   let myForm = document.querySelector(".trade-form");
   let fd = new FormData(myForm);
 
   axios({
     method: "post",
-    url: "../pricing",
+    url: "price",
     data: fd,
     headers: { "Content-Type": "multipart/form-data" },
   })
     .then((response) => {
-      setForm(response.data.form);
+      console.log(response.data);
+      for (var key in response.data.result) {
+        document.querySelector("#val-" + key).innerHTML =
+          response.data.result[key];
+      }
     })
-    .catch(() => {
-      console.log(Error("cannot fetch form"));
+    .catch((e) => {
+      console.error(e);
     });
 });
