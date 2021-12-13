@@ -8,7 +8,7 @@ from django.db.models.deletion import CASCADE, DO_NOTHING, SET_NULL, SET_DEFAULT
 from django.db.models.fields.related import ForeignKey
 from django.utils import timezone
 from django.utils.translation import gettext as _
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.core import validators
 from django.core.validators import RegexValidator, MinValueValidator, DecimalValidator
 
@@ -275,16 +275,35 @@ class FXVolatility(models.Model):
     ref_date = models.DateField()
     ccy_pair = models.ForeignKey(CcyPair, CASCADE, related_name='vol')
     vol = models.FloatField()
+    ccy1_yts = None
+    ccy2_yts = None
 
     class Meta:
         verbose_name_plural = "FX volatilities"
+
+    def get_ccy1_yts(self):
+        return self.ccy1_yst if self.ccy1_yst else IRTermStructure.objects.get(name=self.ccy_pair.base_ccy.foreign_exchange_curve, ref_date=self.ref_date).term_structure()
+
+    def get_ccy2_yts(self):
+        return self.ccy2_yst if self.ccy2_yst else IRTermStructure.objects.get(name=self.ccy_pair.quote_ccy.foreign_exchange_curve, ref_date=self.ref_date).term_structure()
+
+    def __str__(self):
+        return f"{self.ccy_pair} as of {self.ref_date}"
 
     def handle(self):
         return ql.BlackVolTermStructureHandle(
             ql.BlackConstantVol(to_qlDate(self.ref_date), self.ccy_pair.calendar.calendar(), self.vol, ql.Actual365Fixed()))
 
-    def __str__(self):
-        return f"{self.ccy_pair} as of {self.ref_date}"
+
+class FXVolatilityQuote(models.Model):
+    delta = models.FloatField()
+    vol = models.FloatField(validators=[validate_positive])
+    delta_type = models.CharField(
+        max_length=6, choices=['Spot', 'Fwd', 'PaSpot', 'PaFwd'])
+    time = models.CharField()
+    atm_type = models.CharField(max_length=20, choices=[
+                                'AtmNull', 'AtmSpot', 'AtmFwd', 'AtmDeltaNeutral'])
+    fx_volatility = models.ForeignKey(FXVolatility, CASCADE)
 
 
 class FXOManager(models.Manager):
@@ -398,15 +417,19 @@ class CashFlow(models.Model):
 def has_make_pricing_engine(trade):
     def make_pricing_engine(self, as_of):
         if self.active:
-            spot_rate = self.ccy_pair.rates.get(ref_date=as_of)
-            v = self.ccy_pair.vol.get(ref_date=as_of).handle()
-            q = IRTermStructure.objects.filter(
-                ref_date=as_of, as_fx_curve=self.ccy_pair.base_ccy).first().term_structure()
-            r = IRTermStructure.objects.filter(
-                ref_date=as_of, as_fx_curve=self.ccy_pair.quote_ccy).first().term_structure()
-            process = ql.BlackScholesMertonProcess(spot_rate.handle(
-            ), ql.YieldTermStructureHandle(q), ql.YieldTermStructureHandle(r), v)
-            return ql.AnalyticEuropeanEngine(process)
+            try:
+                spot_rate = self.ccy_pair.rates.get(ref_date=as_of)
+                v = self.ccy_pair.vol.get(ref_date=as_of).handle()
+                q = IRTermStructure.objects.filter(
+                    ref_date=as_of, as_fx_curve=self.ccy_pair.base_ccy).first().term_structure()
+                r = IRTermStructure.objects.filter(
+                    ref_date=as_of, as_fx_curve=self.ccy_pair.quote_ccy).first().term_structure()
+                process = ql.BlackScholesMertonProcess(spot_rate.handle(
+                ), ql.YieldTermStructureHandle(q), ql.YieldTermStructureHandle(r), v)
+                return ql.AnalyticEuropeanEngine(process)
+            except ObjectDoesNotExist as error:
+                raise error
+
     trade.make_pricing_engine = make_pricing_engine
     return trade
 

@@ -8,6 +8,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.core.serializers import serialize
+from django.core.exceptions import ValidationError
 from django.template import Context
 from django.forms import modelformset_factory
 from django.views import View
@@ -490,6 +491,8 @@ def fxo_price(request):  # for API
             inst.setPricingEngine(engine)
             side = 1.0 if tr.buy_sell == "B" else -1.0
             spot = tr.ccy_pair.rates.get(ref_date=as_of).rate
+        else:
+            return JsonResponse({'errors': fxo_form.errors}, status=500)
         result = {'npv': inst.NPV(),
                   'delta': inst.delta(),
                   'gamma': inst.gamma()*0.01/spot,
@@ -497,12 +500,12 @@ def fxo_price(request):  # for API
                   'theta': inst.thetaPerDay(),
                   'rho': inst.rho()*0.01,
                   'dividendRho': inst.dividendRho()*0.01,
-                  'itmCashProbability': inst.itmCashProbability()/side/tr.notional_1,
+                  'itmCashProbability': inst.itmCashProbability()
                   }
         result = dict([(x, round(y*side*tr.notional_1, 2))
-                      for x, y in result.items()])
-        valuation_form = FXOValuationForm(initial=result)
-        return JsonResponse({'result': result, 'valuation_message': valuation_message})
+                      if x != 'itmCashProbability' else (x, round(y, 6)) for x, y in result.items()])
+        #valuation_form = FXOValuationForm(initial=result)
+        return JsonResponse({'result': result, 'valuation_message': valuation_message}, )
 
 
 @csrf_exempt
