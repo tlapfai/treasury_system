@@ -294,6 +294,22 @@ class FXVolatility(models.Model):
         return ql.BlackVolTermStructureHandle(
             ql.BlackConstantVol(to_qlDate(self.ref_date), self.ccy_pair.calendar.calendar(), self.vol, ql.Actual365Fixed()))
 
+    def smile_handle(self):
+        smiles = self.smiles.all()  # need to interpolate
+        return ql.VolatilityTermStructure()
+
+
+class FXVolatilitySmile(models.Model):
+    tenor = models.CharField()
+    fx_volatility = models.ForeignKey(
+        FXVolatility, CASCADE, related_name='smiles')
+
+    def __str__(self):
+        return f"{self.fx_volatility.ccy_pair} {self.tenor} smile"
+
+    def ql_time(self):
+        return ql.Period(self.tenor)
+
 
 class FXVolatilityQuote(models.Model):
     delta = models.FloatField()
@@ -303,7 +319,8 @@ class FXVolatilityQuote(models.Model):
     time = models.CharField()
     atm_type = models.CharField(max_length=20, choices=[
                                 'AtmNull', 'AtmSpot', 'AtmFwd', 'AtmDeltaNeutral'])
-    fx_volatility = models.ForeignKey(FXVolatility, CASCADE)
+    smile = models.ForeignKey(
+        FXVolatilitySmile, CASCADE, related_name='quotes')
 
 
 class FXOManager(models.Manager):
