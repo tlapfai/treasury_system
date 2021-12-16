@@ -15,6 +15,31 @@ from django.core.validators import RegexValidator, MinValueValidator, DecimalVal
 import QuantLib as ql
 import pandas as pd
 
+
+class FxSmileSection(ql.SmileSection):
+    # Date 	referenceDate_
+    # Date 	exerciseDate_
+    atm = 0
+    d10 = 0
+    d25 = 0
+    d75 = 0
+    d90 = 0
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def strikes(self, delta, s, r, q):
+        return [s*0.9, s*0.95, s, s*1.05, s*1.1]
+
+
+class FxBlackVarianceSurface(ql.BlackVarianceSurface):
+    name = ""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.name = name
+
+
 FXO_TYPE = [("EUR", "European"),
             ("AME", "American"),
             ("DIG", "Digital"),
