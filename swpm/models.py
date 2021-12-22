@@ -360,7 +360,7 @@ class FXVolatility(models.Model):
                 optionType, deltaType, self.spot, localDcf, foreignDcf, stdDev)
 
             d = calc.deltaFromStrike(self.strike)
-            v = interp(d, allowExtrapolation=True)
+            v = self.interp(d, allowExtrapolation=True)
             return (v - v0)
 
     def get_ccy1_yts(self):
@@ -378,24 +378,42 @@ class FXVolatility(models.Model):
 
     def ql_handle(self, t, strike):
         maturities = []
+        surf_vols = []
+        surf_delta = []
+        temp_date = self.ref_date
+        smile_vol = []
+        smile_delta = []
+        second_data = False
+        temp_date = self.ref_date
+        for s in self.quotes.all().order_by('t', 'delta'):
+            smile_vol.append(s.vol)
+            smile_delta.append(s.delta)
+            if s.t > temp_date and second_data:
+                maturities.append(s.t)
+                surf_vols.append(smile_vol)
+                surf_delta.append(smile_delta)
+                smile_vol = []
+                smile_delta = []
+            temp_date = s.t
+            second_data = True
+        print(surf_vols)
+        print(surf_delta)
         vols = []
-        for s in self.smiles.all().order_by():
-            maturities.append(1)  # maturity is a date
-
         return ql.BlackVolTermStructureHandle(
             ql.BlackVarianceCurve(to_qlDate(self.ref_date), maturities, vols, ql.Actual365Fixed()))
 
     def smile_handle(self):
-        smiles = self.smiles.all()  # need to interpolate
+        smiles = self.quotes.all()  # need to interpolate
         return ql.VolatilityTermStructure()
 
 
-class FXVolatilitySmile(models.Model):
-    tenor = models.CharField()
+""" class FXVolatilitySmile(models.Model):
+    CHOICE_ATM_TYPE = models.TextChoices(
+        'ATM_TYPE', ['Spot', 'Fwd', 'PaSpot', 'PaFwd'])
+    tenor = models.CharField(max_length=6)
     fx_volatility = models.ForeignKey(
         FXVolatility, CASCADE, related_name='smiles')
-    delta_type = models.CharField(
-        max_length=6, choices=['Spot', 'Fwd', 'PaSpot', 'PaFwd'])
+    delta_type = models.CharField(max_length=6, choices=CHOICE_ATM_TYPE)
     atm_type = models.CharField(max_length=20, choices=[
                                 'AtmNull', 'AtmSpot', 'AtmFwd', 'AtmDeltaNeutral'])
 
@@ -405,12 +423,24 @@ class FXVolatilitySmile(models.Model):
     def ql_period(self):
         return ql.Period(self.tenor)
 
+    def ql_delta_vol_quote(self):
+        return ql.DeltaVolQuote() """
+
 
 class FXVolatilityQuote(models.Model):
+    ref_date = models.DateField()
+    tenor = models.CharField(max_length=6)
     delta = models.FloatField()
     vol = models.FloatField(validators=[validate_positive])
-    smile = models.ForeignKey(
-        FXVolatilitySmile, CASCADE, related_name='quotes')
+    surface = models.ForeignKey(FXVolatility, CASCADE, related_name='quotes')
+    t = models.DateField(null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        self.t = (to_qlDate(self.ref_date) + ql.Period(self.tenor)).ISO()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f'({self.ref_date}, {self.tenor}, {self.delta})'
 
 
 class FXOManager(models.Manager):

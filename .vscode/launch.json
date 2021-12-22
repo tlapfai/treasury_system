@@ -22,6 +22,23 @@
             ]
         }, 
         {
+            "name": "Shell Django",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}\\manage.py",
+            "args": [
+                "shell"
+            ],
+            "django": true,
+            "justMyCode": false,
+            "debugOptions": [
+                "WaitOnAbnormalExit",
+                "WaitOnNormalExit",
+                "RedirectOutput",
+                "DjangoDebugging"
+            ]
+        }, 
+        {
             "name": "Test Django",
             "type": "python",
             "request": "launch",
