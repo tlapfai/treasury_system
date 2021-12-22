@@ -14,22 +14,47 @@ from django.core.validators import RegexValidator, MinValueValidator, DecimalVal
 
 import QuantLib as ql
 import pandas as pd
+import math
+
+
+class FxBlackVarianceSurface(ql.BlackVarianceSurface):
+    # Date 	referenceDate_
+    # Date 	exerciseDate_
+    deltas = []
+    volatilities = []
+    tenor = ql.Period('0D')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(volMatrix=ql.Matrix(), *args, **kwargs)
+
+    def volatilityImpl(self, strike):
+        return 1.0
+
+    def volatility(self, k, s, rh, qh):  # v=f(k)
+        r = rh.zeroRate(self.tenor)
+        q = qh.zeroRate(self.tenor)
+
+        return 1.0
 
 
 class FxSmileSection(ql.SmileSection):
     # Date 	referenceDate_
     # Date 	exerciseDate_
-    atm = 0
-    d10 = 0
-    d25 = 0
-    d75 = 0
-    d90 = 0
+    deltas = []
+    volatilities = []
+    tenor = ql.Period('0D')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def strikes(self, delta, s, r, q):
-        return [s*0.9, s*0.95, s, s*1.05, s*1.1]
+    def volatilityImpl(self, strike):
+        return 1.0
+
+    def volatility(self, k, s, rh, qh):  # v=f(k)
+        r = rh.zeroRate(self.tenor)
+        q = qh.zeroRate(self.tenor)
+
+        return 1.0
 
 
 class FxBlackVarianceSurface(ql.BlackVarianceSurface):
@@ -37,7 +62,7 @@ class FxBlackVarianceSurface(ql.BlackVarianceSurface):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.name = name
+        self.name = kwargs.get('name')
 
 
 FXO_TYPE = [("EUR", "European"),
@@ -306,6 +331,38 @@ class FXVolatility(models.Model):
     class Meta:
         verbose_name_plural = "FX volatilities"
 
+    class TargetFun:
+        spot = 1.
+        strike = 1.
+        rTS = None
+        qTS = None
+        maturity = None
+        smile_section = None
+        interp = None
+
+        def __init__(self, spot, strike, rTS, qTS, maturity, smile_section):
+            self.spot = spot
+            self.strike = strike
+            self.rTS = rTS
+            self.qTS = qTS
+            self.maturity = maturity
+            self.smile_section = smile_section
+            self.interp = ql.LinearInterpolation([], [])
+
+        def __call__(self, v0):
+            optionType = ql.Option.Put
+            deltaType = ql.DeltaVolQuote.Spot      # Also supports: Spot, PaSpot, PaFwd, Fwd
+            localDcf = self.rTS.discount(self.maturity)
+            foreignDcf = self.qTS.discount(self.maturity)
+            stdDev = math.sqrt(ql.Actual365Fixed().yearFraction(
+                to_qlDate(self.ref_date), self.maturity)) * v0
+            calc = ql.BlackDeltaCalculator(
+                optionType, deltaType, self.spot, localDcf, foreignDcf, stdDev)
+
+            d = calc.deltaFromStrike(self.strike)
+            v = interp(d, allowExtrapolation=True)
+            return (v - v0)
+
     def get_ccy1_yts(self):
         return self.ccy1_yst if self.ccy1_yst else IRTermStructure.objects.get(name=self.ccy_pair.base_ccy.foreign_exchange_curve, ref_date=self.ref_date).term_structure()
 
@@ -319,6 +376,15 @@ class FXVolatility(models.Model):
         return ql.BlackVolTermStructureHandle(
             ql.BlackConstantVol(to_qlDate(self.ref_date), self.ccy_pair.calendar.calendar(), self.vol, ql.Actual365Fixed()))
 
+    def ql_handle(self, t, strike):
+        maturities = []
+        vols = []
+        for s in self.smiles.all().order_by():
+            maturities.append(1)  # maturity is a date
+
+        return ql.BlackVolTermStructureHandle(
+            ql.BlackVarianceCurve(to_qlDate(self.ref_date), maturities, vols, ql.Actual365Fixed()))
+
     def smile_handle(self):
         smiles = self.smiles.all()  # need to interpolate
         return ql.VolatilityTermStructure()
@@ -328,22 +394,21 @@ class FXVolatilitySmile(models.Model):
     tenor = models.CharField()
     fx_volatility = models.ForeignKey(
         FXVolatility, CASCADE, related_name='smiles')
+    delta_type = models.CharField(
+        max_length=6, choices=['Spot', 'Fwd', 'PaSpot', 'PaFwd'])
+    atm_type = models.CharField(max_length=20, choices=[
+                                'AtmNull', 'AtmSpot', 'AtmFwd', 'AtmDeltaNeutral'])
 
     def __str__(self):
         return f"{self.fx_volatility.ccy_pair} {self.tenor} smile"
 
-    def ql_time(self):
+    def ql_period(self):
         return ql.Period(self.tenor)
 
 
 class FXVolatilityQuote(models.Model):
     delta = models.FloatField()
     vol = models.FloatField(validators=[validate_positive])
-    delta_type = models.CharField(
-        max_length=6, choices=['Spot', 'Fwd', 'PaSpot', 'PaFwd'])
-    time = models.CharField()
-    atm_type = models.CharField(max_length=20, choices=[
-                                'AtmNull', 'AtmSpot', 'AtmFwd', 'AtmDeltaNeutral'])
     smile = models.ForeignKey(
         FXVolatilitySmile, CASCADE, related_name='quotes')
 
@@ -394,7 +459,7 @@ class Counterparty(models.Model):
 
 
 class TradeDetail(models.Model):
-    #trade = models.ForeignKey(FXO, CASCADE, related_name="detail")
+    # trade = models.ForeignKey(FXO, CASCADE, related_name="detail")
     # def __str__(self) -> str:
     #     return f"ID: {self.trade.id}"
     pass
@@ -440,8 +505,8 @@ class Trade(models.Model):
             self.detail.delete()
 
     # class Meta:
-        #abstract = True
-        #ordering = ['id']
+        # abstract = True
+        # ordering = ['id']
     # def save(self, *args, **kwargs):
     #     if self.detail == None:
     #         d = TradeDetail.objects.create()
@@ -476,7 +541,7 @@ def has_make_pricing_engine(trade):
     return trade
 
 
-@has_make_pricing_engine
+@ has_make_pricing_engine
 class FXO(Trade):
     product_type = models.CharField(max_length=12, default="FXO")
     maturity_date = models.DateField(null=False, default=datetime.date.today)
@@ -516,7 +581,7 @@ class FXO(Trade):
 #    pass
 
 class Swap(Trade):
-    #objects = SwapManager()
+    # objects = SwapManager()
     product_type = models.CharField(max_length=12, default="SWAP")
     maturity_date = models.DateField(null=True, blank=True)
 
@@ -580,7 +645,7 @@ class SwapLeg(models.Model):
     def leg(self, as_of):
         sch = self.get_schedule()
         dc = QL_DAY_COUNTER[self.day_counter]
-        #day_rule = QL_DAY_RULE[self.day_rule]
+        # day_rule = QL_DAY_RULE[self.day_rule]
         if self.index:
             leg_idx = self.index.get_index(
                 ref_date=as_of, eff_date=self.effective_date)  # need to fix
