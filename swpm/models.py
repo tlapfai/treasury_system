@@ -378,27 +378,23 @@ class FXVolatility(models.Model):
 
     def ql_handle(self, t, strike):
         maturities = []
-        surf_vols = []
+        surf_vol = []
         surf_delta = []
-        temp_date = self.ref_date
-        smile_vol = []
-        smile_delta = []
-        second_data = False
-        temp_date = self.ref_date
-        for s in self.quotes.all().order_by('t', 'delta'):
-            smile_vol.append(s.vol)
-            smile_delta.append(s.delta)
-            if s.t > temp_date and second_data:
-                maturities.append(s.t)
-                surf_vols.append(smile_vol)
-                surf_delta.append(smile_delta)
-                smile_vol = []
-                smile_delta = []
-            temp_date = s.t
-            second_data = True
-        print(surf_vols)
+        prev_t = None
+        row = -1
+        for q in self.quotes.all().order_by('t', 'delta'):
+            if q.t == prev_t:
+                surf_vol[row].append(q.vol)
+                surf_delta[row].append(q.delta)
+            else:
+                surf_vol.append([q.vol])
+                surf_delta.append([q.delta])
+                maturities.append(q.t)
+                row += 1
+            prev_t = q.t
+        print(surf_vol)
         print(surf_delta)
-        vols = []
+        vols = [] # fake
         return ql.BlackVolTermStructureHandle(
             ql.BlackVarianceCurve(to_qlDate(self.ref_date), maturities, vols, ql.Actual365Fixed()))
 
