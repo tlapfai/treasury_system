@@ -394,9 +394,20 @@ class FXVolatility(models.Model):
             prev_t = q.t
         print(surf_vol)
         print(surf_delta)
-        vols = [] # fake
+        
+        solver = ql.Brent()
+        accuracy = 1e-16
+        step = 1e-6
+        volatilities = []
+        for i, smile in enumerate(surf_vol):
+            interp = ql.LinearInterpolation(surf_delta[i], smile)
+            target = TargetFun(k, ratesTs, maturities[i], interp)
+            guess = smile[2]   
+            volatilities.append(solver.solve(target, accuracy, guess, step))
+        
         return ql.BlackVolTermStructureHandle(
-            ql.BlackVarianceCurve(to_qlDate(self.ref_date), maturities, vols, ql.Actual365Fixed()))
+            ql.BlackVarianceCurve(to_qlDate(self.ref_date), maturities, volatilities, ql.Actual365Fixed()))
+        
 
     def smile_handle(self):
         smiles = self.quotes.all()  # need to interpolate
