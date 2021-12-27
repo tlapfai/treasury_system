@@ -76,9 +76,9 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   });
 
-  $(".btn-primary").click(() => {
+  /* $(".btn-primary").click(() => {
     $(".full-screen").show();
-  });
+  }); */
 
   var triggerTabList = [].slice.call(document.querySelectorAll("#ticketTab a"));
   triggerTabList.forEach(function (triggerEl) {

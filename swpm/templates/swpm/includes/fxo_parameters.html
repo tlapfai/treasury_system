@@ -1,0 +1,23 @@
+{% load humanize %}
+
+<style>
+    table.valuation td {
+        text-align: right;
+    }
+</style>
+
+<div id="val-alert" class="alert alert-secondary" role="alert">
+</div>
+
+<table class="valuation table table-striped">
+    <tbody>
+        <tr>
+            <th id="label-vol">Spot</th>
+            <td id="val-spot"></td>
+        </tr>
+        <tr>
+            <th id="label-vol">Volatility</th>
+            <td id="val-vol"></td>
+        </tr>
+    </tbody>
+</table>

@@ -124,3 +124,8 @@ table.trade-form {
 input.form-control {
   width: auto;
 }
+
+table.fx-vol tr,
+table.fx-vol td {
+  text-align: right;
+}

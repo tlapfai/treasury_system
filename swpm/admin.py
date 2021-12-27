@@ -7,9 +7,7 @@ admin.site.register(Ccy)
 admin.site.register(RateIndex)
 admin.site.register(RateIndexFixing)
 admin.site.register(RateQuote)
-admin.site.register(IRTermStructure)
 admin.site.register(FXVolatility)
-admin.site.register(FXVolatilityQuote)
 admin.site.register(FxSpotRateQuote)
 
 admin.site.register(Trade)
@@ -26,17 +24,35 @@ admin.site.register(TradeMarkToMarket)
 
 
 class CcyPairAdmin(admin.ModelAdmin):
-    fields = ('name', 'base_ccy', 'quote_ccy', 'calendar', 'fixing_days')
+    #fields = ('name', 'base_ccy', 'quote_ccy', 'calendar', 'fixing_days')
     # list of fields to display in django admin
     list_display = ['name', 'base_ccy', 'quote_ccy', 'calendar', 'fixing_days']
     # if you want django admin to show the search bar, just add this line
-    search_fields = ['name', 'base_ccy',
-                     'quote_ccy', 'calendar', 'fixing_days']
+    search_fields = ['name']
     # to define model data list ordering
     ordering = ['name', 'base_ccy', 'quote_ccy', 'calendar', 'fixing_days']
 
 
+class FXVolatilityQuoteAdmin(admin.ModelAdmin):
+    all_fields = ['ref_date', 'tenor', 'delta',
+                  'delta_type', 'vol', 'surface', 'maturity']
+    fields = ('ref_date', 'tenor', 'delta',
+              'delta_type', 'vol', 'surface', 'maturity')
+    list_display = all_fields
+    ordering = all_fields
+
+
+class IRTermStructureAdmin(admin.ModelAdmin):
+    all_fields = ['name', 'ref_date', 'ccy', 'rates',
+                  'as_fx_curve', 'as_rf_curve', 'ref_curve']
+    #fields = tuple(all_fields)
+    list_display = ['ccy', 'name', 'ref_date']
+    ordering = all_fields
+
+
 admin.site.register(CcyPair, CcyPairAdmin)
+admin.site.register(FXVolatilityQuote, FXVolatilityQuoteAdmin)
+admin.site.register(IRTermStructure, IRTermStructureAdmin)
 
 # @admin.register(IRTermStructure)
 # class IRTermStructureAdmin(admin.ModelAdmin):

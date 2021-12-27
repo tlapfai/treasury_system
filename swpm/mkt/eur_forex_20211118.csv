@@ -1,0 +1,3 @@
+Date,Curve,Term,Instrument,Ccy,Market Rate,Day Counter,Ref Curve
+2021-11-18,EUR FOREX,6M,FXSW,EUR,-0.0056,,USD OIS
+2021-11-18,EUR FOREX,1Y,FXSW,EUR,-0.0112,,USD OIS

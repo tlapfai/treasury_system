@@ -5,6 +5,8 @@ function numberWithCommas(x) {
   return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
+document.querySelector(".as_of").value = new Date().toISOString().split("T")[0];
+
 document.getElementById("btn-price").addEventListener("click", (event) => {
   event.preventDefault();
   let myForm = document.querySelector(".trade-form");
@@ -28,6 +30,10 @@ document.getElementById("btn-price").addEventListener("click", (event) => {
           response.data.result[key]
         );
       }
+      for (var key in response.data.parameters) {
+        document.querySelector("#val-" + key).textContent =
+          Math.round(response.data.parameters[key] * 1e8) / 1e8;
+      }
       document.querySelector("#val-alert").textContent =
         response.data.valuation_message;
     })
@@ -44,6 +50,20 @@ document.getElementById("btn-price").addEventListener("click", (event) => {
         .querySelectorAll('[id^="val-"]')
         .forEach((e) => (e.textContent = ""));
       console.error("Valuation error: ", error);
-    })
-    .then(alert(response));
+    });
+});
+
+document.getElementById("btn-mkt").addEventListener("click", (event) => {
+  event.preventDefault();
+  let myForm = document.querySelector(".trade-form");
+  let fd = new FormData(myForm);
+  axios({
+    method: "post",
+    url: "/swpm/fx_volatility_table", // starting from slash to access the root of the site
+    data: fd,
+    headers: { "Content-Type": "multipart/form-data" },
+  }).then((response) => {
+    console.log(response);
+    document.getElementById("mktdata").innerHTML = response.data.result;
+  });
 });

@@ -92,6 +92,12 @@ QL_DAY_RULE = {'Following': ql.Following,
                'ModifiedPreceding': ql.ModifiedPreceding,
                'Unadjusted': ql.Unadjusted}
 
+CHOICE_DELTA_TYPE = models.TextChoices(
+    'DELTA_TYPE', ['Spot', 'PaSpot', 'Fwd', 'PaFwd'])
+QL_DELTA_TYPE = {'Spot': ql.DeltaVolQuote.Spot,
+                 'PaSpot': ql.DeltaVolQuote.PaSpot, 'PaFwd': ql.DeltaVolQuote.PaFwd, 'Fwd': ql.DeltaVolQuote.Fwd}
+
+
 # https://docs.djangoproject.com/en/3.2/ref/models/fields/#enumeration-types
 
 QL_CALENDAR = {'NullCalendar': ql.NullCalendar(),
@@ -184,6 +190,21 @@ class FxSpotRateQuote(models.Model):
     def handle(self):
         return ql.QuoteHandle(ql.SimpleQuote(self.rate))
 
+    def spot_date(self):
+        return self.ccy_pair.calendar.calendar().advance(
+            to_qlDate(self.ref_date), ql.Period(self.ccy_pair.fixing_days, ql.Days))
+
+    def forward_rate(self, maturity):
+        sd = self.spot_date()
+        rts = self.ccy_pair.quote_ccy.fx_curve.get(
+            ref_date=self.ref_date).term_structure()
+        qts = self.ccy_pair.base_ccy.fx_curve.get(
+            ref_date=self.ref_date).term_structure()
+        return self.rate / rts.discount(to_qlDate(maturity)) * rts.discount(sd) * qts.discount(to_qlDate(maturity)) / qts.discount(sd)
+
+    def today_rate(self):
+        return self.forward_rate(self.ref_date)
+
     def __str__(self):
         return f"{self.ccy_pair}: {self.rate} as of {self.ref_date}"
 
@@ -197,9 +218,10 @@ class RateQuote(models.Model):
     ccy = models.ForeignKey(Ccy, CASCADE, related_name="rates")
     day_counter = models.CharField(
         max_length=16, choices=CHOICE_DAY_COUNTER.choices)
+    #ref_curve = models.CharField(max_length=16, null=True, blank=True)
     # index = models.ForeignKey(RateIndex, DO_NOTHING, null=True, blank=True) # RateIndex is not defined yet above this model
 
-    def helper(self, discount_curve=None):
+    def helper(self, **kwargs):
         q = ql.QuoteHandle(ql.SimpleQuote(self.rate))
         tenor_ = None if self.instrument == "FUT" else ql.Period(self.tenor)
         if self.instrument == "DEPO":
@@ -214,8 +236,9 @@ class RateQuote(models.Model):
             if self.ccy.code == "USD":
                 # https://quant.stackexchange.com/questions/32345/quantlib-python-dual-curve-bootstrapping-example
                 swapIndex = ql.UsdLiborSwapIsdaFixAm(tenor_)
-                if discount_curve:
-                    return ql.SwapRateHelper(q, swapIndex, 0, ql.Period(), discount_curve)
+                ref_curve = kwargs.get('ref_curve')  # is a handle
+                if ref_curve:
+                    return ql.SwapRateHelper(q, swapIndex, 0, ql.Period(), ref_curve)
                 else:
                     return ql.SwapRateHelper(q, swapIndex)
         elif self.instrument == "OIS":
@@ -230,6 +253,12 @@ class RateQuote(models.Model):
                     swapIndex = ql.OvernightIndexedSwapIndex(
                         "EFFR", tenor_, settlementDays, ql.USDCurrency(), overnight_index)  # not use??
                     return ql.OISRateHelper(2, tenor_, q, overnight_index, paymentLag=0, paymentCalendar=ql.UnitedStates())
+        elif self.instrument == "FXSW":
+            # ql.FxSwapRateHelper(fwdPoint, spotFx, tenor, fixingDays, calendar, convention, endOfMonth, isFxBaseCurrencyCollateralCurrency, collateralCurve)
+            ref_curve = kwargs.get('ref_curve')  # is a handle
+            ccy_pair = CcyPair.objects.get(name=kwargs.get('ccy_pair'))
+            return ql.FxSwapRateHelper(self.rate, ccy_pair.rates.rate, tenor_, ccy_pair.fixing_days, ccy_pair.calendar.calendar(),
+                                       ql.Following, False, self.ccy == ccy_pair.quote_ccy, ref_curve)
 
     def __str__(self):
         return f"{self.name}: ({self.ccy}) as of {self.ref_date}: {self.rate}"
@@ -245,6 +274,7 @@ class IRTermStructure(models.Model):
         Ccy, CASCADE, related_name="fx_curve", null=True, blank=True)
     as_rf_curve = models.ForeignKey(
         Ccy, CASCADE, related_name="rf_curve", null=True, blank=True)
+    ref_curve = models.CharField(max_length=16, null=True, blank=True)
 
     class Meta:
         unique_together = ('name', 'ref_date', 'ccy')
@@ -252,14 +282,15 @@ class IRTermStructure(models.Model):
     def term_structure(self):
         day_counter = ql.Actual365Fixed()
         # change to helper(ccy.rf_curve.term_structure())
-        helpers = [rate.helper() for rate in self.rates.all()]
+        helpers = [rate.helper(ref_curve=self.ref_curve)
+                   for rate in self.rates.all()]
         yts = ql.PiecewiseLogLinearDiscount(
             to_qlDate(self.ref_date), helpers, day_counter)
         yts.enableExtrapolation()
         return yts
 
     def __str__(self):
-        return f"{self.name} as of {self.ref_date}"
+        return f"{self.ccy} {self.name} as of {self.ref_date.strftime('%Y-%m-%d')}"
 
 
 class RateIndex(models.Model):
@@ -324,94 +355,87 @@ class RateIndexFixing(models.Model):
 class FXVolatility(models.Model):
     ref_date = models.DateField()
     ccy_pair = models.ForeignKey(CcyPair, CASCADE, related_name='vol')
-    vol = models.FloatField()
-    ccy1_yts = None
-    ccy2_yts = None
+    # use '.quotes to get quotes'
 
     class Meta:
         verbose_name_plural = "FX volatilities"
+        unique_together = ('ref_date', 'ccy_pair')
 
     class TargetFun:
-        spot = 1.
-        strike = 1.
-        rTS = None
-        qTS = None
-        maturity = None
-        smile_section = None
-        interp = None
-
-        def __init__(self, spot, strike, rTS, qTS, maturity, smile_section):
-            self.spot = spot
+        def __init__(self, ref_date, ccy_pair, strike, maturity, deltas, delta_types, smile_section):
+            self.ref_date = ref_date
+            self.ccy_pair = ccy_pair
             self.strike = strike
-            self.rTS = rTS
-            self.qTS = qTS
-            self.maturity = maturity
+            self.maturity = to_qlDate(maturity)
+            self.deltas = deltas
+            self.delta_types = delta_types[0]
             self.smile_section = smile_section
-            self.interp = ql.LinearInterpolation([], [])
+            self.spot = FxSpotRateQuote.objects.get(
+                ccy_pair=ccy_pair, ref_date=self.ref_date).rate
+            self.rDcf = ccy_pair.base_ccy.fx_curve.filter(
+                ref_date=ref_date).first().term_structure().discount(self.maturity)
+            self.qDcf = ccy_pair.quote_ccy.fx_curve.filter(
+                ref_date=ref_date).first().term_structure().discount(self.maturity)
 
         def __call__(self, v0):
-            optionType = ql.Option.Put
-            deltaType = ql.DeltaVolQuote.Spot      # Also supports: Spot, PaSpot, PaFwd, Fwd
-            localDcf = self.rTS.discount(self.maturity)
-            foreignDcf = self.qTS.discount(self.maturity)
+            optionType = ql.Option.Call
             stdDev = math.sqrt(ql.Actual365Fixed().yearFraction(
                 to_qlDate(self.ref_date), self.maturity)) * v0
             calc = ql.BlackDeltaCalculator(
-                optionType, deltaType, self.spot, localDcf, foreignDcf, stdDev)
-
+                optionType, self.delta_types, self.spot, self.rDcf, self.qDcf, stdDev)
+            self.interp = ql.LinearInterpolation(
+                self.deltas, self.smile_section)
             d = calc.deltaFromStrike(self.strike)
             v = self.interp(d, allowExtrapolation=True)
             return (v - v0)
 
-    def get_ccy1_yts(self):
-        return self.ccy1_yst if self.ccy1_yst else IRTermStructure.objects.get(name=self.ccy_pair.base_ccy.foreign_exchange_curve, ref_date=self.ref_date).term_structure()
-
-    def get_ccy2_yts(self):
-        return self.ccy2_yst if self.ccy2_yst else IRTermStructure.objects.get(name=self.ccy_pair.quote_ccy.foreign_exchange_curve, ref_date=self.ref_date).term_structure()
-
     def __str__(self):
         return f"{self.ccy_pair} as of {self.ref_date}"
 
-    def handle(self):
-        return ql.BlackVolTermStructureHandle(
-            ql.BlackConstantVol(to_qlDate(self.ref_date), self.ccy_pair.calendar.calendar(), self.vol, ql.Actual365Fixed()))
-
-    def ql_handle(self, t, strike):
+    def surface_matrix(self):
         maturities = []
         surf_vol = []
         surf_delta = []
-        prev_t = None
+        surf_delta_type = []
+        prev_t = None  # datetime.date
         row = -1
-        for q in self.quotes.all().order_by('t', 'delta'):
-            if q.t == prev_t:
+        for q in self.quotes.all().order_by('maturity', 'delta'):
+            if q.maturity == prev_t:
                 surf_vol[row].append(q.vol)
                 surf_delta[row].append(q.delta)
+                surf_delta_type[row].append(QL_DELTA_TYPE[q.delta_type])
             else:
                 surf_vol.append([q.vol])
                 surf_delta.append([q.delta])
-                maturities.append(q.t)
+                surf_delta_type.append([QL_DELTA_TYPE[q.delta_type]])
+                maturities.append(to_qlDate(q.maturity))
                 row += 1
-            prev_t = q.t
-        print(surf_vol)
-        print(surf_delta)
-        
+            prev_t = q.maturity
+        return (surf_vol, surf_delta, surf_delta_type, maturities)
+
+    def handle(self, strike):
+        surf_vol, surf_delta, surf_delta_type, maturities = self.surface_matrix()
+
         solver = ql.Brent()
         accuracy = 1e-16
         step = 1e-6
         volatilities = []
-        for i, smile in enumerate(surf_vol):
-            interp = ql.LinearInterpolation(surf_delta[i], smile)
-            target = TargetFun(k, ratesTs, maturities[i], interp)
-            guess = smile[2]   
-            volatilities.append(solver.solve(target, accuracy, guess, step))
-        
-        return ql.BlackVolTermStructureHandle(
-            ql.BlackVarianceCurve(to_qlDate(self.ref_date), maturities, volatilities, ql.Actual365Fixed()))
-        
 
-    def smile_handle(self):
-        smiles = self.quotes.all()  # need to interpolate
-        return ql.VolatilityTermStructure()
+        for i, smile in enumerate(surf_vol):
+            target = self.TargetFun(self.ref_date, self.ccy_pair, strike,
+                                    maturities[i].ISO(), surf_delta[i], surf_delta_type[i], smile)
+            guess = smile[2]
+            volatilities.append(solver.solve(target, accuracy, guess, step))
+        vts = ql.BlackVarianceCurve(
+            to_qlDate(self.ref_date), maturities, volatilities, ql.Actual365Fixed())
+        vts.enableExtrapolation()
+        return ql.BlackVolTermStructureHandle(vts)
+
+    def surface_dataframe(self):
+        surf_vol, surf_delta, surf_delta_type, maturities = self.surface_matrix()
+        smiles_temp = [pd.DataFrame([smile], columns=surf_delta[i],
+                                    index=[maturities[i].ISO()]) for i, smile in enumerate(surf_vol)]
+        return pd.concat(smiles_temp)
 
 
 """ class FXVolatilitySmile(models.Model):
@@ -440,10 +464,15 @@ class FXVolatilityQuote(models.Model):
     delta = models.FloatField()
     vol = models.FloatField(validators=[validate_positive])
     surface = models.ForeignKey(FXVolatility, CASCADE, related_name='quotes')
-    t = models.DateField(null=True, blank=True)
+    delta_type = models.CharField(
+        choices=CHOICE_DELTA_TYPE.choices, max_length=8, null=True)
+    maturity = models.DateField(null=True, blank=True)
 
     def save(self, *args, **kwargs):
-        self.t = (to_qlDate(self.ref_date) + ql.Period(self.tenor)).ISO()
+        self.maturity = (to_qlDate(self.ref_date) +
+                         ql.Period(self.tenor)).ISO()
+        if self.delta < 0:
+            self.delta = round(1.0 + self.delta, 8)
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -559,17 +588,21 @@ class CashFlow(models.Model):
 
 
 def has_make_pricing_engine(trade):
-    def make_pricing_engine(self, as_of):
+    def make_pricing_engine(self, as_of, **kwargs):
         if self.active:
             try:
-                spot_rate = self.ccy_pair.rates.get(ref_date=as_of)
-                v = self.ccy_pair.vol.get(ref_date=as_of).handle()
-                q = IRTermStructure.objects.filter(
-                    ref_date=as_of, as_fx_curve=self.ccy_pair.base_ccy).first().term_structure()
-                r = IRTermStructure.objects.filter(
-                    ref_date=as_of, as_fx_curve=self.ccy_pair.quote_ccy).first().term_structure()
-                process = ql.BlackScholesMertonProcess(spot_rate.handle(
-                ), ql.YieldTermStructureHandle(q), ql.YieldTermStructureHandle(r), v)
+                spot_rate = ql.QuoteHandle(ql.SimpleQuote(
+                    self.ccy_pair.rates.get(ref_date=as_of).today_rate()))
+                v = self.ccy_pair.vol.get(
+                    ref_date=as_of).handle(kwargs.get('strike'))
+                q = self.ccy_pair.base_ccy.fx_curve.get(
+                    ref_date=as_of).term_structure()
+                r = self.ccy_pair.quote_ccy.fx_curve.get(
+                    ref_date=as_of).term_structure()
+                #q = IRTermStructure.objects.filter(ref_date=as_of, as_fx_curve=self.ccy_pair.base_ccy).first().term_structure()
+                #r = IRTermStructure.objects.filter(ref_date=as_of, as_fx_curve=self.ccy_pair.quote_ccy).first().term_structure()
+                process = ql.BlackScholesMertonProcess(
+                    spot_rate, ql.YieldTermStructureHandle(q), ql.YieldTermStructureHandle(r), v)
                 return ql.AnalyticEuropeanEngine(process)
             except ObjectDoesNotExist as error:
                 raise error
