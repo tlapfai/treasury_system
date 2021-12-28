@@ -17,54 +17,6 @@ import pandas as pd
 import math
 
 
-class FxBlackVarianceSurface(ql.BlackVarianceSurface):
-    # Date 	referenceDate_
-    # Date 	exerciseDate_
-    deltas = []
-    volatilities = []
-    tenor = ql.Period('0D')
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(volMatrix=ql.Matrix(), *args, **kwargs)
-
-    def volatilityImpl(self, strike):
-        return 1.0
-
-    def volatility(self, k, s, rh, qh):  # v=f(k)
-        r = rh.zeroRate(self.tenor)
-        q = qh.zeroRate(self.tenor)
-
-        return 1.0
-
-
-class FxSmileSection(ql.SmileSection):
-    # Date 	referenceDate_
-    # Date 	exerciseDate_
-    deltas = []
-    volatilities = []
-    tenor = ql.Period('0D')
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def volatilityImpl(self, strike):
-        return 1.0
-
-    def volatility(self, k, s, rh, qh):  # v=f(k)
-        r = rh.zeroRate(self.tenor)
-        q = qh.zeroRate(self.tenor)
-
-        return 1.0
-
-
-class FxBlackVarianceSurface(ql.BlackVarianceSurface):
-    name = ""
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.name = kwargs.get('name')
-
-
 FXO_TYPE = [("EUR", "European"),
             ("AME", "American"),
             ("DIG", "Digital"),
