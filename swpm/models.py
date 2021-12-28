@@ -223,7 +223,13 @@ class RateQuote(models.Model):
 
     def helper(self, **kwargs):
         q = ql.QuoteHandle(ql.SimpleQuote(self.rate))
-        tenor_ = None if self.instrument == "FUT" else ql.Period(self.tenor)
+        if self.tenor == ['ON', 'TN']:
+            tenor_ = ql.Period('1D')
+            fixing_days = 0 if self.tenor=='ON' else 1
+        else:
+            tenor_ = None if self.instrument == "FUT" else ql.Period(self.tenor)
+            fixing_days = None
+            
         if self.instrument == "DEPO":
             fixing_days = self.ccy.fixing_days
             convention = ql.ModifiedFollowing
@@ -245,20 +251,20 @@ class RateQuote(models.Model):
             if self.ccy.code == "USD":
                 if self.tenor == '1D':
                     return ql.DepositRateHelper(q, tenor_, 0, ql.TARGET(), ql.Following, False, ql.Actual360())
-                    return ql.DepositRateHelper(q, overnight_index)
+                    #return ql.DepositRateHelper(q, overnight_index)
                 else:
                     overnight_index = ql.OvernightIndex(
                         'USD EFFR', 0, ql.USDCurrency(), ql.UnitedStates(), ql.Actual360())
                     settlementDays = 2
-                    swapIndex = ql.OvernightIndexedSwapIndex(
-                        "EFFR", tenor_, settlementDays, ql.USDCurrency(), overnight_index)  # not use??
+                    #swapIndex = ql.OvernightIndexedSwapIndex("EFFR", tenor_, settlementDays, ql.USDCurrency(), overnight_index)  # not use??
                     return ql.OISRateHelper(2, tenor_, q, overnight_index, paymentLag=0, paymentCalendar=ql.UnitedStates())
         elif self.instrument == "FXSW":
             # ql.FxSwapRateHelper(fwdPoint, spotFx, tenor, fixingDays, calendar, convention, endOfMonth, isFxBaseCurrencyCollateralCurrency, collateralCurve)
             ref_curve = kwargs.get('ref_curve')  # is a handle
             ccy_pair = CcyPair.objects.get(name=kwargs.get('ccy_pair'))
-            return ql.FxSwapRateHelper(self.rate, ccy_pair.rates.rate, tenor_, ccy_pair.fixing_days, ccy_pair.calendar.calendar(),
-                                       ql.Following, False, self.ccy == ccy_pair.quote_ccy, ref_curve)
+            fixing_days = ccy_pair.fixing_days if fixing_days == None else fixing_days
+            return ql.FxSwapRateHelper(self.rate, ccy_pair.rates.rate, tenor_, fixing_days, ccy_pair.calendar.calendar(),
+                                       ql.Following, True, self.ccy == ccy_pair.quote_ccy, ref_curve)
 
     def __str__(self):
         return f"{self.name}: ({self.ccy}) as of {self.ref_date}: {self.rate}"
