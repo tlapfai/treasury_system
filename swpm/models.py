@@ -170,8 +170,10 @@ class RateQuote(models.Model):
     ccy = models.ForeignKey(Ccy, CASCADE, related_name="rates")
     day_counter = models.CharField(
         max_length=16, choices=CHOICE_DAY_COUNTER.choices)
-    #ref_curve = models.CharField(max_length=16, null=True, blank=True)
     # index = models.ForeignKey(RateIndex, DO_NOTHING, null=True, blank=True) # RateIndex is not defined yet above this model
+
+    class Meta:
+        unique_together = ('name', 'tenor', 'ref_date')
 
     def helper(self, **kwargs):
         q = ql.QuoteHandle(ql.SimpleQuote(self.rate))
