@@ -21,17 +21,17 @@
 					<table class='curve-list' data-toggle="table">
 						<thead>
 							<tr>
-								<th data-field="name" data-sortable="true">Name</th>
 								<th data-field="date" data-sortable="true">Date</th>
 								<th data-field="ccy" data-sortable="true">Ccy</th>
+								<th data-field="name" data-sortable="true">Name</th>
 							</tr>
 						</thead>
 						<tbody>
 							{% for r in search_result %}
 							<tr>
-								<td class='name'><a href="{% url 'yield_curve' ref_date=r.ref_date curve=r.name %}">{{ r.name }}</a></td>
-								<td class='date'><a href="{% url 'yield_curve' ref_date=r.ref_date curve=r.name %}">{{ r.ref_date |date:'Y-m-d' }}</a></td>
-								<td class='ccy'><a href="{% url 'yield_curve' ref_date=r.ref_date curve=r.name %}">{{ r.ccy_id }}</a></td>
+								<td class='date'><a href="{% url 'yield_curve' ref_date=r.ref_date curve=r.name ccy=r.ccy_id %}">{{ r.ref_date |date:'Y-m-d' }}</a></td>
+								<td class='ccy'><a href="{% url 'yield_curve' ref_date=r.ref_date curve=r.name ccy=r.ccy_id %}">{{ r.ccy_id }}</a></td>
+								<td class='name'><a href="{% url 'yield_curve' ref_date=r.ref_date curve=r.name ccy=r.ccy_id %}">{{ r.name }}</a></td>
 							</tr>
 							{% endfor %}
 						</tbody>

@@ -36,8 +36,10 @@ urlpatterns = [
          name='fx_volatility_table'),  # api
 
     path('yield_curve/search', views.yield_curve, name='yield_curve_search'),
+    #re_path(r'^yield_curve/(?P<curve>[-\w\s]+)/(?P<ref_date>\d{4}-\d{2}-\d{2})$', views.yield_curve, name='yield_curve'),
+    # \s is for whitespace
     re_path(
-        r'^yield_curve/(?P<curve>[-\w\s]+)/(?P<ref_date>\d{4}-\d{2}-\d{2})$', views.yield_curve, name='yield_curve'),
+        r'^yield_curve/(?P<ccy>[-\w]+)/(?P<curve>[-\w]+)/(?P<ref_date>\d{4}-\d{2}-\d{2})$', views.yield_curve, name='yield_curve'),
     # API
     path('reval', views.reval, name='reval'),
     path('market_data_import', views.market_data_import, name='market_data_import'),

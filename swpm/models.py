@@ -99,8 +99,8 @@ class Calendar(models.Model):
 class Ccy(models.Model):
     code = models.CharField(max_length=3, blank=False, primary_key=True)
     fixing_days = models.PositiveIntegerField(default=2)
-    calendar = models.ForeignKey(
-        Calendar, DO_NOTHING, related_name="ccys", null=True)
+    cal = models.ForeignKey(Calendar, DO_NOTHING,
+                            related_name="ccys", null=True)
     risk_free_curve = models.CharField(
         max_length=16, blank=True, null=True)  # free text
     foreign_exchange_curve = models.CharField(
@@ -116,8 +116,8 @@ class CcyPair(models.Model):
     name = models.CharField(max_length=7, primary_key=True)
     base_ccy = models.ForeignKey(Ccy, CASCADE, related_name="as_base_ccy")
     quote_ccy = models.ForeignKey(Ccy, CASCADE, related_name="as_quote_ccy")
-    calendar = models.ForeignKey(
-        Calendar, DO_NOTHING, related_name="ccy_pairs", null=True)
+    cal = models.ForeignKey(Calendar, DO_NOTHING,
+                            related_name="ccy_pairs", null=True)
     fixing_days = models.PositiveIntegerField(default=2)
 
     def check_order():
@@ -129,6 +129,13 @@ class CcyPair(models.Model):
 
     def get_rate(self, date):
         return self.rates.get(ref_date=date)
+
+    def calendar(self):
+        if self.cal:
+            return self.cal.calendar()
+        else:
+            ql.JointCalendar(self.base_ccy.cal.calendar(),
+                             self.quote_ccy.cal.calendar())
 
 
 class FxSpotRateQuote(models.Model):
@@ -179,11 +186,12 @@ class RateQuote(models.Model):
         q = ql.QuoteHandle(ql.SimpleQuote(self.rate))
         if self.tenor == ['ON', 'TN']:
             tenor_ = ql.Period('1D')
-            fixing_days = 0 if self.tenor=='ON' else 1
+            fixing_days = 0 if self.tenor == 'ON' else 1
         else:
-            tenor_ = None if self.instrument == "FUT" else ql.Period(self.tenor)
+            tenor_ = None if self.instrument == "FUT" else ql.Period(
+                self.tenor)
             fixing_days = None
-            
+
         if self.instrument == "DEPO":
             fixing_days = self.ccy.fixing_days
             convention = ql.ModifiedFollowing
@@ -205,12 +213,10 @@ class RateQuote(models.Model):
             if self.ccy.code == "USD":
                 if self.tenor == '1D':
                     return ql.DepositRateHelper(q, tenor_, 0, ql.TARGET(), ql.Following, False, ql.Actual360())
-                    #return ql.DepositRateHelper(q, overnight_index)
                 else:
-                    overnight_index = ql.OvernightIndex(
-                        'USD EFFR', 0, ql.USDCurrency(), ql.UnitedStates(), ql.Actual360())
+                    #overnight_index = ql.OvernightIndex('USD EFFR', 0, ql.USDCurrency(), ql.UnitedStates(), ql.Actual360())
+                    overnight_index = ql.FedFunds()
                     settlementDays = 2
-                    #swapIndex = ql.OvernightIndexedSwapIndex("EFFR", tenor_, settlementDays, ql.USDCurrency(), overnight_index)  # not use??
                     return ql.OISRateHelper(2, tenor_, q, overnight_index, paymentLag=0, paymentCalendar=ql.UnitedStates())
         elif self.instrument == "FXSW":
             # ql.FxSwapRateHelper(fwdPoint, spotFx, tenor, fixingDays, calendar, convention, endOfMonth, isFxBaseCurrencyCollateralCurrency, collateralCurve)
@@ -661,7 +667,7 @@ class SwapLeg(models.Model):
         if self.day_counter is None:
             self.day_counter = self.ccy.rate_day_counter
         if self.calendar is None:
-            self.calendar = self.ccy.calendar
+            self.calendar = self.ccy.cal
         super(SwapLeg, self).save(*args, **kwargs)
 
     def get_schedule(self):

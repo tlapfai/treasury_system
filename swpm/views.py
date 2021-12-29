@@ -615,7 +615,7 @@ def handle_uploaded_file(f=None, text=None):
                 ccy_ = Ccy.objects.get(code=row['Ccy'])
                 if ccy_.foreign_exchange_curve == row['Curve']:
                     arg_upd['as_fx_curve'] = ccy_
-                arg_upd['ref_curve'] = row['ref_curve']
+                arg_upd['ref_curve'] = row['Ref Curve']
                 yts, created_ = IRTermStructure.objects.update_or_create(
                     name=row['Curve'], ref_date=str2date(row['Date']), ccy=ccy_, defaults=arg_upd)
                 if created_:
@@ -682,7 +682,7 @@ def fx_volatility(request, ccy_pair=None, ref_date=None):
 
 
 @csrf_exempt
-def yield_curve(request, curve=None, ref_date=None):
+def yield_curve(request, curve=None, ref_date=None, **kwargs):
     if request.method == 'POST':
         form = YieldCurveSearchForm(request.POST)
         form_ = dict([(x[0], x[1])
@@ -691,9 +691,11 @@ def yield_curve(request, curve=None, ref_date=None):
             **form_).order_by('-ref_date').values())
         return render(request, 'swpm/yield_curve.html', {'form': form, 'search_result': search_result})
     elif request.method == 'GET':
+        ccy = kwargs.get('ccy')
         if curve and ref_date:
+            ql.Settings.instance().evaluationDate = to_qlDate(ref_date)
             yts_model = IRTermStructure.objects.get(
-                name=curve, ref_date=str2date(ref_date))
+                ccy=ccy, name=curve, ref_date=str2date(ref_date))
             yts = yts_model.term_structure()
             dates = yts.dates()
             rates = []

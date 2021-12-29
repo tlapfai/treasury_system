@@ -26,11 +26,11 @@ admin.site.register(TradeMarkToMarket)
 class CcyPairAdmin(admin.ModelAdmin):
     #fields = ('name', 'base_ccy', 'quote_ccy', 'calendar', 'fixing_days')
     # list of fields to display in django admin
-    list_display = ['name', 'base_ccy', 'quote_ccy', 'calendar', 'fixing_days']
+    list_display = ['name', 'base_ccy', 'quote_ccy', 'cal', 'fixing_days']
     # if you want django admin to show the search bar, just add this line
     search_fields = ['name']
     # to define model data list ordering
-    ordering = ['name', 'base_ccy', 'quote_ccy', 'calendar', 'fixing_days']
+    ordering = ['name', 'base_ccy', 'quote_ccy']
 
 
 class FXVolatilityQuoteAdmin(admin.ModelAdmin):
@@ -47,7 +47,6 @@ class IRTermStructureAdmin(admin.ModelAdmin):
                   'as_fx_curve', 'as_rf_curve', 'ref_curve']
     #fields = tuple(all_fields)
     list_display = ['ccy', 'name', 'ref_date']
-    ordering = all_fields
 
 
 admin.site.register(CcyPair, CcyPairAdmin)
