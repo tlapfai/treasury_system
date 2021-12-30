@@ -608,7 +608,7 @@ def handle_uploaded_file(f=None, text=None):
                 msg.append(str(e))
             else:
                 msg.append(f'{str(r)} is created.')
-    elif {'Instrument', 'Ccy', 'Date', 'Market Rate', 'Curve', 'Term', 'Ref Curve'}.issubset(set(df.columns)):
+    elif {'Instrument', 'Ccy', 'Date', 'Market Rate', 'Curve', 'Term', 'Ref Curve', 'Ref Ccy', 'Ccy Pair'}.issubset(set(df.columns)):
         for idx, row in df.iterrows():
             arg_upd = {}
             try:
@@ -616,22 +616,26 @@ def handle_uploaded_file(f=None, text=None):
                 if ccy_.foreign_exchange_curve == row['Curve']:
                     arg_upd['as_fx_curve'] = ccy_
                 arg_upd['ref_curve'] = row['Ref Curve']
+                arg_upd['ref_ccy'] = Ccy.objects.get(code=row['Ref Ccy'])
                 yts, created_ = IRTermStructure.objects.update_or_create(
                     name=row['Curve'], ref_date=str2date(row['Date']), ccy=ccy_, defaults=arg_upd)
                 if created_:
-                    msg.append(f'{yts.name} ({yts.ref_date}) is created.')
-                r, temp_ = RateQuote.objects.update_or_create(name=row['Curve']+' '+row['Term'],
+                    msg.append(
+                        f'{yts.ccy} {yts.name} {yts.ref_date} is created.')
+                r, temp_ = RateQuote.objects.update_or_create(name=row['Ccy']+' ' + row['Curve']+' '+row['Term'],
                                                               ref_date=str2date(
                                                                   row['Date']),
                                                               defaults={'tenor': row['Term'],
                                                                         'instrument': row['Instrument'],
                                                                         'ccy': ccy_,
-                                                                        'rate': float(row['Market Rate']), }
+                                                                        'rate': float(row['Market Rate']),
+                                                                        'ccy_pair': CcyPair.objects.get(name=row['Ccy Pair'])}
                                                               )
+                yts.rates.add(r)
             except KeyError as e:
                 msg.append(str(e))
             else:
-                msg.append(f'{str(r)} is created.')
+                msg.append(f'{str(r.name)} is created.')
     elif {'Date', 'Ccy Pair', 'Delta', 'Tenor', 'Volatility', 'Delta Type'}.issubset(set(df.columns)):
         for idx, row in df.iterrows():
             arg_upd = {}
@@ -655,7 +659,7 @@ def handle_uploaded_file(f=None, text=None):
             else:
                 msg.append(str(v))
     else:
-        msg = 'Header is wrong'
+        msg = ['Header is wrong']
     return msg
 
 
@@ -700,9 +704,10 @@ def yield_curve(request, curve=None, ref_date=None, **kwargs):
             dates = yts.dates()
             rates = []
             for i, r in enumerate(yts_model.rates.all()):
-                adj_rate = r.rate if r.instrument == 'FUT' else r.rate*100
+                adj_rate = r.rate if r.instrument in [
+                    'FUT', 'FXSW'] else r.rate*100.
                 rates.append({'id': r.id, 'tenor': r.tenor, 'rate': adj_rate, 'date': dates[i+1].ISO(),
-                              'zero_rate': yts.zeroRate(dates[i+1], ql.Actual365Fixed(), ql.Continuous).rate()*100
+                              'zero_rate': yts.zeroRate(dates[i+1], ql.ActualActual(), ql.Continuous).rate()*100
                               })
             # need to fix: order wrong if the rates are not in chronological order, becoz dates comes from ql
             plt_points = min(len(rates)-1, 14)
@@ -710,7 +715,7 @@ def yield_curve(request, curve=None, ref_date=None, **kwargs):
             dataPx = px.line(x=[rr['date'] for rr in rates], y=[rr['zero_rate'] for rr in rates],
                              range_x=[dates[0].ISO(), rates[plt_points]
                                       ['date']],
-                             range_y=[0, rates[plt_points]['zero_rate']*1.1],
+                             #range_y=[0, rates[plt_points]['zero_rate']*1.1],
                              markers=True, labels={'x': 'Date', 'y': 'Zero Rate'})
             # dataPx.update_layout(plot_bgcolor='#111111', paper_bgcolor='#111111', font_color='skyblue')
             app = DjangoDash('yts_plot')

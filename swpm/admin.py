@@ -6,7 +6,7 @@ admin.site.register(Calendar)
 admin.site.register(Ccy)
 admin.site.register(RateIndex)
 admin.site.register(RateIndexFixing)
-admin.site.register(RateQuote)
+
 admin.site.register(FXVolatility)
 admin.site.register(FxSpotRateQuote)
 
@@ -47,11 +47,20 @@ class IRTermStructureAdmin(admin.ModelAdmin):
                   'as_fx_curve', 'as_rf_curve', 'ref_curve']
     #fields = tuple(all_fields)
     list_display = ['ccy', 'name', 'ref_date']
+    ordering = ['ccy', 'name', 'ref_date']
+    search_fields = ['name']
+
+
+class RateQuoteAdmin(admin.ModelAdmin):
+    list_display = ['name', 'ref_date', 'tenor', 'instrument']
+    ordering = ['name', 'ref_date', 'tenor', 'instrument']
+    search_fields = ['name']
 
 
 admin.site.register(CcyPair, CcyPairAdmin)
 admin.site.register(FXVolatilityQuote, FXVolatilityQuoteAdmin)
 admin.site.register(IRTermStructure, IRTermStructureAdmin)
+admin.site.register(RateQuote, RateQuoteAdmin)
 
 # @admin.register(IRTermStructure)
 # class IRTermStructureAdmin(admin.ModelAdmin):

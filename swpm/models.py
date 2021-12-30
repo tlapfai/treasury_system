@@ -169,14 +169,15 @@ class FxSpotRateQuote(models.Model):
 
 
 class RateQuote(models.Model):
-    name = models.CharField(max_length=16)
+    name = models.CharField(max_length=16)  # e.g. USD OIS 12M
     ref_date = models.DateField()
     rate = models.FloatField()
     tenor = models.CharField(max_length=5)
     instrument = models.CharField(max_length=5)
     ccy = models.ForeignKey(Ccy, CASCADE, related_name="rates")
     day_counter = models.CharField(
-        max_length=16, choices=CHOICE_DAY_COUNTER.choices)
+        max_length=16, choices=CHOICE_DAY_COUNTER.choices, null=True, blank=True)
+    ccy_pair = models.ForeignKey(CcyPair, CASCADE, null=True, blank=True)
     # index = models.ForeignKey(RateIndex, DO_NOTHING, null=True, blank=True) # RateIndex is not defined yet above this model
 
     class Meta:
@@ -184,7 +185,7 @@ class RateQuote(models.Model):
 
     def helper(self, **kwargs):
         q = ql.QuoteHandle(ql.SimpleQuote(self.rate))
-        if self.tenor == ['ON', 'TN']:
+        if self.tenor in ['ON', 'TN']:
             tenor_ = ql.Period('1D')
             fixing_days = 0 if self.tenor == 'ON' else 1
         else:
@@ -220,14 +221,20 @@ class RateQuote(models.Model):
                     return ql.OISRateHelper(2, tenor_, q, overnight_index, paymentLag=0, paymentCalendar=ql.UnitedStates())
         elif self.instrument == "FXSW":
             # ql.FxSwapRateHelper(fwdPoint, spotFx, tenor, fixingDays, calendar, convention, endOfMonth, isFxBaseCurrencyCollateralCurrency, collateralCurve)
-            ref_curve = kwargs.get('ref_curve')  # is a handle
-            ccy_pair = CcyPair.objects.get(name=kwargs.get('ccy_pair'))
-            fixing_days = ccy_pair.fixing_days if fixing_days == None else fixing_days
-            return ql.FxSwapRateHelper(self.rate, ccy_pair.rates.rate, tenor_, fixing_days, ccy_pair.calendar.calendar(),
-                                       ql.Following, True, self.ccy == ccy_pair.quote_ccy, ref_curve)
+            if self.ccy_pair:
+                ref_curve = kwargs.get('ref_curve')  # is a handle
+                fixing_days = self.ccy_pair.fixing_days if fixing_days == None else fixing_days
+                return ql.FxSwapRateHelper(ql.QuoteHandle(ql.SimpleQuote(self.rate)),
+                                           ql.QuoteHandle(ql.SimpleQuote(
+                                               self.ccy_pair.rates.get(ref_date=self.ref_date).rate)),
+                                           tenor_, fixing_days, self.ccy_pair.calendar(),
+                                           ql.Following, True, self.ccy == self.ccy_pair.quote_ccy,
+                                           ref_curve)
+            else:
+                raise KeyError('No Ccy Pair in FXSW type rate quote')
 
     def __str__(self):
-        return f"{self.name}: ({self.ccy}) as of {self.ref_date}: {self.rate}"
+        return f"{self.name} as of {self.ref_date.strftime('%Y-%m-%d')}: {self.rate}"
 
 
 class IRTermStructure(models.Model):
@@ -240,6 +247,7 @@ class IRTermStructure(models.Model):
         Ccy, CASCADE, related_name="fx_curve", null=True, blank=True)
     as_rf_curve = models.ForeignKey(
         Ccy, CASCADE, related_name="rf_curve", null=True, blank=True)
+    ref_ccy = models.ForeignKey(Ccy, CASCADE, null=True, blank=True)
     ref_curve = models.CharField(max_length=16, null=True, blank=True)
 
     class Meta:
@@ -248,7 +256,11 @@ class IRTermStructure(models.Model):
     def term_structure(self):
         day_counter = ql.Actual365Fixed()
         # change to helper(ccy.rf_curve.term_structure())
-        helpers = [rate.helper(ref_curve=self.ref_curve)
+        ref_curve_ = None
+        if self.ref_curve and self.ref_ccy:
+            ref_curve_ = IRTermStructure.objects.get(
+                name=self.ref_curve, ccy=self.ref_ccy, ref_date=self.ref_date).term_structure()
+        helpers = [rate.helper(ref_curve=ql.YieldTermStructureHandle(ref_curve_))
                    for rate in self.rates.all()]
         yts = ql.PiecewiseLogLinearDiscount(
             to_qlDate(self.ref_date), helpers, day_counter)
