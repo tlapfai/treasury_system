@@ -43,6 +43,7 @@ def str2date(s):
     elif len(str(s)) == 8:
         return datetime.datetime.strptime(str(s), '%Y%m%d')
 
+
 # def tenor2date(request):
 #     if request.is_ajax():
 #         effective_date = request.POST.get('effective_date', None)
@@ -83,9 +84,8 @@ def login_view(request):
             return HttpResponseRedirect(reverse("index"))
             # return redirect(request.POST.get('next'))
         else:
-            return render(request, "swpm/login.html", {
-                "message": "Invalid username and/or password."
-            })
+            return render(request, "swpm/login.html",
+                          {"message": "Invalid username and/or password."})
     else:
         return render(request, "swpm/login.html")
 
@@ -104,16 +104,16 @@ def register(request):
         password = request.POST["password"]
         confirmation = request.POST["confirmation"]
         if password != confirmation:
-            return render(request, "swpm/register.html", {"message": "Passwords must match."})
+            return render(request, "swpm/register.html",
+                          {"message": "Passwords must match."})
 
         # Attempt to create new user
         try:
             user = User.objects.create_user(username, email, password)
             user.save()
         except IntegrityError:
-            return render(request, "swpm/register.html", {
-                "message": "Username already taken."
-            })
+            return render(request, "swpm/register.html",
+                          {"message": "Username already taken."})
         login(request, user)
         return HttpResponseRedirect(reverse("index"))
     else:
@@ -125,8 +125,8 @@ class FXOCreateView(CreateView):
     form_class = FXOForm
     model = FXO
     template_name = "swpm/fxo_create.html"
-    make_models_forms = ("FX Option", FXO, FXOForm,
-                         None, None, FXOValuationForm)
+    make_models_forms = ("FX Option", FXO, FXOForm, None, None,
+                         FXOValuationForm)
 
 
 class FXOUpdateView(UpdateView):
@@ -134,16 +134,18 @@ class FXOUpdateView(UpdateView):
     form_class = FXOForm
     model = FXO
     template_name = "swpm/fxo_create.html"
-    make_models_forms = ("FX Option", FXO, FXOForm,
-                         None, None, FXOValuationForm)
+    make_models_forms = ("FX Option", FXO, FXOForm, None, None,
+                         FXOValuationForm)
 
 
 class TradeView(CreateView):
+
     def make_models_forms(self, inst):
         if inst == 'FXO':
             return ("FX Option", FXO, FXOForm, None, None, FXOValuationForm)
         elif inst == 'SWAP':
-            return ("Swap", Swap, SwapForm, SwapLeg, SwapLegForm, SwapValuationForm)
+            return ("Swap", Swap, SwapForm, SwapLeg, SwapLegForm,
+                    SwapValuationForm)
 
     def get(self, request, **kwargs):
         try:
@@ -168,22 +170,34 @@ class TradeView(CreateView):
                         initial={'loaded_id': trade_id})
                     trade_form = inst_form(instance=loaded_trade)
                     if leg_model:
-                        leg_form_set = modelformset_factory(
-                            leg_model, leg_form, extra=2)
+                        leg_form_set = modelformset_factory(leg_model,
+                                                            leg_form,
+                                                            extra=2)
                         trade_form = inst_form(
                             initial={'trade_date': datetime.date.today()})
-                        trade_forms = leg_form_set(queryset=leg_model.objects.none(), initial=[
-                                                   {'maturity_date': datetime.date.today()+datetime.timedelta(days=365)}])
+                        trade_forms = leg_form_set(
+                            queryset=leg_model.objects.none(),
+                            initial=[{
+                                'maturity_date':
+                                datetime.date.today() +
+                                datetime.timedelta(days=365)
+                            }])
             else:
                 trade_id_form = TradeIDForm()
                 trade_form = inst_form()
                 if leg_model:
-                    leg_form_set = modelformset_factory(
-                        leg_model, leg_form, extra=2)
+                    leg_form_set = modelformset_factory(leg_model,
+                                                        leg_form,
+                                                        extra=2)
                     trade_form = inst_form(
                         initial={'trade_date': datetime.date.today()})
-                    trade_forms = leg_form_set(queryset=leg_model.objects.none(), initial=[
-                                               {'maturity_date': datetime.date.today()+datetime.timedelta(days=365)}])
+                    trade_forms = leg_form_set(
+                        queryset=leg_model.objects.none(),
+                        initial=[{
+                            'maturity_date':
+                            datetime.date.today() +
+                            datetime.timedelta(days=365)
+                        }])
 
         return render(request, "swpm/trade.html", locals())
 
@@ -193,11 +207,13 @@ def new_trade(request):
 
 
 def trade(request, **kwargs):
+
     def make_models_forms(inst):
         if inst == 'FXO':
             return ("FX Option", FXO, FXOForm, None, None, FXOValuationForm)
         elif inst == 'SWAP':
-            return ("Swap", Swap, SwapForm, SwapLeg, SwapLegForm, SwapValuationForm)
+            return ("Swap", Swap, SwapForm, SwapLeg, SwapLegForm,
+                    SwapValuationForm)
 
     if request.method == 'GET':
         try:
@@ -221,22 +237,34 @@ def trade(request, **kwargs):
                         initial={'loaded_id': trade_id})
                     trade_form = inst_form(instance=loaded_trade)
                     if leg_model:
-                        leg_form_set = modelformset_factory(
-                            leg_model, leg_form, extra=2)
+                        leg_form_set = modelformset_factory(leg_model,
+                                                            leg_form,
+                                                            extra=2)
                         trade_form = SwapForm(
                             initial={'trade_date': datetime.date.today()})
-                        trade_forms = leg_form_set(queryset=leg_model.objects.none(), initial=[
-                                                   {'maturity_date': datetime.date.today()+datetime.timedelta(days=365)}])
+                        trade_forms = leg_form_set(
+                            queryset=leg_model.objects.none(),
+                            initial=[{
+                                'maturity_date':
+                                datetime.date.today() +
+                                datetime.timedelta(days=365)
+                            }])
             else:
                 trade_id_form = TradeIDForm()
                 trade_form = inst_form()
                 if leg_model:
-                    leg_form_set = modelformset_factory(
-                        leg_model, leg_form, extra=2)
+                    leg_form_set = modelformset_factory(leg_model,
+                                                        leg_form,
+                                                        extra=2)
                     trade_form = inst_form(
                         initial={'trade_date': datetime.date.today()})
-                    trade_forms = leg_form_set(queryset=leg_model.objects.none(), initial=[
-                                               {'maturity_date': datetime.date.today()+datetime.timedelta(days=365)}])
+                    trade_forms = leg_form_set(
+                        queryset=leg_model.objects.none(),
+                        initial=[{
+                            'maturity_date':
+                            datetime.date.today() +
+                            datetime.timedelta(days=365)
+                        }])
 
         return render(request, "swpm/trade.html", locals())
     elif request.method == 'POST':  # from clicked price key
@@ -293,17 +321,25 @@ def trade(request, **kwargs):
                     else:
                         trade_id_form = TradeIDForm(initial={'id': trade_id})
                         trade_form = SwapForm(instance=loaded_trade)
-                        SwapLegFormSet = modelformset_factory(
-                            SwapLeg, SwapLegForm, extra=0)
+                        SwapLegFormSet = modelformset_factory(SwapLeg,
+                                                              SwapLegForm,
+                                                              extra=0)
                         trade_forms = SwapLegFormSet(
-                            queryset=SwapLeg.objects.filter(trade=loaded_trade))  # to be fixed
+                            queryset=SwapLeg.objects.filter(
+                                trade=loaded_trade))  # to be fixed
                 else:
-                    SwapLegFormSet = modelformset_factory(
-                        SwapLeg, SwapLegForm, extra=2)
+                    SwapLegFormSet = modelformset_factory(SwapLeg,
+                                                          SwapLegForm,
+                                                          extra=2)
                     trade_form = SwapForm(
                         initial={'trade_date': datetime.date.today()})
-                    trade_forms = SwapLegFormSet(queryset=SwapLeg.objects.none(), initial=[
-                                                 {'maturity_date': datetime.date.today()+datetime.timedelta(days=365)}])
+                    trade_forms = SwapLegFormSet(
+                        queryset=SwapLeg.objects.none(),
+                        initial=[{
+                            'maturity_date':
+                            datetime.date.today() +
+                            datetime.timedelta(days=365)
+                        }])
         else:
             return HttpResponseNotFound('<h1>Page not found</h1>')
         return render(request, "swpm/trade.html", locals())
@@ -312,15 +348,19 @@ def trade(request, **kwargs):
 def trade_list(request):
     if request.method == 'POST':
         form = TradeSearchForm(request.POST)
-        form_ = dict([(x[0], x[1])
-                     for x in form.data.dict().items() if len(x[1]) > 0])
+        form_ = dict([(x[0], x[1]) for x in form.data.dict().items()
+                      if len(x[1]) > 0])
         form_.pop('csrfmiddlewaretoken')
         trades1 = list(FXO.objects.filter(**form_).values())
         trades2 = list(Swap.objects.filter(**form_).values())
         search_result = trades1 + trades2
-        return render(request, 'swpm/trade-list.html', {'form': TradeSearchForm(), "search_result": search_result})
+        return render(request, 'swpm/trade-list.html', {
+            'form': TradeSearchForm(),
+            "search_result": search_result
+        })
     else:
-        return render(request, 'swpm/trade-list.html', {'form': TradeSearchForm()})
+        return render(request, 'swpm/trade-list.html',
+                      {'form': TradeSearchForm()})
 
 
 def load_market_data(request, pricing=False):
@@ -337,25 +377,33 @@ def load_market_data(request, pricing=False):
             try:
                 ccy_pair = CcyPair.objects.get(
                     name=trade_form.data['ccy_pair'])
-                fx_spot_quote = FxSpotRateQuote.objects.get(
-                    ref_date=as_of, ccy_pair=ccy_pair)
+                fx_spot_quote = FxSpotRateQuote.objects.get(ref_date=as_of,
+                                                            ccy_pair=ccy_pair)
             except AttributeError:
                 valuation_message = 'Cannot find market data'
                 if pricing:
                     return None
                 else:
-                    return trade(request, as_of_form=as_of_form, inst=inst, trade_form=trade_form,
+                    return trade(request,
+                                 as_of_form=as_of_form,
+                                 inst=inst,
+                                 trade_form=trade_form,
                                  trade_id_form=trade_id_form,
-                                 val_form=val_form, valuation_message=valuation_message)
+                                 val_form=val_form,
+                                 valuation_message=valuation_message)
             else:
                 market_data['fx_spot'] = FxSpotRateQuoteForm(
                     instance=fx_spot_quote)
         if pricing:
             return market_data
         else:
-            return trade(request, as_of_form=as_of_form, inst=inst, trade_form=trade_form,
+            return trade(request,
+                         as_of_form=as_of_form,
+                         inst=inst,
+                         trade_form=trade_form,
                          trade_id_form=trade_id_form,
-                         val_form=val_form, market_data_form=market_data)
+                         val_form=val_form,
+                         market_data_form=market_data)
 
 
 def pricing(request, commit=False):
@@ -379,7 +427,8 @@ def pricing(request, commit=False):
                 # will get full market data
                 spot = tr.ccy_pair.rates.get(ref_date=as_of).rate
 
-                if commit and request.POST.get('book') and request.POST.get('counterparty'):
+                if commit and request.POST.get('book') and request.POST.get(
+                        'counterparty'):
                     # need to check market data
                     tr.input_user = request.user
                     tr.detail = TradeDetail.objects.create()
@@ -388,22 +437,32 @@ def pricing(request, commit=False):
                     trade_id_form = TradeIDForm(
                         initial={'loaded_id': str(tr.id)})
 
-                result = {'npv': inst.NPV(),
-                          'delta': inst.delta(),
-                          'gamma': inst.gamma()*0.01/spot,
-                          'vega': inst.vega()*0.01,
-                          'theta': inst.thetaPerDay(),
-                          'rho': inst.rho()*0.01,
-                          'dividendRho': inst.dividendRho()*0.01,
-                          'itmCashProbability': inst.itmCashProbability()/side/tr.notional_1,
-                          }
-                result = dict([(x, round(y*side*tr.notional_1, 2))
-                              for x, y in result.items()])
+                result = {
+                    'npv':
+                    inst.NPV(),
+                    'delta':
+                    inst.delta(),
+                    'gamma':
+                    inst.gamma() * 0.01 / spot,
+                    'vega':
+                    inst.vega() * 0.01,
+                    'theta':
+                    inst.thetaPerDay(),
+                    'rho':
+                    inst.rho() * 0.01,
+                    'dividendRho':
+                    inst.dividendRho() * 0.01,
+                    'itmCashProbability':
+                    inst.itmCashProbability() / side / tr.notional_1,
+                }
+                result = dict([(x, round(y * side * tr.notional_1, 2))
+                               for x, y in result.items()])
                 valuation_form = FXOValuationForm(initial=result)
             else:
                 valuation_form = FXOValuationForm()
 
-            return trade(request, inst='fxo',
+            return trade(request,
+                         inst='fxo',
                          trade_form=fxo_form,
                          trade_id_form=trade_id_form,
                          as_of_form=as_of_form,
@@ -411,8 +470,9 @@ def pricing(request, commit=False):
                          market_data_form=market_data_form,
                          valuation_message=valuation_message)
         elif request.POST.get('trade_type') == 'Swap':
-            SwapLegFormSet = modelformset_factory(
-                SwapLeg, SwapLegForm, extra=2)
+            SwapLegFormSet = modelformset_factory(SwapLeg,
+                                                  SwapLegForm,
+                                                  extra=2)
             swap_leg_form_set = SwapLegFormSet(request.POST)
             swap_form = SwapForm(request.POST, instance=Swap())
             if swap_form.is_valid() and swap_leg_form_set.is_valid():
@@ -428,22 +488,21 @@ def pricing(request, commit=False):
                     dc = QL_DAY_COUNTER[leg.day_counter]
                     yts = leg.discounting_curve(as_of)
                     for k in range(len(leg.leg(as_of))):
-                        d2, d1 = sch[k+1], sch[k]
-                        leg_cf.append((d1.ISO(),
-                                       d2.ISO(),
-                                       dc.dayCount(d1, d2),
-                                       dc.yearFraction(d1, d2),
-                                       ql_leg[k].date().ISO(),
-                                       ql_leg[k].amount(),
-                                       yts.discount(ql_leg[k].date()),
-                                       yts.discount(
-                                           ql_leg[k].date()) * ql_leg[k].amount(),
-                                       leg.ccy.code
-                                       ))
+                        d2, d1 = sch[k + 1], sch[k]
+                        leg_cf.append(
+                            (d1.ISO(), d2.ISO(), dc.dayCount(d1, d2),
+                             dc.yearFraction(d1, d2),
+                             ql_leg[k].date().ISO(), ql_leg[k].amount(),
+                             yts.discount(ql_leg[k].date()),
+                             yts.discount(ql_leg[k].date()) *
+                             ql_leg[k].amount(), leg.ccy.code))
                     leg_tables.append(leg_cf)
-                    leg_npv.append(ql.CashFlows.npv(
-                        ql_leg, ql.YieldTermStructureHandle(yts), False))
-                if commit and request.POST.get('book') and request.POST.get('counterparty'):
+                    leg_npv.append(
+                        ql.CashFlows.npv(ql_leg,
+                                         ql.YieldTermStructureHandle(yts),
+                                         False))
+                if commit and request.POST.get('book') and request.POST.get(
+                        'counterparty'):
                     tr.input_user = request.user
                     tr.detail = TradeDetail.objects.create()
                     tr.maturity_date = max([leg.maturity_date for leg in legs])
@@ -461,20 +520,37 @@ def pricing(request, commit=False):
                     inst = ql.Swap(leg_inst, is_pay)
                     #yts1 = legs[0].ccy.rf_curve.get(ref_date=as_of).term_structure()
                     yts1 = IRTermStructure.objects.filter(
-                        ref_date=as_of, name=legs[0].ccy.risk_free_curve).first().term_structure()
-                    inst.setPricingEngine(ql.DiscountingSwapEngine(
-                        ql.YieldTermStructureHandle(yts1)))
+                        ref_date=as_of, name=legs[0].ccy.risk_free_curve
+                    ).first().term_structure()
+                    inst.setPricingEngine(
+                        ql.DiscountingSwapEngine(
+                            ql.YieldTermStructureHandle(yts1)))
                     valuation_message = None
-                result = {'npv': inst.NPV(), 'leg1npv': leg_npv[0], 'leg2npv': leg_npv[1], 'leg1bpv': inst.legBPS(
-                    0), 'leg2bpv': inst.legBPS(1)}
+                result = {
+                    'npv': inst.NPV(),
+                    'leg1npv': leg_npv[0],
+                    'leg2npv': leg_npv[1],
+                    'leg1bpv': inst.legBPS(0),
+                    'leg2bpv': inst.legBPS(1)
+                }
                 result = dict([(x, round(y, 2)) for x, y in result.items()])
                 valuation_form = SwapValuationForm(initial=result)
             else:  # invalid swap_form or invalid swap_leg_form_set, return empty valuation_form
-                return trade(request, inst='swap', trade_form=swap_form, as_of_form=as_of_form, trade_forms=swap_leg_form_set, val_form=SwapValuationForm())
+                return trade(request,
+                             inst='swap',
+                             trade_form=swap_form,
+                             as_of_form=as_of_form,
+                             trade_forms=swap_leg_form_set,
+                             val_form=SwapValuationForm())
             return trade(request,
                          inst='swap',
-                         trade_form=swap_form, as_of_form=as_of_form, trade_forms=swap_leg_form_set, trade_id_form=trade_id_form,
-                         val_form=valuation_form, valuation_message=valuation_message, leg_tables=leg_tables)
+                         trade_form=swap_form,
+                         as_of_form=as_of_form,
+                         trade_forms=swap_leg_form_set,
+                         trade_id_form=trade_id_form,
+                         val_form=valuation_form,
+                         valuation_message=valuation_message,
+                         leg_tables=leg_tables)
 
 
 def fx_volatility_table(request):  # for API
@@ -482,11 +558,21 @@ def fx_volatility_table(request):  # for API
         try:
             as_of = request.POST['as_of']
             ccy_pair = request.POST['ccy_pair']
-            fxv = FXVolatility.objects.filter(
-                ref_date=as_of, ccy_pair=ccy_pair).first()
+            fxv = FXVolatility.objects.filter(ref_date=as_of,
+                                              ccy_pair=ccy_pair).first()
             #ql.Settings.instance().evaluationDate = to_qlDate(as_of)
             market_data_message = None
-            return JsonResponse({'result': fxv.surface_dataframe().to_html(classes='table fx-vol table-striped', na_rep='', border='1px', col_space='5em'), 'message': market_data_message}, )
+            return JsonResponse(
+                {
+                    'result':
+                    fxv.surface_dataframe().to_html(
+                        classes='table fx-vol table-striped',
+                        na_rep='',
+                        border='1px',
+                        col_space='5em'),
+                    'message':
+                    market_data_message
+                }, )
         except RuntimeError as error:
             return JsonResponse({'errors': [error.args]}, status=500)
 
@@ -495,36 +581,55 @@ def fxo_price(request):  # for API
     if request.method == 'POST':
         try:
             as_of = request.POST['as_of']
-            as_of_form = AsOfForm(request.POST)  # for render back to page
+            #as_of_form = AsOfForm(request.POST)  # for render back to page
             ql.Settings.instance().evaluationDate = to_qlDate(as_of)
             valuation_message = None
             fxo_form = FXOForm(request.POST, instance=FXO())
             if fxo_form.is_valid():
                 tr = fxo_form.save(commit=False)
                 inst = tr.instrument()
-                engine = tr.make_pricing_engine(as_of, strike=tr.strike_price)
+                engine, process = tr.make_pricing_engine(
+                    as_of, strike=tr.strike_price)
                 inst.setPricingEngine(engine)
                 side = 1.0 if tr.buy_sell == "B" else -1.0
-                spot = tr.ccy_pair.rates.get(ref_date=as_of).today_rate()
-                vol = tr.ccy_pair.vol.get(ref_date=as_of).handle(
-                    strike=tr.strike_price).blackVol(to_qlDate(tr.maturity_date), float(tr.strike_price), True)
+                spot_0 = tr.ccy_pair.rates.get(ref_date=as_of).today_rate()
+                spot = tr.ccy_pair.rates.get(ref_date=as_of).rate
+                #vol = tr.ccy_pair.vol.get(ref_date=as_of).handle(
+                #    strike=tr.strike_price).blackVol(
+                #        to_qlDate(tr.maturity_date), float(tr.strike_price),
+                #        True)
+                vol = process.blackVolatility().blackVol(
+                    to_qlDate(tr.maturity_date), float(tr.strike_price), True)
             else:
                 return JsonResponse({'errors': fxo_form.errors}, status=500)
-            result = {'npv': inst.NPV(),
-                      'delta': inst.delta(),
-                      'gamma': inst.gamma()*0.01/spot,
-                      'vega': inst.vega()*0.01,
-                      'theta': inst.thetaPerDay(),
-                      'rho': inst.rho()*0.01,
-                      'dividendRho': inst.dividendRho()*0.01,
-                      'strikeSensitivity': inst.strikeSensitivity(),
-                      'itmCashProbability': inst.itmCashProbability(),
-                      # 'impliedVolatility': inst.impliedVolatility(),
-                      }
-            result = dict([(x, round(y*side*tr.notional_1, 2))
-                           if x != 'itmCashProbability' else (x, round(y, 6)) for x, y in result.items()])
-            parameters = {'spot': spot, 'vol': vol*100, }
-            return JsonResponse({'result': result, 'parameters': parameters, 'valuation_message': valuation_message}, )
+            result = {
+                'npv': inst.NPV(),
+                'delta': inst.delta(),
+                'gamma': inst.gamma() * 0.01 / spot_0,
+                'vega': inst.vega() * 0.01,
+                'theta': inst.thetaPerDay(),
+                'rho': inst.rho() * 0.01,
+                'dividendRho': inst.dividendRho() * 0.01,
+                'strikeSensitivity': inst.strikeSensitivity(),
+                'itmCashProbability': inst.itmCashProbability(),
+                # 'impliedVolatility': inst.impliedVolatility(),
+            }
+            result = dict([
+                (x, round(y * side *
+                          tr.notional_1, 2)) if x != 'itmCashProbability' else
+                (x, round(y, 6)) for x, y in result.items()
+            ])
+            parameters = {
+                #'spot_0': spot_0,
+                'spot': spot,
+                'vol': vol * 100,
+            }
+            return JsonResponse(
+                {
+                    'result': result,
+                    'parameters': parameters,
+                    'valuation_message': valuation_message
+                }, )
         except RuntimeError as error:
             return JsonResponse({'errors': [error.args]}, status=500)
 
@@ -536,7 +641,10 @@ def save_ccypair(request):
         ccypair_form = CcyPairForm(request.POST, instance=ccypair_obj)
         if ccypair_form.is_valid():
             ccypair_form.save()
-            return render(request, 'swpm/index.html', {"message": "saved successfully.", 'myform': ccypair_form})
+            return render(request, 'swpm/index.html', {
+                "message": "saved successfully.",
+                'myform': ccypair_form
+            })
 
 
 @csrf_exempt
@@ -557,14 +665,25 @@ def reval(request):
             engine = t.trade.first().make_pricing_engine(reval_date)
             inst.setPricingEngine(engine)
             side = 1.0 if t.trade.first().buy_sell == "B" else -1.0
-            mtm, _ = TradeMarkToMarket.objects.get_or_create(as_of=reval_date, trade_d=t, defaults={
-                                                             'npv': side * inst.NPV() * t.trade.first().notional_1})
-        return render(request, 'swpm/reval.html', {'reval_form': RevalForm(request.POST),
-                                                   'result': "Reval completed: \n" + str(TradeMarkToMarket.objects.filter(as_of=reval_date))
-                                                   }
-                      )
+            mtm, _ = TradeMarkToMarket.objects.get_or_create(
+                as_of=reval_date,
+                trade_d=t,
+                defaults={
+                    'npv': side * inst.NPV() * t.trade.first().notional_1
+                })
+        return render(
+            request, 'swpm/reval.html', {
+                'reval_form':
+                RevalForm(request.POST),
+                'result':
+                "Reval completed: \n" +
+                str(TradeMarkToMarket.objects.filter(as_of=reval_date))
+            })
     else:
-        return render(request, 'swpm/reval.html', {'reval_form': RevalForm(initial={'reval_date': datetime.date.today()})})
+        return render(request, 'swpm/reval.html', {
+            'reval_form':
+            RevalForm(initial={'reval_date': datetime.date.today()})
+        })
 
 
 def handle_uploaded_file(f=None, text=None):
@@ -577,7 +696,10 @@ def handle_uploaded_file(f=None, text=None):
         temp = [line.split(',') for line in lines if len(line) > 0]
         df = pd.DataFrame(temp[1:], columns=temp[0])
 
-    if {'Instrument', 'Ccy', 'Date', 'Market Rate', 'Curve', 'Term', 'Day Counter'}.issubset(set(df.columns)):
+    if {
+            'Instrument', 'Ccy', 'Date', 'Market Rate', 'Curve', 'Term',
+            'Day Counter'
+    }.issubset(set(df.columns)):
         for idx, row in df.iterrows():
             #arg_ = {'name': row['Curve'], 'ref_date': str2date(row['Date']), 'ccy': Ccy.objects.get(code=row['Ccy'])}
             arg_upd = {}
@@ -588,27 +710,34 @@ def handle_uploaded_file(f=None, text=None):
                 if ccy_.risk_free_curve == row['Curve']:
                     arg_upd['as_rf_curve'] = ccy_
                 yts, created_ = IRTermStructure.objects.update_or_create(
-                    name=row['Curve'], ref_date=str2date(row['Date']), ccy=ccy_, defaults=arg_upd)
+                    name=row['Curve'],
+                    ref_date=str2date(row['Date']),
+                    ccy=ccy_,
+                    defaults=arg_upd)
                 if created_:
                     msg.append(f'{yts.name} ({yts.ref_date}) created.')
                 if row['Term'][:2] == 'ED':
                     row['Term'] = row['Term'][:4]
-                    row['Market Rate'] = 100.0*float(row['Market Rate'])
-                r, temp_ = RateQuote.objects.update_or_create(name=row['Ccy']+''+row['Curve']+' '+row['Term'],
-                                                              ref_date=str2date(
-                                                                  row['Date']),
-                                                              defaults={'tenor': row['Term'],
-                                                                        'instrument': row['Instrument'],
-                                                                        'ccy': ccy_,
-                                                                        'day_counter': row['Day Counter'],
-                                                                        'rate': float(row['Market Rate'])*0.01}
-                                                              )
+                    row['Market Rate'] = 100.0 * float(row['Market Rate'])
+                r, temp_ = RateQuote.objects.update_or_create(
+                    name=row['Ccy'] + '' + row['Curve'] + ' ' + row['Term'],
+                    ref_date=str2date(row['Date']),
+                    defaults={
+                        'tenor': row['Term'],
+                        'instrument': row['Instrument'],
+                        'ccy': ccy_,
+                        'day_counter': row['Day Counter'],
+                        'rate': float(row['Market Rate']) * 0.01
+                    })
                 yts.rates.add(r)
             except KeyError as e:
                 msg.append(str(e))
             else:
                 msg.append(f'{str(r)} is created.')
-    elif {'Instrument', 'Ccy', 'Date', 'Market Rate', 'Curve', 'Term', 'Ref Curve', 'Ref Ccy', 'Ccy Pair'}.issubset(set(df.columns)):
+    elif {
+            'Instrument', 'Ccy', 'Date', 'Market Rate', 'Curve', 'Term',
+            'Ref Curve', 'Ref Ccy', 'Ccy Pair'
+    }.issubset(set(df.columns)):
         for idx, row in df.iterrows():
             arg_upd = {}
             try:
@@ -618,25 +747,30 @@ def handle_uploaded_file(f=None, text=None):
                 arg_upd['ref_curve'] = row['Ref Curve']
                 arg_upd['ref_ccy'] = Ccy.objects.get(code=row['Ref Ccy'])
                 yts, created_ = IRTermStructure.objects.update_or_create(
-                    name=row['Curve'], ref_date=str2date(row['Date']), ccy=ccy_, defaults=arg_upd)
+                    name=row['Curve'],
+                    ref_date=str2date(row['Date']),
+                    ccy=ccy_,
+                    defaults=arg_upd)
                 if created_:
                     msg.append(
                         f'{yts.ccy} {yts.name} {yts.ref_date} is created.')
-                r, temp_ = RateQuote.objects.update_or_create(name=row['Ccy']+' ' + row['Curve']+' '+row['Term'],
-                                                              ref_date=str2date(
-                                                                  row['Date']),
-                                                              defaults={'tenor': row['Term'],
-                                                                        'instrument': row['Instrument'],
-                                                                        'ccy': ccy_,
-                                                                        'rate': float(row['Market Rate']),
-                                                                        'ccy_pair': CcyPair.objects.get(name=row['Ccy Pair'])}
-                                                              )
+                r, temp_ = RateQuote.objects.update_or_create(
+                    name=row['Ccy'] + ' ' + row['Curve'] + ' ' + row['Term'],
+                    ref_date=str2date(row['Date']),
+                    defaults={
+                        'tenor': row['Term'],
+                        'instrument': row['Instrument'],
+                        'ccy': ccy_,
+                        'rate': float(row['Market Rate']),
+                        'ccy_pair': CcyPair.objects.get(name=row['Ccy Pair'])
+                    })
                 yts.rates.add(r)
             except KeyError as e:
                 msg.append(str(e))
             else:
                 msg.append(f'{str(r.name)} is created.')
-    elif {'Date', 'Ccy Pair', 'Delta', 'Tenor', 'Volatility', 'Delta Type'}.issubset(set(df.columns)):
+    elif {'Date', 'Ccy Pair', 'Delta', 'Tenor', 'Volatility',
+          'Delta Type'}.issubset(set(df.columns)):
         for idx, row in df.iterrows():
             arg_upd = {}
             try:
@@ -645,15 +779,17 @@ def handle_uploaded_file(f=None, text=None):
                     ref_date=str2date(row['Date']), ccy_pair=ccy_pair_)
                 if created_:
                     msg.append(
-                        f'{fxv.ccy_pair.name} ({fxv.ref_date}) FXVolatility created.')
-                v, temp_ = FXVolatilityQuote.objects.update_or_create(ref_date=str2date(row['Date']),
-                                                                      tenor=row['Tenor'],
-                                                                      delta=float(
-                                                                          row['Delta']),
-                                                                      defaults={'delta_type': row['Delta Type'],
-                                                                                'vol': float(row['Volatility']),
-                                                                                'surface': fxv
-                                                                                })
+                        f'{fxv.ccy_pair.name} ({fxv.ref_date}) FXVolatility created.'
+                    )
+                v, temp_ = FXVolatilityQuote.objects.update_or_create(
+                    ref_date=str2date(row['Date']),
+                    tenor=row['Tenor'],
+                    delta=float(row['Delta']),
+                    defaults={
+                        'delta_type': row['Delta Type'],
+                        'vol': float(row['Volatility']),
+                        'surface': fxv
+                    })
             except KeyError as e:
                 msg.append(str(e))
             else:
@@ -670,10 +806,14 @@ def market_data_import(request):
             message = handle_uploaded_file(request.FILES['file'])
         elif request.POST.get('text'):
             message = handle_uploaded_file(text=request.POST['text'])
-        return render(request, 'swpm/market_data_import.html', {'upload_file_form': UploadFileForm(), 'message': message})
+        return render(request, 'swpm/market_data_import.html', {
+            'upload_file_form': UploadFileForm(),
+            'message': message
+        })
     else:
         form = UploadFileForm()
-    return render(request, 'swpm/market_data_import.html', {'upload_file_form': form})
+    return render(request, 'swpm/market_data_import.html',
+                  {'upload_file_form': form})
 
 
 def fx_volatility(request, ccy_pair=None, ref_date=None):
@@ -685,15 +825,18 @@ def fx_volatility(request, ccy_pair=None, ref_date=None):
             pass
 
 
-@csrf_exempt
 def yield_curve(request, curve=None, ref_date=None, **kwargs):
     if request.method == 'POST':
         form = YieldCurveSearchForm(request.POST)
-        form_ = dict([(x[0], x[1])
-                     for x in form.data.dict().items() if len(x[1]) > 0])
-        search_result = list(IRTermStructure.objects.filter(
-            **form_).order_by('-ref_date').values())
-        return render(request, 'swpm/yield_curve.html', {'form': form, 'search_result': search_result})
+        form_ = dict([(x[0], x[1]) for x in form.data.dict().items()
+                      if len(x[1]) > 0 and x[0] != 'csrfmiddlewaretoken'])
+        search_result = list(
+            IRTermStructure.objects.filter(
+                **form_).order_by('-ref_date').values())
+        return render(request, 'swpm/yield_curve.html', {
+            'form': form,
+            'search_result': search_result
+        })
     elif request.method == 'GET':
         ccy = kwargs.get('ccy')
         if curve and ref_date:
@@ -705,31 +848,56 @@ def yield_curve(request, curve=None, ref_date=None, **kwargs):
             rates = []
             for i, r in enumerate(yts_model.rates.all()):
                 adj_rate = r.rate if r.instrument in [
-                    'FUT', 'FXSW'] else r.rate*100.
-                rates.append({'id': r.id, 'tenor': r.tenor, 'rate': adj_rate, 'date': dates[i+1].ISO(),
-                              'zero_rate': yts.zeroRate(dates[i+1], ql.ActualActual(), ql.Continuous).rate()*100
-                              })
+                    'FUT',
+                    'FXSW',
+                ] else r.rate * 100.
+                rates.append({
+                    'id':
+                    r.id,
+                    'tenor':
+                    r.tenor,
+                    'rate':
+                    adj_rate,
+                    'date':
+                    dates[i + 1].ISO(),
+                    'zero_rate':
+                    yts.zeroRate(dates[i + 1], ql.ActualActual(),
+                                 ql.Continuous).rate() * 100
+                })
+                rates.sort(key=lambda r: r['date'])
             # need to fix: order wrong if the rates are not in chronological order, becoz dates comes from ql
-            plt_points = min(len(rates)-1, 14)
+            #plt_points = min(len(rates) - 1, 14)
             # https://plotly.com/python/px-arguments/
-            dataPx = px.line(x=[rr['date'] for rr in rates], y=[rr['zero_rate'] for rr in rates],
-                             range_x=[dates[0].ISO(), rates[plt_points]
-                                      ['date']],
-                             #range_y=[0, rates[plt_points]['zero_rate']*1.1],
-                             markers=True, labels={'x': 'Date', 'y': 'Zero Rate'})
+            dataPx = px.line(
+                x=[rr['date'] for rr in rates],
+                y=[rr['zero_rate'] for rr in rates],
+                #range_x=[dates[0].ISO(), rates[plt_points]['date']],
+                #range_y=[0, rates[plt_points]['zero_rate']*1.1],
+                markers=True,
+                labels={
+                    'x': 'Date',
+                    'y': 'Zero Rate'
+                })
             # dataPx.update_layout(plot_bgcolor='#111111', paper_bgcolor='#111111', font_color='skyblue')
             app = DjangoDash('yts_plot')
             app.layout = html.Div([dcc.Graph(id="yts_plot_id", figure=dataPx)],
                                   className="yts_plot_class",
-                                  style={"width": "100%"}
-                                  )
-            data = {'name': yts_model.name,
-                    'ref_date': str2date(ref_date), 'rates': rates}
-            return render(request, 'swpm/yield_curve.html', {'form': YieldCurveSearchForm(), 'data': data})
+                                  style={"width": "100%"})
+            data = {
+                'name': ccy + ' ' + yts_model.name,
+                'ref_date': str2date(ref_date),
+                'rates': rates
+            }
+            return render(request, 'swpm/yield_curve.html', {
+                'form': YieldCurveSearchForm(),
+                'data': data
+            })
         else:
-            return render(request, 'swpm/yield_curve.html', {'form': YieldCurveSearchForm()})
+            return render(request, 'swpm/yield_curve.html',
+                          {'form': YieldCurveSearchForm()})
     else:
-        return JsonResponse({"error": "GET or PUT request required."}, status=400)
+        return JsonResponse({"error": "GET or PUT request required."},
+                            status=400)
 
 
 class CalendarViewSet(viewsets.ModelViewSet):

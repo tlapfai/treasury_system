@@ -38,7 +38,8 @@ document.getElementById("btn-price").addEventListener("click", (event) => {
         response.data.valuation_message;
     })
     .catch((error) => {
-      console.log(error.response.data.errors);
+      //console.log(error.response.data.errors);
+      console.log(error);
       var e = error.response.data.errors;
       for (var y in e) {
         var li = document.createElement("div");
