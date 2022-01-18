@@ -1,5 +1,5 @@
 import datetime
-from QuantLib.QuantLib import PiecewiseLogLinearDiscount
+from QuantLib.QuantLib import PiecewiseLogLinearDiscount, RealTimeSeries
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.db.models import query_utils
@@ -11,6 +11,7 @@ from django.utils.translation import gettext as _
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.core import validators
 from django.core.validators import RegexValidator, MinValueValidator, DecimalValidator
+from django.core.cache import caches, cache
 
 import QuantLib as ql
 import pandas as pd
@@ -84,6 +85,8 @@ def to_qlDate(d) -> ql.Date:
     try:
         if isinstance(d, str):
             return ql.Date(d, '%Y-%m-%d')
+        elif isinstance(d, list):
+            return [to_qlDate(dd) for dd in d]
         else:
             return ql.Date(d.isoformat(), '%Y-%m-%d')
     except TypeError as e:
@@ -107,10 +110,7 @@ class Calendar(models.Model):
 class Ccy(models.Model):
     code = models.CharField(max_length=3, blank=False, primary_key=True)
     fixing_days = models.PositiveIntegerField(default=2)
-    cal = models.ForeignKey(Calendar,
-                            DO_NOTHING,
-                            related_name="ccys",
-                            null=True)
+    cal = models.ForeignKey(Calendar, DO_NOTHING, null=True)
     risk_free_curve = models.CharField(max_length=16, blank=True,
                                        null=True)  # free text
     foreign_exchange_curve = models.CharField(max_length=16,
@@ -124,13 +124,16 @@ class Ccy(models.Model):
     def __str__(self):
         return self.code
 
+    def calendar(self):
+        return self.cal.calendar()
+
 
 class CcyPair(models.Model):
     name = models.CharField(max_length=7, primary_key=True)
     base_ccy = models.ForeignKey(Ccy, CASCADE, related_name="as_base_ccy")
     quote_ccy = models.ForeignKey(Ccy, CASCADE, related_name="as_quote_ccy")
     cal = models.ForeignKey(Calendar,
-                            DO_NOTHING,
+                            SET_NULL,
                             related_name="ccy_pairs",
                             null=True)
     fixing_days = models.PositiveIntegerField(default=2)
@@ -219,7 +222,7 @@ class RateQuote(models.Model):
             convention = ql.ModifiedFollowing
             ccy = Ccy.objects.get(code=self.ccy)  # not used yet
             return ql.DepositRateHelper(self.rate, tenor_, fixing_days,
-                                        ql.TARGET(), convention, False,
+                                        ccy.calendar(), convention, False,
                                         QL_DAY_COUNTER[self.day_counter])
         elif self.instrument == "FUT":
             if self.tenor[:2] == 'ED':
@@ -427,25 +430,30 @@ class FXVolatility(models.Model):
         return f"{self.ccy_pair} as of {self.ref_date}"
 
     def surface_matrix(self):
-        maturities = []
-        surf_vol = []
-        surf_delta = []
-        surf_delta_type = []
-        prev_t = None  # datetime.date
-        row = -1
-        for q in self.quotes.all().order_by('maturity', 'delta'):
-            if q.maturity == prev_t:
-                surf_vol[row].append(q.vol)
-                surf_delta[row].append(q.delta)
-                surf_delta_type[row].append(QL_DELTA_TYPE[q.delta_type])
-            else:
-                surf_vol.append([q.vol])
-                surf_delta.append([q.delta])
-                surf_delta_type.append([QL_DELTA_TYPE[q.delta_type]])
-                maturities.append(to_qlDate(q.maturity))
-                row += 1
-            prev_t = q.maturity
-        return (surf_vol, surf_delta, surf_delta_type, maturities)
+        obj = cache.get(f'{self.ref_date}-{self.ccy_pair}', None)
+        if not obj:
+            maturities = []
+            surf_vol = []
+            surf_delta = []
+            surf_delta_type = []
+            prev_t = None  # datetime.date
+            row = -1
+            for q in self.quotes.all().order_by('maturity', 'delta'):
+                if q.maturity == prev_t:
+                    surf_vol[row].append(q.vol)
+                    surf_delta[row].append(q.delta)
+                    surf_delta_type[row].append(QL_DELTA_TYPE[q.delta_type])
+                else:
+                    surf_vol.append([q.vol])
+                    surf_delta.append([q.delta])
+                    surf_delta_type.append([QL_DELTA_TYPE[q.delta_type]])
+                    #maturities.append(to_qlDate(q.maturity))
+                    maturities.append(q.maturity)
+                    row += 1
+                prev_t = q.maturity
+            obj = surf_vol, surf_delta, surf_delta_type, maturities
+            cache.set(f'{self.ref_date}-{self.ccy_pair}', obj)
+        return obj
 
     def handle(self, strike, **kwargs):
         t_start = time.time()
@@ -453,18 +461,29 @@ class FXVolatility(models.Model):
         )
 
         solver = ql.Brent()
-        accuracy = 1e-16
+        accuracy = 1e-12
         step = 1e-6
         volatilities = []
 
+        if kwargs.get('maturity'):
+            mat = kwargs.get('maturity')
+            ii = []
+            ii.append(max([j for j, m in maturities if m <= to_qlDate(mat)]))
+            ii.append(min([j for j, m in maturities if m >= to_qlDate(mat)]))
+            surf_vol = [surf_vol[i_] for i_ in ii if i_]
+            surf_delta = [surf_delta[i_] for i_ in ii if i_]
+            surf_delta_type = [surf_delta_type[i_] for i_ in ii if i_]
+            maturities = [maturities[i_] for i_ in ii if i_]
+
         for i, smile in enumerate(surf_vol):
             target = self.TargetFun(self.ref_date, self.ccy_pair, strike,
-                                    maturities[i].ISO(), surf_delta[i],
+                                    maturities[i], surf_delta[i],
                                     surf_delta_type[i], smile)
             guess = smile[2]
             volatilities.append(solver.solve(target, accuracy, guess, step))
-        vts = ql.BlackVarianceCurve(to_qlDate(self.ref_date), maturities,
-                                    volatilities, ql.Actual365Fixed())
+        vts = ql.BlackVarianceCurve(to_qlDate(self.ref_date),
+                                    to_qlDate(maturities), volatilities,
+                                    ql.Actual365Fixed())
         vts.enableExtrapolation()
         t_end = time.time()
         print(f'Elapsed time = {t_end - t_start:.8f}')
@@ -479,9 +498,7 @@ class FXVolatility(models.Model):
         surf_vol, surf_delta, surf_delta_type, maturities = self.surface_matrix(
         )
         smiles_temp = [
-            pd.DataFrame([smile],
-                         columns=surf_delta[i],
-                         index=[maturities[i].ISO()])
+            pd.DataFrame([smile], columns=surf_delta[i], index=[maturities[i]])
             for i, smile in enumerate(surf_vol)
         ]
         return pd.concat(smiles_temp)
@@ -650,6 +667,33 @@ class CashFlow(models.Model):
     ccy = models.ForeignKey(Ccy, CASCADE)
     amount = models.FloatField(default=0)
     trade = models.ForeignKey(Trade, CASCADE, null=True, blank=True)
+
+
+class FXOPricingSets:
+    ccy_pairs = {}
+    spot = {}  # dict
+    yts = {}  # dict
+
+    def __init__(self, ref_date) -> None:
+        self.ref_date = ref_date
+
+    def addCcyPair(self, ccy_pair):  # ccy_pair in XXX/YYY format
+        self.ccy_pairs.add(ccy_pair)
+        ccy1, ccy2 = ccy_pair[:2], ccy_pair[3:]
+        if ccy1 not in self.yts:
+            self.yts[ccy1] = IRTermStructure.objects.get(
+                ref_date=self.ref_date, ccy=ccy1).term_structure()
+        if ccy2 not in self.yts:
+            self.yts[ccy2] = IRTermStructure.objects.get(
+                ref_date=self.ref_date, ccy=ccy2).term_structure()
+        if ccy_pair not in self.spot:
+            self.spot[ccy_pair] = ql.QuoteHandle(
+                ql.SimpleQuote(
+                    CcyPair.objects.get(name=ccy_pair).get_rate(
+                        self.ref_date)))
+
+    def get_market_date(self, ref_date):
+        pass
 
 
 def has_make_pricing_engine(trade):

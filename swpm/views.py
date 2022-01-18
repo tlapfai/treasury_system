@@ -577,11 +577,14 @@ def fx_volatility_table(request):  # for API
             return JsonResponse({'errors': [error.args]}, status=500)
 
 
+class PricingSet():
+    pass
+
+
 def fxo_price(request):  # for API
     if request.method == 'POST':
         try:
             as_of = request.POST['as_of']
-            #as_of_form = AsOfForm(request.POST)  # for render back to page
             ql.Settings.instance().evaluationDate = to_qlDate(as_of)
             valuation_message = None
             fxo_form = FXOForm(request.POST, instance=FXO())
