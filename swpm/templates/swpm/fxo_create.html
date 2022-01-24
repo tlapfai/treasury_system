@@ -3,19 +3,22 @@
 {% load humanize %} 
 {% debug %} 
 {% block body %}
-<div class="container">
+
+
+<div class="container-fluid">
   <div class="row gx-2">
-    <div class="trade-ticket col-md-6" style="border: skyblue; border-style: solid">
+    <div class="trade-ticket col-md-6" style="padding: 1em;">
       <form class="trade-form">
         {% csrf_token %}
         <input type="date" class="as_of" name="as_of" required id="id_as_of">
         <fieldset>
           <legend>{{ trade_type }}</legend>
           {% if valuation_message %}
-          <div class="callout"><span>{{ valuation_message }}</span></div>
+            <div class="callout"><span>{{ valuation_message }}</span></div>
           {% endif %}
           <button id="btn-mkt" type="submit" class="btn btn-primary">Load Market Data</button>
-          <button type="submit" class="btn btn-primary" formaction="">Auto Fill</button>
+          <button id="btn-auto-fill" class="btn btn-primary" formaction="">Auto Fill</button>
+          <button id="btn-std-fill" class="btn btn-primary" formaction="">Standard Trade</button>
           <button id="btn-price" type="submit" class="btn btn-primary">Price</button>
           {% if user.is_authenticated %}
             <button type="submit" class="btn btn-primary" formaction="{% url 'pricing-do' %}">Do</button>
@@ -70,11 +73,13 @@
       </form>
     </div>
     <!--End of class="trade-ticket">-->
-    <div class="valuation col-md-3" style="border: grey; border-style: solid">
+
+    <div class="valuation col-md-3" style="padding: 1em">
       <h4>Parameters</h4>
       {% include 'swpm/includes/fxo_parameters.html'%}
     </div>
-    <div class="valuation col-md-3" style="border: grey; border-style: solid">
+
+    <div class="valuation col-md-3" style="padding: 1em">
       <h4>Valuation</h4>
       {% include 'swpm/includes/fxo_valuation.html' with form=val_form %}
     </div>
@@ -82,10 +87,11 @@
   </div>
 <div>
 <!-- end of class="row"-->
-
 <script src="{% static 'swpm/fxo.js' %}"></script>
 
 {% endblock %}
+
+
 {% block script %}
 
 <script src="{% static 'swpm/jquery-3.6.0.slim.min.js' %}"></script>

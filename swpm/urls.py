@@ -31,6 +31,7 @@ urlpatterns = [
     path('trade/fxo/create', views.FXOCreateView.as_view(), name='fxo_create'),
     path('trade/fxo/<int:pk>', views.FXOUpdateView.as_view(), name='fxo_update'),
     path('trade/fxo/price', views.fxo_price, name='fxo_price'),  # api
+    path('load_fxo_mkt', views.load_fxo_mkt, name='load_fxo_mkt'),  # api
 
     path('fx_volatility_table', views.fx_volatility_table,
          name='fx_volatility_table'),  # api

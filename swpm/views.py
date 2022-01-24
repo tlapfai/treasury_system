@@ -1,3 +1,4 @@
+from weakref import ref
 from QuantLib.QuantLib import as_fixed_rate_coupon
 from django.contrib.auth import REDIRECT_FIELD_NAME, authenticate, login, logout
 from django.db.models.query import RawQuerySet
@@ -577,8 +578,34 @@ def fx_volatility_table(request):  # for API
             return JsonResponse({'errors': [error.args]}, status=500)
 
 
-class PricingSet():
-    pass
+class MktDataSet():
+
+    def __init__(self, ref_date) -> None:
+        self.ref_date = ref_date
+        self.ccy_pairs = set()
+        self.ytss = dict()
+        self.spots = dict()
+        self.vols = dict()
+
+    def add_ccy_pair(self, ccy_pair, ref_date):
+        if ref_date == self.ref_date:
+            ccy1 = ccy_pair[:2]
+            ccy2 = ccy_pair[-3:]
+            if not ccy_pair in self.ccy_pairs:
+                self.ccy_pairs.add(ccy_pair)
+            if self.ytss.get(ccy1) == None:
+                self.ytss[ccy1] = Ccy.objects.get(code=ccy1).fx_curve.get(
+                    ref_date=ref_date).term_structure()
+            if self.ytss.get(ccy2) == None:
+                self.ytss[ccy2] = Ccy.objects.get(code=ccy2).fx_curve.get(
+                    ref_date=ref_date).term_structure()
+        else:
+            return False
+
+    def fxo_mkt_data(self, ccy_pair):
+        qts = self.yts.get(ccy_pair[:2])
+        rts = self.yts.get(ccy_pair[-3:])
+        return {'ccy_pair': ccy_pair, 'qts': qts, 'rts': rts}
 
 
 def fxo_price(request):  # for API
@@ -597,10 +624,6 @@ def fxo_price(request):  # for API
                 side = 1.0 if tr.buy_sell == "B" else -1.0
                 spot_0 = tr.ccy_pair.rates.get(ref_date=as_of).today_rate()
                 spot = tr.ccy_pair.rates.get(ref_date=as_of).rate
-                #vol = tr.ccy_pair.vol.get(ref_date=as_of).handle(
-                #    strike=tr.strike_price).blackVol(
-                #        to_qlDate(tr.maturity_date), float(tr.strike_price),
-                #        True)
                 vol = process.blackVolatility().blackVol(
                     to_qlDate(tr.maturity_date), float(tr.strike_price), True)
             else:
@@ -635,6 +658,30 @@ def fxo_price(request):  # for API
                 }, )
         except RuntimeError as error:
             return JsonResponse({'errors': [error.args]}, status=500)
+
+
+@csrf_exempt
+def load_fxo_mkt(request):
+    # request.POST is only for form-encoded data.
+    # If you are posting JSON, then you should use request.body instead.
+    if request.method == "POST":
+        data = json.loads(request.body.decode('utf-8'))
+        ref_date = data.get('as_of')
+        cp = data.get('ccy_pair')
+        maturity = data.get('maturity_date')
+        strike_price = float(data.get('strike_price'))
+        ccy_pair = CcyPair.objects.get(name=cp)
+        rts, qts = ccy_pair.fx_curves(ref_date)
+        fx_quote = ccy_pair.rates.get(ref_date=ref_date)  # FxSpotRateQuote
+        fx_quote.set_yts(rts, qts)
+        spot = fx_quote.today_rate()
+        fwd = fx_quote.forward_rate(maturity)
+        fx_vol = FXVolatility.objects.get(ccy_pair=ccy_pair, ref_date=ref_date)
+        fx_vol.set_yts(rts, qts)
+        fx_vol.set_spot(spot)
+        fx_vol_h = fx_vol.handle(strike_price)
+        vol = fx_vol_h.blackVol(to_qlDate(maturity), strike_price)
+        return JsonResponse({'spot': spot, 'fwd': fwd, 'vol': vol})
 
 
 @csrf_exempt
@@ -850,10 +897,10 @@ def yield_curve(request, curve=None, ref_date=None, **kwargs):
             dates = yts.dates()
             rates = []
             for i, r in enumerate(yts_model.rates.all()):
-                adj_rate = r.rate if r.instrument in [
-                    'FUT',
-                    'FXSW',
-                ] else r.rate * 100.
+                if r.instrument in ['FUT', 'FXSW']:
+                    adj_rate = r.rate
+                else:
+                    adj_rate = r.rate * 100.
                 rates.append({
                     'id':
                     r.id,

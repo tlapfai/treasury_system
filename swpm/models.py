@@ -82,15 +82,12 @@ def validate_positive(value):
 
 
 def to_qlDate(d) -> ql.Date:
-    try:
-        if isinstance(d, str):
-            return ql.Date(d, '%Y-%m-%d')
-        elif isinstance(d, list):
-            return [to_qlDate(dd) for dd in d]
-        else:
-            return ql.Date(d.isoformat(), '%Y-%m-%d')
-    except TypeError as e:
-        raise e
+    if isinstance(d, str):
+        return ql.DateParser.parseISO(d)
+    elif isinstance(d, list):
+        return [to_qlDate(dd) for dd in d]
+    else:
+        return ql.DateParser.parseISO(d.isoformat())
 
 
 class User(AbstractUser):
@@ -155,6 +152,11 @@ class CcyPair(models.Model):
             ql.JointCalendar(self.base_ccy.cal.calendar(),
                              self.quote_ccy.cal.calendar())
 
+    def fx_curves(self, ref_date):
+        rts = self.quote_ccy.fx_curve.get(ref_date=ref_date).term_structure()
+        qts = self.base_ccy.fx_curve.get(ref_date=ref_date).term_structure()
+        return rts, qts
+
 
 class FxSpotRateQuote(models.Model):
     ref_date = models.DateField()
@@ -163,6 +165,17 @@ class FxSpotRateQuote(models.Model):
 
     class Meta:
         unique_together = ('ref_date', 'ccy_pair')
+
+    def __init__(self, *args, **kwargs) -> None:
+        self.rts = None
+        self.qts = None
+        super().__init__(*args, **kwargs)
+
+    def set_yts(self, rts=None, qts=None):
+        if rts:
+            self.rts = rts
+        if qts:
+            self.qts = qts
 
     def handle(self):
         return ql.QuoteHandle(ql.SimpleQuote(self.rate))
@@ -174,13 +187,11 @@ class FxSpotRateQuote(models.Model):
 
     def forward_rate(self, maturity):
         sd = self.spot_date()
-        rts = self.ccy_pair.quote_ccy.fx_curve.get(
-            ref_date=self.ref_date).term_structure()
-        qts = self.ccy_pair.base_ccy.fx_curve.get(
-            ref_date=self.ref_date).term_structure()
-        return self.rate / rts.discount(
-            to_qlDate(maturity)) * rts.discount(sd) * qts.discount(
-                to_qlDate(maturity)) / qts.discount(sd)
+        if self.rts == None or self.qts == None:
+            self.rts, self.qts = self.ccy_pair.fx_curves(self.ref_date)
+        return self.rate / self.rts.discount(
+            to_qlDate(maturity)) * self.rts.discount(sd) * self.qts.discount(
+                to_qlDate(maturity)) / self.qts.discount(sd)
 
     def today_rate(self):
         return self.forward_rate(self.ref_date)
@@ -207,7 +218,14 @@ class RateQuote(models.Model):
     class Meta:
         unique_together = ('name', 'tenor', 'ref_date')
 
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.helper_obj = None
+
     def helper(self, **kwargs):
+        if self.helper_obj:
+            return self.helper_obj
+
         q = ql.QuoteHandle(ql.SimpleQuote(self.rate))
         if self.tenor in ['ON', 'TN']:
             tenor_ = ql.Period('1D')
@@ -220,14 +238,14 @@ class RateQuote(models.Model):
         if self.instrument == "DEPO":
             fixing_days = self.ccy.fixing_days
             convention = ql.ModifiedFollowing
-            ccy = Ccy.objects.get(code=self.ccy)  # not used yet
+            ccy = Ccy.objects.get(code=self.ccy)
             return ql.DepositRateHelper(self.rate, tenor_, fixing_days,
                                         ccy.calendar(), convention, False,
-                                        QL_DAY_COUNTER[self.day_counter])
+                                        QL_DAY_COUNTER[self.day_counter]), q
         elif self.instrument == "FUT":
             if self.tenor[:2] == 'ED':
                 return ql.FuturesRateHelper(q, ql.IMM.date(self.tenor[2:4]),
-                                            ql.USDLibor(ql.Period('3M')))
+                                            ql.USDLibor(ql.Period('3M'))), q
         elif self.instrument == "SWAP":
             if self.ccy.code == "USD":
                 # https://quant.stackexchange.com/questions/32345/quantlib-python-dual-curve-bootstrapping-example
@@ -235,25 +253,26 @@ class RateQuote(models.Model):
                 ref_curve = kwargs.get('ref_curve')  # is a handle
                 if ref_curve:
                     return ql.SwapRateHelper(q, swapIndex, 0, ql.Period(),
-                                             ref_curve)
+                                             ref_curve), q
                 else:
-                    return ql.SwapRateHelper(q, swapIndex)
+                    return ql.SwapRateHelper(q, swapIndex), q
         elif self.instrument == "OIS":
             if self.ccy.code == "USD":
                 if self.tenor == '1D':
                     return ql.DepositRateHelper(q, tenor_, 0, ql.TARGET(),
                                                 ql.Following, False,
-                                                ql.Actual360())
+                                                ql.Actual360()), q
                 else:
-                    #overnight_index = ql.OvernightIndex('USD EFFR', 0, ql.USDCurrency(), ql.UnitedStates(), ql.Actual360())
                     overnight_index = ql.FedFunds()
                     settlementDays = 2
-                    return ql.OISRateHelper(2,
-                                            tenor_,
-                                            q,
-                                            overnight_index,
-                                            paymentLag=0,
-                                            paymentCalendar=ql.UnitedStates())
+                    self.helper_obj = ql.OISRateHelper(
+                        2,
+                        tenor_,
+                        q,
+                        overnight_index,
+                        paymentLag=0,
+                        paymentCalendar=ql.UnitedStates()), q
+                    return self.helper_obj
         elif self.instrument == "FXSW":
             # ql.FxSwapRateHelper(fwdPoint, spotFx, tenor, fixingDays, calendar, convention, endOfMonth, isFxBaseCurrencyCollateralCurrency, collateralCurve)
             if self.ccy_pair:
@@ -266,9 +285,10 @@ class RateQuote(models.Model):
                             self.ccy_pair.rates.get(
                                 ref_date=self.ref_date).rate)), tenor_,
                     fixing_days, self.ccy_pair.calendar(), ql.Following, True,
-                    self.ccy == self.ccy_pair.quote_ccy, ref_curve)
+                    self.ccy == self.ccy_pair.quote_ccy, ref_curve), q
             else:
-                raise KeyError('No Ccy Pair in FXSW type rate quote')
+                raise KeyError(
+                    'CcyPair does not exist in FXSW type rate quote')
 
     def __str__(self):
         return f"{self.name} as of {self.ref_date.strftime('%Y-%m-%d')}: {self.rate}"
@@ -299,22 +319,35 @@ class IRTermStructure(models.Model):
     class Meta:
         unique_together = ('name', 'ref_date', 'ccy')
 
+    def __init__(self, *args, **kwargs) -> None:
+        self.yts = None
+        super().__init__(*args, **kwargs)
+        print(f'Called __init__ {self.name} {self.ref_date} {self.ccy}')
+
     def term_structure(self):
-        day_counter = ql.Actual365Fixed()
-        # change to helper(ccy.rf_curve.term_structure())
-        ref_curve_ = None
-        if self.ref_curve and self.ref_ccy:
-            ref_curve_ = IRTermStructure.objects.get(
-                name=self.ref_curve, ccy=self.ref_ccy,
-                ref_date=self.ref_date).term_structure()
-        helpers = [
-            rate.helper(ref_curve=ql.YieldTermStructureHandle(ref_curve_))
-            for rate in self.rates.all()
-        ]
-        yts = ql.PiecewiseLogLinearDiscount(to_qlDate(self.ref_date), helpers,
-                                            day_counter)
-        yts.enableExtrapolation()
-        return yts
+        if self.yts == None:
+            dc = ql.Actual365Fixed()
+            # change to helper(ccy.rf_curve.term_structure())
+            ref_curve_ = None
+            if self.ref_curve and self.ref_ccy:
+                ref_curve_ = IRTermStructure.objects.get(
+                    name=self.ref_curve,
+                    ccy=self.ref_ccy,
+                    ref_date=self.ref_date).term_structure()
+            rates = cache.get(f'{self.ccy}-{self.name}-{self.ref_date}')
+            if rates == None:
+                rates = self.rates.all()
+                cache.set(f'{self.ccy}-{self.name}-{self.ref_date}', rates, 60)
+            helpers = [
+                rate.helper(
+                    ref_curve=ql.YieldTermStructureHandle(ref_curve_))[0]
+                for rate in rates
+            ]
+            self.yts = ql.PiecewiseLogLinearDiscount(to_qlDate(self.ref_date),
+                                                     helpers, dc)
+            self.yts.enableExtrapolation()
+
+        return self.yts
 
     def __str__(self):
         return f"{self.ccy} {self.name} as of {self.ref_date.strftime('%Y-%m-%d')}"
@@ -395,23 +428,16 @@ class FXVolatility(models.Model):
 
     class TargetFun:
 
-        def __init__(self, ref_date, ccy_pair, strike, maturity, deltas,
+        def __init__(self, ref_date, spot, rdf, qdf, strike, maturity, deltas,
                      delta_types, smile_section):
             self.ref_date = ref_date
-            self.ccy_pair = ccy_pair
             self.strike = strike
             self.maturity = to_qlDate(maturity)
-            self.deltas = deltas
             self.delta_types = delta_types[0]
-            self.smile_section = smile_section
-            self.spot = FxSpotRateQuote.objects.get(
-                ccy_pair=ccy_pair, ref_date=self.ref_date).rate
-            self.rDcf = ccy_pair.base_ccy.fx_curve.filter(
-                ref_date=ref_date).first().term_structure().discount(
-                    self.maturity)
-            self.qDcf = ccy_pair.quote_ccy.fx_curve.filter(
-                ref_date=ref_date).first().term_structure().discount(
-                    self.maturity)
+            self.interp = ql.LinearInterpolation(deltas, smile_section)
+            self.spot = spot
+            self.rDcf = rdf
+            self.qDcf = qdf
 
         def __call__(self, v0):
             optionType = ql.Option.Call
@@ -420,11 +446,15 @@ class FXVolatility(models.Model):
             calc = ql.BlackDeltaCalculator(optionType, self.delta_types,
                                            self.spot, self.rDcf, self.qDcf,
                                            stdDev)
-            self.interp = ql.LinearInterpolation(self.deltas,
-                                                 self.smile_section)
             d = calc.deltaFromStrike(self.strike)
             v = self.interp(d, allowExtrapolation=True)
             return (v - v0)
+
+    def __init__(self, *args, **kwargs) -> None:
+        self.rts = None
+        self.qts = None
+        self.spot = None
+        super().__init__(*args, **kwargs)
 
     def __str__(self):
         return f"{self.ccy_pair} as of {self.ref_date}"
@@ -447,7 +477,6 @@ class FXVolatility(models.Model):
                     surf_vol.append([q.vol])
                     surf_delta.append([q.delta])
                     surf_delta_type.append([QL_DELTA_TYPE[q.delta_type]])
-                    #maturities.append(to_qlDate(q.maturity))
                     maturities.append(q.maturity)
                     row += 1
                 prev_t = q.maturity
@@ -455,8 +484,17 @@ class FXVolatility(models.Model):
             cache.set(f'{self.ref_date}-{self.ccy_pair}', obj)
         return obj
 
+    def set_yts(self, rts, qts):
+        if rts:
+            self.rts = rts
+        if qts:
+            self.qts = qts
+
+    def set_spot(self, spot):
+        self.spot = spot
+
     def handle(self, strike, **kwargs):
-        t_start = time.time()
+
         surf_vol, surf_delta, surf_delta_type, maturities = self.surface_matrix(
         )
 
@@ -475,18 +513,31 @@ class FXVolatility(models.Model):
             surf_delta_type = [surf_delta_type[i_] for i_ in ii if i_]
             maturities = [maturities[i_] for i_ in ii if i_]
 
+        if self.spot == None:
+            self.spot = self.ccy_pair.rates.get(
+                ref_date=self.ref_date).today_rate()
+
+        if self.rts == None:  # yts is the slowest part
+            self.rts = self.ccy_pair.quote_ccy.fx_curve.filter(
+                ref_date=self.ref_date).first().term_structure()
+        if self.qts == None:
+            self.qts = self.ccy_pair.base_ccy.fx_curve.filter(
+                ref_date=self.ref_date).first().term_structure()
+
         for i, smile in enumerate(surf_vol):
-            target = self.TargetFun(self.ref_date, self.ccy_pair, strike,
+            mat = to_qlDate(maturities[i])
+            target = self.TargetFun(self.ref_date, self.spot,
+                                    self.rts.discount(mat),
+                                    self.qts.discount(mat), strike,
                                     maturities[i], surf_delta[i],
                                     surf_delta_type[i], smile)
             guess = smile[2]
             volatilities.append(solver.solve(target, accuracy, guess, step))
         vts = ql.BlackVarianceCurve(to_qlDate(self.ref_date),
                                     to_qlDate(maturities), volatilities,
-                                    ql.Actual365Fixed())
+                                    ql.Actual365Fixed(), False)
         vts.enableExtrapolation()
-        t_end = time.time()
-        print(f'Elapsed time = {t_end - t_start:.8f}')
+
         if kwargs.get('maturity'):
             return (ql.BlackVolTermStructureHandle(vts),
                     vts.blackVol(to_qlDate(kwargs.get('maturity')), strike,
