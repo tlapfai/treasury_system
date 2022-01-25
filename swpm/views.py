@@ -579,28 +579,46 @@ def fx_volatility_table(request):  # for API
 
 
 class MktDataSet():
+    ccy_pairs = dict()
+    fx_quotes = dict()
+    ytss = dict()
+    spots = dict()
+    vols = dict()
 
     def __init__(self, ref_date) -> None:
         self.ref_date = ref_date
-        self.ccy_pairs = set()
-        self.ytss = dict()
-        self.spots = dict()
-        self.vols = dict()
 
     def add_ccy_pair(self, ccy_pair, ref_date):
+        """ return 0 if ref_date is not match, 1 if anything added, 2 if nothing added """
         if ref_date == self.ref_date:
+            result = 2
             ccy1 = ccy_pair[:2]
             ccy2 = ccy_pair[-3:]
-            if not ccy_pair in self.ccy_pairs:
-                self.ccy_pairs.add(ccy_pair)
             if self.ytss.get(ccy1) == None:
                 self.ytss[ccy1] = Ccy.objects.get(code=ccy1).fx_curve.get(
                     ref_date=ref_date).term_structure()
+                result = 1
+                
             if self.ytss.get(ccy2) == None:
                 self.ytss[ccy2] = Ccy.objects.get(code=ccy2).fx_curve.get(
                     ref_date=ref_date).term_structure()
+                result = 1
+                
+            if self.ccy_pairs.get(ccy_pair) == None:
+                cp = CcyPair.objects.get(name=ccy_pair)
+                self.ccy_pairs[ccy_pair] = cp
+                # fxq FxSpotRateQuote
+                fxq = cp.rates.get(ref_date=ref_date)
+                fxq.set_yts(rts, qts)
+                fx_quote[ccy_pair] = fxq
+                # fxv
+                fxv = FXVolatility.objects.get(ccy_pair=ccy_pair, ref_date=ref_date)
+                fxv.set_yts(self.ytss[ccy2], self.ytss[ccy1])
+                fxv.set_spot(fxq.today_rate()) # here is a pure value, need to consider to change to fxquote instead
+                result = 1
+            return result
         else:
-            return False
+            return 0
 
     def fxo_mkt_data(self, ccy_pair):
         qts = self.yts.get(ccy_pair[:2])
