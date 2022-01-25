@@ -578,7 +578,7 @@ class FXVolatility(models.Model):
 class FXVolatilityQuote(models.Model):
     ref_date = models.DateField()
     tenor = models.CharField(max_length=6)
-    delta = models.FloatField()
+    delta = models.FloatField(error_messages={'required': 'Delta value is required.'})
     vol = models.FloatField(validators=[validate_positive])
     surface = models.ForeignKey(FXVolatility, CASCADE, related_name='quotes')
     delta_type = models.CharField(choices=CHOICE_DELTA_TYPE.choices,
@@ -786,7 +786,7 @@ class FXO(Trade):
     objects = FXOManager()
 
     def __str__(self):
-        return f"FXO ID: {self.id}, {self.ccy_pair}, Notional={self.notional_1:.0f}, K={self.strike_price}"
+        return f"FXO ID: {self.id}, {self.ccy_pair}, Notional={self.notional_1:.0f}, K={self.strike_price}, {self.cp}"
 
     def save(self, *args, **kwargs):
         if self.notional_2 == None:
@@ -804,6 +804,9 @@ class FXO(Trade):
         exercise = ql.EuropeanExercise(to_qlDate(self.maturity_date))
         inst = ql.VanillaOption(payoff, exercise)
         return inst
+
+    def link_mktset(self, mktset):
+        self.mktset = mktset
 
 
 # class SwapManager():
