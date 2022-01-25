@@ -592,8 +592,7 @@ class MktDataSet():
         """ return 0 if ref_date is not match, 1 if anything added, 2 if nothing added """
         if ref_date == self.ref_date:
             result = 2
-            ccy1 = ccy_pair[:2]
-            ccy2 = ccy_pair[-3:]
+            ccy1, ccy2 = ccy_pair.split('/')
             if self.ytss.get(ccy1) == None:
                 self.ytss[ccy1] = Ccy.objects.get(code=ccy1).fx_curve.get(
                     ref_date=ref_date).term_structure()
@@ -614,16 +613,25 @@ class MktDataSet():
                 # fxv
                 fxv = FXVolatility.objects.get(ccy_pair=ccy_pair, ref_date=ref_date)
                 fxv.set_yts(self.ytss[ccy2], self.ytss[ccy1])
-                fxv.set_spot(fxq.today_rate()) # here is a pure value, need to consider to change to fxquote instead
+                fxv.set_spot(fxq) # fxq is FXSpotRateQuote
+                vols[ccy_pair] = fxv # fxv is a Django object
                 result = 1
             return result
         else:
             return 0
 
     def fxo_mkt_data(self, ccy_pair):
-        qts = self.yts.get(ccy_pair[:2])
-        rts = self.yts.get(ccy_pair[-3:])
-        return {'ccy_pair': ccy_pair, 'qts': qts, 'rts': rts}
+        """ instrument should call corresponding _mkt_data """
+        if ccy_pairs.get(ccy_pair, None):
+            ccy1, ccy2 = ccy_pair.split('/')
+            spot = self.spots.get(ccy_pair)
+            qts = self.yts.get(ccy1)
+            rts = self.yts.get(ccy2)
+            vol = self.vols[ccy_pair] # fxv is a Django object
+            # should we ask for strike as input?
+            return {'ccy_pair': ccy_pair, 'spot': spot, 'qts': qts, 'rts': rts, 'vol', vol}
+        else:
+            return None
 
 
 def fxo_price(request):  # for API
