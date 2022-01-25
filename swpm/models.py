@@ -491,7 +491,7 @@ class FXVolatility(models.Model):
             self.qts = qts
 
     def set_spot(self, spot):
-        self.spot = spot # FXSpotRateQuote
+        self.spot = spot  # FXSpotRateQuote
 
     def handle(self, strike, **kwargs):
 
@@ -502,7 +502,6 @@ class FXVolatility(models.Model):
         accuracy = 1e-12
         step = 1e-6
         volatilities = []
-
         """if kwargs.get('maturity'):
             mat = kwargs.get('maturity')
             ii = []
@@ -577,7 +576,8 @@ class FXVolatility(models.Model):
 class FXVolatilityQuote(models.Model):
     ref_date = models.DateField()
     tenor = models.CharField(max_length=6)
-    delta = models.FloatField(error_messages={'required': 'Delta value is required.'})
+    delta = models.FloatField(
+        error_messages={'required': 'Delta value is required.'})
     vol = models.FloatField(validators=[validate_positive])
     surface = models.ForeignKey(FXVolatility, CASCADE, related_name='quotes')
     delta_type = models.CharField(choices=CHOICE_DELTA_TYPE.choices,
@@ -771,7 +771,7 @@ def has_make_pricing_engine(trade):
     return trade
 
 
-@has_make_pricing_engine
+#@has_make_pricing_engine
 class FXO(Trade):
     product_type = models.CharField(max_length=12, default="FXO")
     maturity_date = models.DateField(null=False, default=datetime.date.today)
@@ -805,11 +805,24 @@ class FXO(Trade):
         return inst
 
     def link_mktset(self, mktset):
+        """ check whether ccy_pair is in mktset """
         if self.ccy_pair.name in mktset.ccy_pair:
             self.mktset = mktset
             return True
         else:
             return False
+
+    def make_pricing_engine(self):
+        if self.mktset:
+            mkt = self.mktset.fxo_mkt_data(self.ccy_pair.name)
+            process = ql.BlackScholesMertonProcess(
+                mkt.spot.rate, ql.YieldTermStructureHandle(mkt.qts),
+                ql.YieldTermStructureHandle(mkt.rts),
+                mkt.vol.handle(self.strike_price))
+            return {
+                'engine': ql.AnalyticEuropeanEngine(process),
+                'process': process
+            }
 
 
 # class SwapManager():

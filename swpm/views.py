@@ -597,41 +597,78 @@ class MktDataSet():
                 self.ytss[ccy1] = Ccy.objects.get(code=ccy1).fx_curve.get(
                     ref_date=ref_date).term_structure()
                 result = 1
-                
+
             if self.ytss.get(ccy2) == None:
                 self.ytss[ccy2] = Ccy.objects.get(code=ccy2).fx_curve.get(
                     ref_date=ref_date).term_structure()
                 result = 1
-                
+
             if self.ccy_pairs.get(ccy_pair) == None:
                 cp = CcyPair.objects.get(name=ccy_pair)
                 self.ccy_pairs[ccy_pair] = cp
-                # fxq FxSpotRateQuote
                 fxq = cp.rates.get(ref_date=ref_date)
-                fxq.set_yts(rts, qts)
-                fx_quote[ccy_pair] = fxq
+                fxq.set_yts(self.ytss[ccy2], self.ytss[ccy1])
+                self.spots[ccy_pair] = fxq  # fxq is FxSpotRateQuote
                 # fxv
-                fxv = FXVolatility.objects.get(ccy_pair=ccy_pair, ref_date=ref_date)
+                fxv = FXVolatility.objects.get(ccy_pair=ccy_pair,
+                                               ref_date=ref_date)
                 fxv.set_yts(self.ytss[ccy2], self.ytss[ccy1])
-                fxv.set_spot(fxq) # fxq is FXSpotRateQuote
-                vols[ccy_pair] = fxv # fxv is a Django object
+                fxv.set_spot(fxq)  # fxq is FXSpotRateQuote
+                self.vols[ccy_pair] = fxv  # fxv is a Django object
                 result = 1
             return result
         else:
             return 0
 
+    def add_ccy_pair_with_trades(self, trades):
+        if isinstance(trades, list):
+            tradelist = trades
+        else:
+            tradelist = [trades]
+        for t in tradelist:
+            self.add_ccy_pair(t.ccy_pair, self.ref_date)
+
     def fxo_mkt_data(self, ccy_pair):
         """ instrument should call corresponding _mkt_data """
-        if ccy_pairs.get(ccy_pair, None):
+        if self.ccy_pairs.get(ccy_pair, None):
             ccy1, ccy2 = ccy_pair.split('/')
             spot = self.spots.get(ccy_pair)
-            qts = self.yts.get(ccy1)
+            qts = self.yts.get(ccy1)  # is yts, not handle
             rts = self.yts.get(ccy2)
-            vol = self.vols[ccy_pair] # fxv is a Django object
-            # should we ask for strike as input?
-            return {'ccy_pair': ccy_pair, 'spot': spot, 'qts': qts, 'rts': rts, 'vol', vol}
+            vol = self.vols[ccy_pair]
+            # fxv is a Django object, invoke vol.hendle(strike)
+            return {
+                'ccy_pair': ccy_pair,
+                'spot': spot,
+                'qts': qts,
+                'rts': rts,
+                'vol': vol
+            }
         else:
             return None
+
+
+def fxo_price2(request):  # for API
+    if request.method == 'POST':
+        try:
+            as_of = request.POST['as_of']
+            ql.Settings.instance().evaluationDate = to_qlDate(as_of)
+            valuation_message = None
+            fxo_form = FXOForm(request.POST, instance=FXO())
+            if fxo_form.is_valid():
+                tr = fxo_form.save(commit=False)
+                mktset = MktDataSet(as_of)
+                mktset.add_ccy_pair_with_trades(tr)
+                inst = tr.instrument()
+                eng = tr.make_pricing_engine()
+                inst.setPricingEngine(eng['engine'])
+                result = {'npv': inst.NPV(), 'delta': inst.delta()}
+            return JsonResponse({
+                'result': result,
+                'message': valuation_message
+            })
+        except RuntimeError as error:
+            return JsonResponse({'errors': [error.args]}, status=500)
 
 
 def fxo_price(request):  # for API
