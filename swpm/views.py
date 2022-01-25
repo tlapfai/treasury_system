@@ -628,6 +628,7 @@ def fxo_price(request):  # for API
                     to_qlDate(tr.maturity_date), float(tr.strike_price), True)
             else:
                 return JsonResponse({'errors': fxo_form.errors}, status=500)
+                # try try fxo_form.errors.as_json()
             result = {
                 'npv': inst.NPV(),
                 'delta': inst.delta(),
