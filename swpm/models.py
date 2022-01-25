@@ -806,7 +806,11 @@ class FXO(Trade):
         return inst
 
     def link_mktset(self, mktset):
-        self.mktset = mktset
+        if self.ccy_pair.name in mktset.ccy_pair:
+            self.mktset = mktset
+            return True
+        else:
+            return False
 
 
 # class SwapManager():
