@@ -40,13 +40,14 @@ class IRTermStructureForm(ModelForm):
 
 
 class FXOForm(ModelForm):
+    tenor = form.CharField(max_length=10, null=True, blank=True)
     class Meta:
         model = FXO
-        fields = ['buy_sell', 'trade_date', 'maturity_date', 'ccy_pair', 'type', 'cp',
+        fields = ['buy_sell', 'trade_date', 'maturity_date', 'tenor', 'ccy_pair', 'type', 'cp',
                   'strike_price', 'notional_1', 'notional_2', 'book', 'counterparty']
-        # exclude = ['id', 'create_time', 'detail', 'input_user']
-        # https://stackoverflow.com/questions/43067707/why-doesnt-my-django-template-render-a-modelforms-id-or-pk-field
-        # The id field automatically has editable=False, which means by default it doesn't show up in any model forms.
+        """ list all the necessary fields and put them in order
+        https://stackoverflow.com/questions/43067707/why-doesnt-my-django-template-render-a-modelforms-id-or-pk-field
+        The id field automatically has editable=False, which means by default it doesn't show up in any model forms."""
         widgets = {
             'buy_sell': HorizontalRadioSelect(attrs={'class': "form-check-input"}),
             'trade_date': DateInput(attrs={'type': 'date', 'class': "form-control"}),
