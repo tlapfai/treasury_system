@@ -491,7 +491,7 @@ class FXVolatility(models.Model):
             self.qts = qts
 
     def set_spot(self, spot):
-        self.spot = spot
+        self.spot = spot # FXSpotRateQuote
 
     def handle(self, strike, **kwargs):
 
@@ -503,7 +503,7 @@ class FXVolatility(models.Model):
         step = 1e-6
         volatilities = []
 
-        if kwargs.get('maturity'):
+        """if kwargs.get('maturity'):
             mat = kwargs.get('maturity')
             ii = []
             ii.append(max([j for j, m in maturities if m <= to_qlDate(mat)]))
@@ -511,11 +511,11 @@ class FXVolatility(models.Model):
             surf_vol = [surf_vol[i_] for i_ in ii if i_]
             surf_delta = [surf_delta[i_] for i_ in ii if i_]
             surf_delta_type = [surf_delta_type[i_] for i_ in ii if i_]
-            maturities = [maturities[i_] for i_ in ii if i_]
+            maturities = [maturities[i_] for i_ in ii if i_]"""
 
         if self.spot == None:
-            self.spot = self.ccy_pair.rates.get(
-                ref_date=self.ref_date).today_rate()
+            self.spot = self.ccy_pair.rates.get(ref_date=self.ref_date)
+        s0 = self.spot.today_rate()
 
         if self.rts == None:  # yts is the slowest part
             self.rts = self.ccy_pair.quote_ccy.fx_curve.filter(
@@ -526,8 +526,7 @@ class FXVolatility(models.Model):
 
         for i, smile in enumerate(surf_vol):
             mat = to_qlDate(maturities[i])
-            target = self.TargetFun(self.ref_date, self.spot,
-                                    self.rts.discount(mat),
+            target = self.TargetFun(self.ref_date, s0, self.rts.discount(mat),
                                     self.qts.discount(mat), strike,
                                     maturities[i], surf_delta[i],
                                     surf_delta_type[i], smile)
