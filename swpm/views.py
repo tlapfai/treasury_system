@@ -585,8 +585,21 @@ class MktDataSet():
     spots = dict()
     vols = dict()
 
-    def __init__(self, ref_date) -> None:
+    def add_ccy_pair_with_args(self, **kwargs):
+        """ input kwargs for manually initialize MktDataSet """
+        if kwargs:
+            ccy1, ccy2 = ccy_pair.split('/')
+            self.ccy_pairs[ccy_pair] = CcyPair.objects.get(name=ccy_pair)
+            fxspot = FXSpotRateQuote(ref_date=ref_date, rate=float(kwargs.get('s')), ccy_pair=self.ccy_pairs[ccy_pair])
+            self.spots[ccy_pair] = fxspot.save(False)
+            self.ytss[ccy2] = ql.FlatForward(to_qlDate(ref_date), ql.QuoteHandle(ql.SimpleQuote(float(kwargs.get('r')))), ql.Actual365Fixed(), ql.Compounded, ql.Continuous)
+            self.ytss[ccy1] = ql.FlatForward(to_qlDate(ref_date), ql.QuoteHandle(ql.SimpleQuote(float(kwargs.get('q')))), ql.Actual365Fixed(), ql.Compounded, ql.Continuous)
+            # self.vols[ccy_pair] = FXVolatility(...)
+    
+    def __init__(self, ref_date, **kwargs) -> None:
+        """ input kwargs for manually initialize MktDataSet """
         self.ref_date = ref_date
+        self.add_ccy_pair_with_args(**kwargs)    
 
     def add_ccy_pair(self, ccy_pair, ref_date):
         """ return 0 if ref_date is not match, 1 if anything added, 2 if nothing added """
@@ -662,9 +675,17 @@ def fxo_price2(request):  # for API
                 inst = tr.instrument()
                 eng = tr.make_pricing_engine()
                 inst.setPricingEngine(eng['engine'])
-                result = {'npv': inst.NPV(), 'delta': inst.delta()}
+                result = {'npv': inst.NPV(), 
+                          'delta': inst.delta(), 
+                          'gamma': inst.gamma(), 
+                          'vega': inst.vega(), 
+                          'theta': inst.thetaPerDay(),
+                          'rho': inst.rho() * 0.01,
+                          'dividendRho': inst.dividendRho() * 0.01,
+                         }
+                result = dict((x, * side * tr.notional_1) for x, y in result.items())
             return JsonResponse({
-                'result': result,
+                'result': result, 
                 'message': valuation_message
             })
         except RuntimeError as error:
