@@ -157,10 +157,14 @@ class CcyPair(models.Model):
         qts = self.base_ccy.fx_curve.get(ref_date=ref_date).term_structure()
         return rts, qts
 
+
 def with_mktdataset(mktdata):
+
     def link_mktdataset(self, mktdataset):
         self.mktdataset = mktdataset
+
     mktdata.mktdataset = None
+
 
 class FxSpotRateQuote(models.Model):
     ref_date = models.DateField()
@@ -282,9 +286,15 @@ class RateQuote(models.Model):
             if self.ccy_pair:
                 ref_curve = kwargs.get('ref_curve')  # is a handle
                 fixing_days = self.ccy_pair.fixing_days if fixing_days == None else fixing_days
-                return ql.FxSwapRateHelper(q, ql.QuoteHandle(ql.SimpleQuote(self.ccy_pair.rates.get(ref_date=self.ref_date).rate)), tenor_,
+                return ql.FxSwapRateHelper(
+                    q,
+                    ql.QuoteHandle(
+                        ql.SimpleQuote(
+                            self.ccy_pair.rates.get(
+                                ref_date=self.ref_date).rate)), tenor_,
                     fixing_days, self.ccy_pair.calendar(), ql.Following, True,
-                    self.ccy == self.ccy_pair.quote_ccy, ref_curve), q  # 2nd parameter should load instead of make a new handle
+                    self.ccy == self.ccy_pair.quote_ccy, ref_curve
+                ), q  # 2nd parameter should load instead of make a new handle
             else:
                 raise KeyError(
                     'CcyPair does not exist in FXSW type rate quote')
@@ -332,13 +342,16 @@ class IRTermStructure(models.Model):
                 ref_curve_ = IRTermStructure.objects.get(
                     name=self.ref_curve,
                     ccy=self.ref_ccy,
-                    ref_date=self.ref_date).term_structure() # need to edit, should not build up another yts
+                    ref_date=self.ref_date).term_structure(
+                    )  # need to edit, should not build up another yts
             rates = cache.get(f'{self.ccy}-{self.name}-{self.ref_date}')
             if rates == None:
                 rates = self.rates.all()
                 cache.set(f'{self.ccy}-{self.name}-{self.ref_date}', rates, 60)
             ref_yts_handle = ql.YieldTermStructureHandle(ref_curve_)
-            helpers = [rate.helper(ref_curve=ref_yts_handle)[0] for rate in rates]
+            helpers = [
+                rate.helper(ref_curve=ref_yts_handle)[0] for rate in rates
+            ]
             self.yts = ql.PiecewiseLogLinearDiscount(to_qlDate(self.ref_date),
                                                      helpers, dc)
             self.yts.enableExtrapolation()
@@ -941,3 +954,96 @@ class SwapLeg(models.Model):
             as_of)
         return ql.CashFlows.npv(self.leg(as_of),
                                 ql.YieldTermStructureHandle(yts))
+
+
+class MktDataSet:
+    ccy_pairs = dict()
+    fx_quotes = dict()
+    ytss = dict()
+    spots = dict()
+    vols = dict()
+
+    def add_ccy_pair_with_args(self, **kwargs):
+        """ input kwargs for manually initialize MktDataSet """
+        if kwargs:
+            cp = kwargs.get('ccy_pair')
+            ref_date = kwargs.get('ref_date')
+            ccy1, ccy2 = cp.split('/')
+            self.ccy_pairs[cp] = CcyPair.objects.get(name=cp)
+            fxspot = FxSpotRateQuote(ref_date=ref_date,
+                                     rate=float(kwargs.get('s')),
+                                     ccy_pair=self.ccy_pairs[cp])
+            self.spots[cp] = fxspot.save(False)
+            self.ytss[ccy2] = ql.FlatForward(
+                to_qlDate(ref_date),
+                ql.QuoteHandle(ql.SimpleQuote(float(kwargs.get('r')))),
+                ql.Actual365Fixed(), ql.Compounded, ql.Continuous)
+            self.ytss[ccy1] = ql.FlatForward(
+                to_qlDate(ref_date),
+                ql.QuoteHandle(ql.SimpleQuote(float(kwargs.get('q')))),
+                ql.Actual365Fixed(), ql.Compounded, ql.Continuous)
+            # self.vols[ccy_pair] = FXVolatility(...)
+
+    def __init__(self, ref_date, **kwargs) -> None:
+        """ input kwargs for manually initialize MktDataSet """
+        self.ref_date = ref_date
+        self.add_ccy_pair_with_args(**kwargs)
+
+    def add_ccy_pair(self, ccy_pair, ref_date):
+        """ return 0 if ref_date is not match, 1 if anything added, 2 if nothing added """
+        if ref_date == self.ref_date:
+            result = 2
+            ccy1, ccy2 = ccy_pair.split('/')
+            if self.ytss.get(ccy1) == None:
+                self.ytss[ccy1] = Ccy.objects.get(code=ccy1).fx_curve.get(
+                    ref_date=ref_date).term_structure()
+                result = 1
+
+            if self.ytss.get(ccy2) == None:
+                self.ytss[ccy2] = Ccy.objects.get(code=ccy2).fx_curve.get(
+                    ref_date=ref_date).term_structure()
+                result = 1
+
+            if self.ccy_pairs.get(ccy_pair) == None:
+                cp = CcyPair.objects.get(name=ccy_pair)
+                self.ccy_pairs[ccy_pair] = cp
+                fxq = cp.rates.get(ref_date=ref_date)
+                fxq.set_yts(self.ytss[ccy2], self.ytss[ccy1])
+                self.spots[ccy_pair] = fxq  # fxq is FxSpotRateQuote
+                # fxv
+                fxv = FXVolatility.objects.get(ccy_pair=ccy_pair,
+                                               ref_date=ref_date)
+                fxv.set_yts(self.ytss[ccy2], self.ytss[ccy1])
+                fxv.set_spot(fxq)  # fxq is FXSpotRateQuote
+                self.vols[ccy_pair] = fxv  # fxv is a Django object
+                result = 1
+            return result
+        else:
+            return 0
+
+    def add_ccy_pair_with_trades(self, trades):
+        if isinstance(trades, list):
+            tradelist = trades
+        else:
+            tradelist = [trades]
+        for t in tradelist:
+            self.add_ccy_pair(t.ccy_pair, self.ref_date)
+
+    def fxo_mkt_data(self, ccy_pair):
+        """ instrument should call corresponding _mkt_data """
+        if self.ccy_pairs.get(ccy_pair, None):
+            ccy1, ccy2 = ccy_pair.split('/')
+            spot = self.spots.get(ccy_pair)
+            qts = self.yts.get(ccy1)  # is yts, not handle
+            rts = self.yts.get(ccy2)
+            vol = self.vols[ccy_pair]
+            # fxv is a Django object, invoke vol.hendle(strike)
+            return {
+                'ccy_pair': ccy_pair,
+                'spot': spot,
+                'qts': qts,
+                'rts': rts,
+                'vol': vol
+            }
+        else:
+            return None
