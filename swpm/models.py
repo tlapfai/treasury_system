@@ -157,6 +157,10 @@ class CcyPair(models.Model):
         qts = self.base_ccy.fx_curve.get(ref_date=ref_date).term_structure()
         return rts, qts
 
+def with_mktdataset(mktdata):
+    def link_mktdataset(self, mktdataset):
+        self.mktdataset = mktdataset
+    mktdata.mktdataset = None
 
 class FxSpotRateQuote(models.Model):
     ref_date = models.DateField()
@@ -278,14 +282,9 @@ class RateQuote(models.Model):
             if self.ccy_pair:
                 ref_curve = kwargs.get('ref_curve')  # is a handle
                 fixing_days = self.ccy_pair.fixing_days if fixing_days == None else fixing_days
-                return ql.FxSwapRateHelper(
-                    ql.QuoteHandle(ql.SimpleQuote(self.rate)),
-                    ql.QuoteHandle(
-                        ql.SimpleQuote(
-                            self.ccy_pair.rates.get(
-                                ref_date=self.ref_date).rate)), tenor_,
+                return ql.FxSwapRateHelper(q, ql.QuoteHandle(ql.SimpleQuote(self.ccy_pair.rates.get(ref_date=self.ref_date).rate)), tenor_,
                     fixing_days, self.ccy_pair.calendar(), ql.Following, True,
-                    self.ccy == self.ccy_pair.quote_ccy, ref_curve), q
+                    self.ccy == self.ccy_pair.quote_ccy, ref_curve), q  # 2nd parameter should load instead of make a new handle
             else:
                 raise KeyError(
                     'CcyPair does not exist in FXSW type rate quote')
@@ -333,20 +332,16 @@ class IRTermStructure(models.Model):
                 ref_curve_ = IRTermStructure.objects.get(
                     name=self.ref_curve,
                     ccy=self.ref_ccy,
-                    ref_date=self.ref_date).term_structure()
+                    ref_date=self.ref_date).term_structure() # need to edit, should not build up another yts
             rates = cache.get(f'{self.ccy}-{self.name}-{self.ref_date}')
             if rates == None:
                 rates = self.rates.all()
                 cache.set(f'{self.ccy}-{self.name}-{self.ref_date}', rates, 60)
-            helpers = [
-                rate.helper(
-                    ref_curve=ql.YieldTermStructureHandle(ref_curve_))[0]
-                for rate in rates
-            ]
+            ref_yts_handle = ql.YieldTermStructureHandle(ref_curve_)
+            helpers = [rate.helper(ref_curve=ref_yts_handle)[0] for rate in rates]
             self.yts = ql.PiecewiseLogLinearDiscount(to_qlDate(self.ref_date),
                                                      helpers, dc)
             self.yts.enableExtrapolation()
-
         return self.yts
 
     def __str__(self):
