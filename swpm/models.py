@@ -957,12 +957,6 @@ class SwapLeg(models.Model):
 
 
 class MktDataSet:
-    ccy_pairs = dict()
-    fx_quotes = dict()
-    ytss = dict()
-    spots = dict()
-    vols = dict()
-
     def add_ccy_pair_with_args(self, **kwargs):
         """ input kwargs for manually initialize MktDataSet """
         if kwargs:
@@ -987,7 +981,13 @@ class MktDataSet:
     def __init__(self, ref_date, **kwargs) -> None:
         """ input kwargs for manually initialize MktDataSet """
         self.ref_date = ref_date
-        self.add_ccy_pair_with_args(**kwargs)
+        self.ccy_pairs = dict() # Ccypair
+        #self.fx_quotes = dict()
+        self.ytss = dict()
+        self.spots = dict() # FxSpotRateQuote
+        self.vols = dict()
+        if kwargs:
+            self.add_ccy_pair_with_args(**kwargs)
 
     def add_ccy_pair(self, ccy_pair, ref_date):
         """ return 0 if ref_date is not match, 1 if anything added, 2 if nothing added """
