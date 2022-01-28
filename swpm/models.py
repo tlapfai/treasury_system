@@ -81,11 +81,11 @@ def validate_positive(value):
 #         super().validate(value)
 
 
-def to_qlDate(d) -> ql.Date:
+def qlDate(d) -> ql.Date:
     if isinstance(d, str):
         return ql.DateParser.parseISO(d)
     elif isinstance(d, list):
-        return [to_qlDate(dd) for dd in d]
+        return [qlDate(dd) for dd in d]
     else:
         return ql.DateParser.parseISO(d.isoformat())
 
@@ -164,12 +164,15 @@ def with_mktdataset(mktdata):
         self.mktdataset = mktdataset
 
     mktdata.mktdataset = None
+    mktdata.link_mktdataset = link_mktdataset
+    return mktdata
 
 
+@with_mktdataset
 class FxSpotRateQuote(models.Model):
     ref_date = models.DateField()
     rate = models.FloatField()
-    ccy_pair = models.ForeignKey(CcyPair, CASCADE, related_name="rates")
+    ccy_pair = models.ForeignKey(CcyPair, CASCADE, related_name="quotes")
 
     class Meta:
         unique_together = ('ref_date', 'ccy_pair')
@@ -190,16 +193,16 @@ class FxSpotRateQuote(models.Model):
 
     def spot_date(self):
         return self.ccy_pair.calendar().advance(
-            to_qlDate(self.ref_date),
-            ql.Period(self.ccy_pair.fixing_days, ql.Days))
+            qlDate(self.ref_date), ql.Period(self.ccy_pair.fixing_days,
+                                             ql.Days))
 
     def forward_rate(self, maturity):
         sd = self.spot_date()
         if self.rts == None or self.qts == None:
             self.rts, self.qts = self.ccy_pair.fx_curves(self.ref_date)
         return self.rate / self.rts.discount(
-            to_qlDate(maturity)) * self.rts.discount(sd) * self.qts.discount(
-                to_qlDate(maturity)) / self.qts.discount(sd)
+            qlDate(maturity)) * self.rts.discount(sd) * self.qts.discount(
+                qlDate(maturity)) / self.qts.discount(sd)
 
     def today_rate(self):
         return self.forward_rate(self.ref_date)
@@ -208,7 +211,7 @@ class FxSpotRateQuote(models.Model):
         return f"{self.ccy_pair} as of {self.ref_date}"
 
 
-class RateQuote(models.Model):
+class InterestRateQuote(models.Model):
     name = models.CharField(max_length=16)  # e.g. USD OIS 12M
     ref_date = models.DateField()
     rate = models.FloatField()
@@ -286,14 +289,13 @@ class RateQuote(models.Model):
             if self.ccy_pair:
                 ref_curve = kwargs.get('ref_curve')  # is a handle
                 fixing_days = self.ccy_pair.fixing_days if fixing_days == None else fixing_days
+                s = ql.QuoteHandle(
+                    ql.SimpleQuote(
+                        self.ccy_pair.quotes.get(ref_date=self.ref_date).rate))
                 return ql.FxSwapRateHelper(
-                    q,
-                    ql.QuoteHandle(
-                        ql.SimpleQuote(
-                            self.ccy_pair.rates.get(
-                                ref_date=self.ref_date).rate)), tenor_,
-                    fixing_days, self.ccy_pair.calendar(), ql.Following, True,
-                    self.ccy == self.ccy_pair.quote_ccy, ref_curve
+                    q, s, tenor_, fixing_days, self.ccy_pair.calendar(),
+                    ql.Following, True, self.ccy == self.ccy_pair.quote_ccy,
+                    ref_curve
                 ), q  # 2nd parameter should load instead of make a new handle
             else:
                 raise KeyError(
@@ -303,6 +305,7 @@ class RateQuote(models.Model):
         return f"{self.name} as of {self.ref_date.strftime('%Y-%m-%d')}: {self.rate}"
 
 
+@with_mktdataset
 class IRTermStructure(models.Model):
     name = models.CharField(max_length=16)
     ref_date = models.DateField()
@@ -311,7 +314,7 @@ class IRTermStructure(models.Model):
                             related_name="all_curves",
                             null=True,
                             blank=True)
-    rates = models.ManyToManyField(RateQuote, related_name="ts")
+    rates = models.ManyToManyField(InterestRateQuote, related_name="ts")
     as_fx_curve = models.ForeignKey(Ccy,
                                     CASCADE,
                                     related_name="fx_curve",
@@ -331,7 +334,7 @@ class IRTermStructure(models.Model):
     def __init__(self, *args, **kwargs) -> None:
         self.yts = None
         super().__init__(*args, **kwargs)
-        print(f'Called __init__ {self.name} {self.ref_date} {self.ccy}')
+        print(f'Called __init__() of {self.name} {self.ref_date} {self.ccy}')
 
     def term_structure(self):
         if self.yts == None:
@@ -339,20 +342,24 @@ class IRTermStructure(models.Model):
             # change to helper(ccy.rf_curve.term_structure())
             ref_curve_ = None
             if self.ref_curve and self.ref_ccy:
-                ref_curve_ = IRTermStructure.objects.get(
-                    name=self.ref_curve,
-                    ccy=self.ref_ccy,
-                    ref_date=self.ref_date).term_structure(
-                    )  # need to edit, should not build up another yts
-            rates = cache.get(f'{self.ccy}-{self.name}-{self.ref_date}')
-            if rates == None:
-                rates = self.rates.all()
-                cache.set(f'{self.ccy}-{self.name}-{self.ref_date}', rates, 60)
+                if self.mktdataset:
+                    ref_curve_ = self.mktdataset.ytss.get(self.ref_ccy.code)
+                else:
+                    ref_curve_ = IRTermStructure.objects.get(
+                        name=self.ref_curve,
+                        ccy=self.ref_ccy,
+                        ref_date=self.ref_date).term_structure()
+                    # need to edit, should not build up another yts
+            #rates = cache.get(f'{self.ccy}-{self.name}-{self.ref_date}')
+            #if rates == None:
+            #    rates = self.rates.all()
+            #cache.set(f'{self.ccy}-{self.name}-{self.ref_date}', rates, 60)
             ref_yts_handle = ql.YieldTermStructureHandle(ref_curve_)
             helpers = [
-                rate.helper(ref_curve=ref_yts_handle)[0] for rate in rates
+                r.helper(ref_curve=ref_yts_handle)[0]
+                for r in self.rates.all()
             ]
-            self.yts = ql.PiecewiseLogLinearDiscount(to_qlDate(self.ref_date),
+            self.yts = ql.PiecewiseLogLinearDiscount(qlDate(self.ref_date),
                                                      helpers, dc)
             self.yts.enableExtrapolation()
         return self.yts
@@ -404,10 +411,10 @@ class RateIndex(models.Model):
                                   ql.Actual360())
 
         if eff_date:
-            first_fixing_date = idx_obj.fixingDate(to_qlDate(eff_date))
+            first_fixing_date = idx_obj.fixingDate(qlDate(eff_date))
             for f in self.fixings.filter(
                     ref_date__gte=first_fixing_date.ISO()):
-                idx_obj.addFixings([to_qlDate(f.ref_date)], [f.value])
+                idx_obj.addFixings([qlDate(f.ref_date)], [f.value])
 
         return idx_obj
 
@@ -440,7 +447,7 @@ class FXVolatility(models.Model):
                      delta_types, smile_section):
             self.ref_date = ref_date
             self.strike = strike
-            self.maturity = to_qlDate(maturity)
+            self.maturity = qlDate(maturity)
             self.delta_types = delta_types[0]
             self.interp = ql.LinearInterpolation(deltas, smile_section)
             self.spot = spot
@@ -450,7 +457,7 @@ class FXVolatility(models.Model):
         def __call__(self, v0):
             optionType = ql.Option.Call
             stdDev = math.sqrt(ql.Actual365Fixed().yearFraction(
-                to_qlDate(self.ref_date), self.maturity)) * v0
+                qlDate(self.ref_date), self.maturity)) * v0
             calc = ql.BlackDeltaCalculator(optionType, self.delta_types,
                                            self.spot, self.rDcf, self.qDcf,
                                            stdDev)
@@ -513,8 +520,8 @@ class FXVolatility(models.Model):
         """if kwargs.get('maturity'):
             mat = kwargs.get('maturity')
             ii = []
-            ii.append(max([j for j, m in maturities if m <= to_qlDate(mat)]))
-            ii.append(min([j for j, m in maturities if m >= to_qlDate(mat)]))
+            ii.append(max([j for j, m in maturities if m <= qlDate(mat)]))
+            ii.append(min([j for j, m in maturities if m >= qlDate(mat)]))
             surf_vol = [surf_vol[i_] for i_ in ii if i_]
             surf_delta = [surf_delta[i_] for i_ in ii if i_]
             surf_delta_type = [surf_delta_type[i_] for i_ in ii if i_]
@@ -532,22 +539,20 @@ class FXVolatility(models.Model):
                 ref_date=self.ref_date).first().term_structure()
 
         for i, smile in enumerate(surf_vol):
-            mat = to_qlDate(maturities[i])
+            mat = qlDate(maturities[i])
             target = self.TargetFun(self.ref_date, s0, self.rts.discount(mat),
                                     self.qts.discount(mat), strike,
                                     maturities[i], surf_delta[i],
                                     surf_delta_type[i], smile)
             guess = smile[2]
             volatilities.append(solver.solve(target, accuracy, guess, step))
-        vts = ql.BlackVarianceCurve(to_qlDate(self.ref_date),
-                                    to_qlDate(maturities), volatilities,
-                                    ql.Actual365Fixed(), False)
+        vts = ql.BlackVarianceCurve(qlDate(self.ref_date), qlDate(maturities),
+                                    volatilities, ql.Actual365Fixed(), False)
         vts.enableExtrapolation()
 
         if kwargs.get('maturity'):
             return (ql.BlackVolTermStructureHandle(vts),
-                    vts.blackVol(to_qlDate(kwargs.get('maturity')), strike,
-                                 True))
+                    vts.blackVol(qlDate(kwargs.get('maturity')), strike, True))
         else:
             return ql.BlackVolTermStructureHandle(vts)
 
@@ -594,8 +599,7 @@ class FXVolatilityQuote(models.Model):
     maturity = models.DateField(null=True, blank=True)
 
     def save(self, *args, **kwargs):
-        self.maturity = (to_qlDate(self.ref_date) +
-                         ql.Period(self.tenor)).ISO()
+        self.maturity = (qlDate(self.ref_date) + ql.Period(self.tenor)).ISO()
         if self.delta < 0:
             self.delta = round(1.0 + self.delta, 8)
         super().save(*args, **kwargs)
@@ -808,7 +812,7 @@ class FXO(Trade):
             payoff = ql.CashOrNothingPayoff(cp, self.strike_price, 1.0)
         else:
             payoff = ql.PlainVanillaPayoff(cp, self.strike_price)
-        exercise = ql.EuropeanExercise(to_qlDate(self.maturity_date))
+        exercise = ql.EuropeanExercise(qlDate(self.maturity_date))
         inst = ql.VanillaOption(payoff, exercise)
         return inst
 
@@ -902,8 +906,8 @@ class SwapLeg(models.Model):
 
     def get_schedule(self):
         cdr = self.calendar.calendar()
-        return ql.MakeSchedule(to_qlDate(self.effective_date),
-                               to_qlDate(self.maturity_date),
+        return ql.MakeSchedule(qlDate(self.effective_date),
+                               qlDate(self.maturity_date),
                                ql.Period(self.payment_freq),
                                rule=QL_DAY_RULE[self.day_rule],
                                calendar=cdr)
@@ -957,6 +961,7 @@ class SwapLeg(models.Model):
 
 
 class MktDataSet:
+
     def add_ccy_pair_with_args(self, **kwargs):
         """ input kwargs for manually initialize MktDataSet """
         if kwargs:
@@ -969,11 +974,11 @@ class MktDataSet:
                                      ccy_pair=self.ccy_pairs[cp])
             self.spots[cp] = fxspot.save(False)
             self.ytss[ccy2] = ql.FlatForward(
-                to_qlDate(ref_date),
+                qlDate(ref_date),
                 ql.QuoteHandle(ql.SimpleQuote(float(kwargs.get('r')))),
                 ql.Actual365Fixed(), ql.Compounded, ql.Continuous)
             self.ytss[ccy1] = ql.FlatForward(
-                to_qlDate(ref_date),
+                qlDate(ref_date),
                 ql.QuoteHandle(ql.SimpleQuote(float(kwargs.get('q')))),
                 ql.Actual365Fixed(), ql.Compounded, ql.Continuous)
             # self.vols[ccy_pair] = FXVolatility(...)
@@ -981,10 +986,10 @@ class MktDataSet:
     def __init__(self, ref_date, **kwargs) -> None:
         """ input kwargs for manually initialize MktDataSet """
         self.ref_date = ref_date
-        self.ccy_pairs = dict() # Ccypair
+        self.ccy_pairs = dict()  # Ccypair
         #self.fx_quotes = dict()
         self.ytss = dict()
-        self.spots = dict() # FxSpotRateQuote
+        self.spots = dict()  # FxSpotRateQuote
         self.vols = dict()
         if kwargs:
             self.add_ccy_pair_with_args(**kwargs)
@@ -995,13 +1000,15 @@ class MktDataSet:
             result = 2
             ccy1, ccy2 = ccy_pair.split('/')
             if self.ytss.get(ccy1) == None:
-                self.ytss[ccy1] = Ccy.objects.get(code=ccy1).fx_curve.get(
-                    ref_date=ref_date).term_structure()
+                cv = Ccy.objects.get(code=ccy1).fx_curve.get(ref_date=ref_date)
+                cv.link_mktdataset(self)
+                self.ytss[ccy1] = cv.term_structure()
                 result = 1
 
             if self.ytss.get(ccy2) == None:
-                self.ytss[ccy2] = Ccy.objects.get(code=ccy2).fx_curve.get(
-                    ref_date=ref_date).term_structure()
+                cv = Ccy.objects.get(code=ccy2).fx_curve.get(ref_date=ref_date)
+                cv.link_mktdataset(self)
+                self.ytss[ccy2] = cv.term_structure()
                 result = 1
 
             if self.ccy_pairs.get(ccy_pair) == None:

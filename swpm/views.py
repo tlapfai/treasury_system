@@ -52,7 +52,7 @@ def str2date(s):
 #         calendar = request.POST.get('calendar', None)
 #         day_rule = request.POST.get('day_rule', None)
 #         try:
-#             d = to_qlDate(effective_date)
+#             d = qlDate(effective_date)
 #             tnr = ql.Period(tenor)
 #             cdr = Calendar.objects.get(name=calendar).calendar()
 #             maturity_date = cdr.advance(d, tnr, QL_DAY_RULE[day_rule])
@@ -414,7 +414,7 @@ def pricing(request, commit=False):
         as_of = request.POST['as_of']
         trade_id_form = TradeIDForm(request.POST)
         as_of_form = AsOfForm(request.POST)  # for render back to page
-        ql.Settings.instance().evaluationDate = to_qlDate(as_of)
+        ql.Settings.instance().evaluationDate = qlDate(as_of)
         valuation_message = None
         if request.POST['trade_type'] == 'FX Option':
             fxo_form = FXOForm(request.POST, instance=FXO())
@@ -426,7 +426,7 @@ def pricing(request, commit=False):
                 inst.setPricingEngine(engine)
                 side = 1.0 if tr.buy_sell == "B" else -1.0
                 # will get full market data
-                spot = tr.ccy_pair.rates.get(ref_date=as_of).rate
+                spot = tr.ccy_pair.quotes.get(ref_date=as_of).rate
 
                 if commit and request.POST.get('book') and request.POST.get(
                         'counterparty'):
@@ -561,7 +561,7 @@ def fx_volatility_table(request):  # for API
             ccy_pair = request.POST['ccy_pair']
             fxv = FXVolatility.objects.filter(ref_date=as_of,
                                               ccy_pair=ccy_pair).first()
-            #ql.Settings.instance().evaluationDate = to_qlDate(as_of)
+            #ql.Settings.instance().evaluationDate = qlDate(as_of)
             market_data_message = None
             return JsonResponse(
                 {
@@ -582,7 +582,7 @@ def fxo_price2(request):  # for API
     if request.method == 'POST':
         try:
             as_of = request.POST['as_of']
-            ql.Settings.instance().evaluationDate = to_qlDate(as_of)
+            ql.Settings.instance().evaluationDate = qlDate(as_of)
             valuation_message = None
             fxo_form = FXOForm(request.POST, instance=FXO())
             if fxo_form.is_valid():
@@ -616,7 +616,7 @@ def fxo_price(request):  # for API
     if request.method == 'POST':
         try:
             as_of = request.POST['as_of']
-            ql.Settings.instance().evaluationDate = to_qlDate(as_of)
+            ql.Settings.instance().evaluationDate = qlDate(as_of)
             valuation_message = None
             fxo_form = FXOForm(request.POST, instance=FXO())
             if fxo_form.is_valid():
@@ -626,10 +626,10 @@ def fxo_price(request):  # for API
                     as_of, strike=tr.strike_price)
                 inst.setPricingEngine(engine)
                 side = 1.0 if tr.buy_sell == "B" else -1.0
-                spot_0 = tr.ccy_pair.rates.get(ref_date=as_of).today_rate()
-                spot = tr.ccy_pair.rates.get(ref_date=as_of).rate
+                spot_0 = tr.ccy_pair.quotes.get(ref_date=as_of).today_rate()
+                spot = tr.ccy_pair.quotes.get(ref_date=as_of).rate
                 vol = process.blackVolatility().blackVol(
-                    to_qlDate(tr.maturity_date), float(tr.strike_price), True)
+                    qlDate(tr.maturity_date), float(tr.strike_price), True)
             else:
                 return JsonResponse({'errors': fxo_form.errors}, status=500)
                 # try try fxo_form.errors.as_json()
@@ -677,7 +677,7 @@ def load_fxo_mkt(request):
         strike_price = float(data.get('strike_price'))
         ccy_pair = CcyPair.objects.get(name=cp)
         rts, qts = ccy_pair.fx_curves(ref_date)
-        fx_quote = ccy_pair.rates.get(ref_date=ref_date)  # FxSpotRateQuote
+        fx_quote = ccy_pair.quotes.get(ref_date=ref_date)  # FxSpotRateQuote
         fx_quote.set_yts(rts, qts)
         spot = fx_quote.today_rate()
         fwd = fx_quote.forward_rate(maturity)
@@ -685,7 +685,7 @@ def load_fxo_mkt(request):
         fx_vol.set_yts(rts, qts)
         fx_vol.set_spot(spot)
         fx_vol_h = fx_vol.handle(strike_price)
-        vol = fx_vol_h.blackVol(to_qlDate(maturity), strike_price)
+        vol = fx_vol_h.blackVol(qlDate(maturity), strike_price)
         return JsonResponse({'spot': spot, 'fwd': fwd, 'vol': vol})
 
 
@@ -774,7 +774,7 @@ def handle_uploaded_file(f=None, text=None):
                 if row['Term'][:2] == 'ED':
                     row['Term'] = row['Term'][:4]
                     row['Market Rate'] = 100.0 * float(row['Market Rate'])
-                r, temp_ = RateQuote.objects.update_or_create(
+                r, temp_ = InterestRateQuote.objects.update_or_create(
                     name=row['Ccy'] + '' + row['Curve'] + ' ' + row['Term'],
                     ref_date=str2date(row['Date']),
                     defaults={
@@ -809,7 +809,7 @@ def handle_uploaded_file(f=None, text=None):
                 if created_:
                     msg.append(
                         f'{yts.ccy} {yts.name} {yts.ref_date} is created.')
-                r, temp_ = RateQuote.objects.update_or_create(
+                r, temp_ = InterestRateQuote.objects.update_or_create(
                     name=row['Ccy'] + ' ' + row['Curve'] + ' ' + row['Term'],
                     ref_date=str2date(row['Date']),
                     defaults={
@@ -895,7 +895,7 @@ def yield_curve(request, curve=None, ref_date=None, **kwargs):
     elif request.method == 'GET':
         ccy = kwargs.get('ccy')
         if curve and ref_date:
-            ql.Settings.instance().evaluationDate = to_qlDate(ref_date)
+            ql.Settings.instance().evaluationDate = qlDate(ref_date)
             yts_model = IRTermStructure.objects.get(
                 ccy=ccy, name=curve, ref_date=str2date(ref_date))
             yts = yts_model.term_structure()

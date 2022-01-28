@@ -34,24 +34,28 @@ class CcyPairAdmin(admin.ModelAdmin):
 
 
 class FXVolatilityQuoteAdmin(admin.ModelAdmin):
-    all_fields = ['ref_date', 'tenor', 'delta',
-                  'delta_type', 'vol', 'surface', 'maturity']
-    fields = ('ref_date', 'tenor', 'delta',
-              'delta_type', 'vol', 'surface', 'maturity')
+    all_fields = [
+        'ref_date', 'tenor', 'delta', 'delta_type', 'vol', 'surface',
+        'maturity'
+    ]
+    fields = ('ref_date', 'tenor', 'delta', 'delta_type', 'vol', 'surface',
+              'maturity')
     list_display = all_fields
     ordering = all_fields
 
 
 class IRTermStructureAdmin(admin.ModelAdmin):
-    all_fields = ['name', 'ref_date', 'ccy', 'rates',
-                  'as_fx_curve', 'as_rf_curve', 'ref_curve']
+    all_fields = [
+        'name', 'ref_date', 'ccy', 'rates', 'as_fx_curve', 'as_rf_curve',
+        'ref_curve'
+    ]
     #fields = tuple(all_fields)
     list_display = ['ccy', 'name', 'ref_date']
     ordering = ['ccy', 'name', 'ref_date']
     search_fields = ['name']
 
 
-class RateQuoteAdmin(admin.ModelAdmin):
+class InterestRateQuoteAdmin(admin.ModelAdmin):
     list_display = ['name', 'ref_date', 'tenor', 'instrument']
     ordering = ['name', 'ref_date', 'tenor', 'instrument']
     search_fields = ['name']
@@ -60,7 +64,7 @@ class RateQuoteAdmin(admin.ModelAdmin):
 admin.site.register(CcyPair, CcyPairAdmin)
 admin.site.register(FXVolatilityQuote, FXVolatilityQuoteAdmin)
 admin.site.register(IRTermStructure, IRTermStructureAdmin)
-admin.site.register(RateQuote, RateQuoteAdmin)
+admin.site.register(InterestRateQuote, InterestRateQuoteAdmin)
 
 # @admin.register(IRTermStructure)
 # class IRTermStructureAdmin(admin.ModelAdmin):
@@ -68,7 +72,6 @@ admin.site.register(RateQuote, RateQuoteAdmin)
 #     list_display = ['name', 'ref_date', 'ccy', 'as_fx_curve', 'as_rf_curve']
 #     #search_fields = ['name', 'ref_date', 'ccy', 'rates', 'as_fx_curve', 'as_rf_curve']
 #     ordering = ['name', 'ref_date', 'ccy', 'rates', 'as_fx_curve', 'as_rf_curve']
-
 
 # @admin.register(FXO)
 # class FXOAdmin(admin.ModelAdmin):

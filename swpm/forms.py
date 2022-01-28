@@ -42,14 +42,14 @@ class IRTermStructureForm(ModelForm):
 
 
 class FXOForm(ModelForm):
-    #tenor = forms.CharField(max_length=10, null=True, blank=True)
+    tenor = forms.CharField(required=False)
 
     class Meta:
         model = FXO
         fields = [
             'buy_sell', 'trade_date', 'maturity_date', 'ccy_pair', 'type',
             'cp', 'strike_price', 'notional_1', 'notional_2', 'book',
-            'counterparty'
+            'counterparty', 'tenor'
         ]
         """ list all the necessary fields and put them in order
         https://stackoverflow.com/questions/43067707/why-doesnt-my-django-template-render-a-modelforms-id-or-pk-field
@@ -223,7 +223,7 @@ class YieldCurveSearchForm(forms.Form):
                                label='Date')
     ccy = forms.ModelChoiceField(Ccy.objects.all(),
                                  required=False,
-                                 label='Currency')
+                                 label='Ccy')
 
 
 class TradeSearchForm(forms.Form):
