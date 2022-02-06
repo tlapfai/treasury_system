@@ -1,3 +1,7 @@
+* {
+  font-size: smaller;
+}
+
 .alert-danger {
   color: red;
 }
@@ -11,6 +15,10 @@
 
 .main-body {
   padding: 1px;
+}
+
+nav.navbar li a {
+  font-size: smaller;
 }
 
 .flex-container {
@@ -103,12 +111,6 @@ table.rate-list td {
   padding: 2px;
 }
 
-.valuation-table input {
-  float: right;
-  clear: both;
-  text-align: right;
-}
-
 table.trade-form th,
 table.trade-form td {
   border: 1px solid black;
@@ -127,5 +129,24 @@ input.form-control {
 
 table.fx-vol tr,
 table.fx-vol td {
+  text-align: right;
+}
+
+table.fx-vol thead th {
+  text-align: center;
+}
+
+table.parameters input {
+  text-align: right;
+  float: right;
+}
+
+table.valuation td {
+  text-align: right;
+}
+
+.valuation-table input {
+  float: right;
+  clear: both;
   text-align: right;
 }

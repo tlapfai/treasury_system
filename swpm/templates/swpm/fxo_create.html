@@ -7,7 +7,7 @@
 
 <div class="container-fluid">
   <div class="row gx-2">
-    <div class="trade-ticket col-md-6" style="padding: 1em;">
+    <div class="trade-area col-md-6" style="padding: 1em;">
       <form class="trade-form">
         {% csrf_token %}
         <input type="date" class="as_of" name="as_of" required id="id_as_of">
@@ -93,8 +93,5 @@
 
 
 {% block script %}
-
-<script src="{% static 'swpm/jquery-3.6.0.slim.min.js' %}"></script>
-<script src="https://unpkg.com/bootstrap-table@1.18.3/dist/bootstrap-table.min.js"></script>
 
 {% endblock %}

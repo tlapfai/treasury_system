@@ -12,7 +12,7 @@
   </div>
 {% endif %}
 
-<div class="row" style="margin: 0;">
+<div class="trade-ticket row" style="margin: 0;">
     <div class="form-group col-sm-6 col-xs-12">
         <label for="{{ form.buy_sell.id_for_label }}">{{ form.buy_sell.label }}</label>        
         {% if form.is_bound %}
@@ -93,8 +93,24 @@
         {% endif %}
     </div>
 
+    <div class="form-group col-sm-6 col-xs-12">
+        <label for="{{ form.maturity_date.id_for_label }}">{{ form.maturity_date.label }}</label>
+        {% if form.is_bound %}
+            {% if form.maturity_date.errors %}
+                {% render_field form.maturity_date class+="form-control-sm is-invalid" %}
+                {% for error in form.maturity_date.errors %}
+                    <div class="invalid-feedback">{{ error }}</div>
+                {% endfor %}
+            {% else %}
+                {% render_field form.maturity_date class+="form-control-sm is-valid" %}
+            {% endif %}
+        {% else %}
+            {% render_field form.maturity_date class+="form-control" %}
+        {% endif %}
+    </div>
+
     {% for field in form.visible_fields %}
-        {% if not field.name in "buy_sell, strike_price, notional_1, notional_2, ccy_pair" %}
+        {% if not field.name in "maturity_date, buy_sell, strike_price, notional_1, notional_2, ccy_pair" %}
             <div class="form-group col-6">
                 {% render_field field.label_tag %}
                 {% if form.is_bound %}

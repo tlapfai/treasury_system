@@ -1,18 +1,15 @@
 {% load humanize %}
 
 <style>
-    table.valuation td {
-        text-align: right;
-    }
+
 </style>
 
-<div id="val-alert" class="alert alert-secondary" role="alert">
-</div>
+<div id="val-alert" class="alert alert-secondary" role="alert" style="display: none;"></div>
 
 <table class="valuation table table-striped">
     <tbody>
     <tr>
-        <th id="label-npv">NPV</th>
+        <th id="label-npv" data-bs-toggle="tooltip" data-bs-placement="left" title="NPV">NPV</th>
         <td id="val-npv">{{ form.initial.npv }}</td>
     </tr>
     <tr>
@@ -20,23 +17,23 @@
         <td id="val-delta">{{ form.initial.delta }}</td>
     </tr>
     <tr>
-        <th>Gamma</th>
+        <th data-bs-toggle="tooltip" data-bs-placement="left" title="Gamma with respect to 1% spot change">Gamma</th>
         <td id="val-gamma">{{ form.initial.gamma |floatformat:0 | intcomma }}</td>
     </tr>
     <tr>
-        <th>Vega</th>
+        <th data-bs-toggle="tooltip" data-bs-placement="left" title="1% Vega">Vega</th>
         <td id="val-vega">{{ form.initial.vega }}</td>
     </tr>
     <tr>
-        <th>Theta</th>
+        <th data-bs-toggle="tooltip" data-bs-placement="left" title="Theta per day">Theta</th>
         <td id="val-theta"></td>
     </tr>
     <tr>
-        <th>Ccy1 Rho</th>
+        <th data-bs-toggle="tooltip" data-bs-placement="left" title="1% Rho">Ccy1 Rho</th>
         <td id="val-dividendRho"></td>
     </tr>
     <tr>
-        <th>Ccy2 Rho</th>
+        <th data-bs-toggle="tooltip" data-bs-placement="left" title="1% Rho">Ccy2 Rho</th>
         <td id="val-rho"></td>
     </tr>
     <tr>

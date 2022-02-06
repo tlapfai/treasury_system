@@ -5,10 +5,11 @@
 {% block body %}
 <div class="container-fluid">
 	<legend>Search Trade</legend>
-	<form action="{% url 'trade_list' %}" method="post">
+	<form id="trade-search" action="{% url 'trade_list' %}" method="post">
 		{% csrf_token %}
 		{{ form }}
-		<button type="submit" class="btn btn-primary">Search</button>
+		<button type="submit" class="btn btn-primary btn-sm">Search</button>
+		<button type="button" class="btn btn-secondary btn-sm" onclick="resetSearchForm()">Reset</button>
 	</form>
 </div>
 
@@ -35,7 +36,7 @@
 			<tbody>
 				{% for t in search_result %}
 				<tr>
-					<td class='tradeid'><a href="trade/{{ t.product_type }}/{{ t.id }}">{{ t.id }}</a></td>
+					<td class='tradeid'><a href="trade/{{ t.product_type | lower }}/{{ t.id }}">{{ t.id }}</a></td>
 					<td class='tradeid'>{{ t.product_type }}</td>
 					<td class='ccypair'>{{ t.ccy_pair_id }}</td>
 					<td class='type'>{{ t.type }}</td>
@@ -58,7 +59,6 @@
 
 {% block script %}
 	<script src="{% static 'swpm/index.js' %}"></script>
-	<script src="{% static 'swpm/jquery-3.6.0.slim.min.js' %}"></script>
 	
 	<!-- BOOTSTRAP TABLE START -->
     <!-- Latest compiled and minified CSS -->

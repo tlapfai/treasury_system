@@ -6,34 +6,33 @@
     }
 </style>
 
-<div id="val-alert" class="alert alert-secondary" role="alert">
-</div>
+<div id="para-alert" class="alert alert-secondary" role="alert" style="display: none"></div>
 
-<table class="valuation table table-striped">
+<table class="parameters table table-striped">
     <tbody>
         <tr>
+            <th id="label-vol">Spot Today</th>
+            <td id="para-spot0"><input type="text" id="spot0"></input></td>
+        </tr>
+        <tr>
             <th id="label-vol">Spot</th>
-            <td id="val-spot"><input type="text" id="spot"></input></td>
+            <td id="para-spot"><input type="text" id="spot"></input></td>
         </tr>
         <tr>
             <th id="label-vol">Fwd</th>
-            <td id="val-spot"><input type="text" id="fwd"></input></td>
+            <td id="para-spot"><input type="text" id="fwd"></input></td>
         </tr>
         <tr>
             <th id="label-vol">Volatility</th>
-            <td id="val-vol"><input type="text" id="vol"></input></td>
+            <td id="para-vol"><input type="text" id="vol"></input></td>
         </tr>
         <tr>
-            <th id="label-vol">R</th>
-            <td id="val-vol"><input type="text" id="r"></input></td>
+            <th id="label-vol">Local IR</th>
+            <td id="para-vol"><input type="text" id="r"></input></td>
         </tr>
         <tr>
-            <th id="label-vol">Q</th>
-            <td id="val-vol"><input type="text" id="q"></input></td>
-        </tr>
-        <tr>
-            <th id="label-vol">Tenor</th>
-            <td id="val-vol"><input type="text" id="t"></input></td>
+            <th id="label-vol">For IR</th>
+            <td id="para-vol"><input type="text" id="q"></input></td>
         </tr>
     </tbody>
 </table>

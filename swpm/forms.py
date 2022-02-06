@@ -1,3 +1,5 @@
+from email.policy import default
+from random import choices
 from django.db.models import fields
 from django.forms import ModelForm, modelformset_factory, SelectDateWidget, DateInput, NumberInput, RadioSelect, ModelMultipleChoiceField, widgets, TextInput
 from django import forms
@@ -9,6 +11,14 @@ import datetime
 
 from django_plotly_dash.dash_wrapper import wid2str
 from .models import *
+
+CHOICE_TRADE_TYPE = [('FXO', 'FXO'), ('SWAP', 'SWAP')]
+date_attrs = {'type': 'date', 'class': "form-control"}
+inline_date_attrs = {
+    'type': 'date',
+    'class': 'form-control',
+    'style': 'display: inline'
+}
 
 
 class HorizontalRadioSelect(RadioSelect):
@@ -47,25 +57,23 @@ class FXOForm(ModelForm):
     class Meta:
         model = FXO
         fields = [
-            'buy_sell', 'trade_date', 'maturity_date', 'ccy_pair', 'type',
-            'cp', 'strike_price', 'notional_1', 'notional_2', 'book',
-            'counterparty', 'tenor'
+            'buy_sell', 'trade_date', 'tenor', 'maturity_date', 'ccy_pair',
+            'payoff_type', 'exercise_type', 'cp', 'strike_price', 'notional_1',
+            'notional_2', 'exercise_start', 'exercise_end', 'book',
+            'counterparty'
         ]
         """ list all the necessary fields and put them in order
         https://stackoverflow.com/questions/43067707/why-doesnt-my-django-template-render-a-modelforms-id-or-pk-field
         The id field automatically has editable=False, which means by default it doesn't show up in any model forms."""
         widgets = {
-            'buy_sell':
-            HorizontalRadioSelect(attrs={'class': "form-check-input"}),
-            'trade_date':
-            DateInput(attrs={
-                'type': 'date',
-                'class': "form-control"
-            }),
-            'maturity_date':
-            DateInput(attrs={'type': 'date'}),
-            'notional_1':
-            NumberInput(attrs={'class': "form-control"})
+            'buy_sell': forms.Select(attrs={'class': "form-control-sm"}),
+            'trade_date': DateInput(attrs=date_attrs),
+            'maturity_date': DateInput(attrs=date_attrs),
+            'strike_price': TextInput(attrs={'class': "form-control"}),
+            'notional_1': TextInput(attrs={'class': "form-control"}),
+            'notional_2': TextInput(attrs={'class': "form-control"}),
+            'exercise_start': DateInput(attrs=date_attrs),
+            'exercise_end': DateInput(attrs=date_attrs),
         }
         labels = {
             'buy_sell': 'Buy/Sell',
@@ -77,19 +85,32 @@ class FXOForm(ModelForm):
 
     def clean(self):
         try:
-            cleaned_data = super().clean()
-            option_type = cleaned_data.get('type')
-            if option_type == "EUR" and abs(
-                    cleaned_data.get('strike_price') *
-                    cleaned_data.get('notional_1') -
-                    cleaned_data.get('notional_2')) > 0.1:
-                raise ValidationError(_('Strike and notionals do not match.'),
+            cd = super().clean()
+            if cd.get('maturity_date') < cd.get('trade_date'):
+                raise ValidationError(_(
+                    'Maturity date must be not earlier than trade date. (form clean check)'
+                ),
                                       code='unmatch1')
-            if cleaned_data.get('maturity_date') < cleaned_data.get(
-                    'trade_date'):
-                raise ValidationError(
-                    _('Maturity date must be not earlier than trade date.'),
-                    code='unmatch1')
+            exercise_type = cd.get('exercise_type')
+            if exercise_type == "EUR":
+                if abs(
+                        cd.get('strike_price') * cd.get('notional_1') -
+                        cd.get('notional_2')) > 0.1:
+                    raise ValidationError(
+                        _('Strike and notionals do not match.'),
+                        code='unmatch1')
+                cd.get('exercise_start') == None
+                cd.get('exercise_end') == None
+            elif exercise_type == "AME":
+                if cd.get('exercise_start') == None:
+                    cd['exercise_start'] = cd['trade_date']
+                if cd.get('exercise_end') == None:
+                    cd['exercise_end'] = cd['maturity_date']
+                if cd['exercise_end'] < cd['exercise_start']:
+                    raise ValidationError(_(
+                        'Exercise End must be not earlier than Exercise Start. (form clean check)'
+                    ),
+                                          code='unmatch1')
         except KeyError:
             raise ValidationError(_('Fields not completed.'), code=KeyError)
 
@@ -228,5 +249,11 @@ class YieldCurveSearchForm(forms.Form):
 
 class TradeSearchForm(forms.Form):
     id = forms.IntegerField(required=False)
-    trade_date = forms.DateField(widget=DateInput(attrs={'type': 'date'}),
-                                 required=False)
+    trade_date__gte = forms.DateField(label="Traded from",
+                                      widget=DateInput(inline_date_attrs),
+                                      required=False)
+    trade_date__lte = forms.DateField(label="Traded before",
+                                      widget=DateInput(inline_date_attrs),
+                                      required=False)
+    book = forms.CharField(max_length=16, required=False)
+    #trade_type = forms.MultipleChoiceField(choices=CHOICE_TRADE_TYPE,required=False)

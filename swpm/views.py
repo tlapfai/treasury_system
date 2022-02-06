@@ -37,14 +37,6 @@ import datetime
 import json
 import pandas as pd
 
-
-def str2date(s):
-    if len(s) == 10:
-        return datetime.datetime.strptime(s, '%Y-%m-%d')
-    elif len(str(s)) == 8:
-        return datetime.datetime.strptime(str(s), '%Y%m%d')
-
-
 # def tenor2date(request):
 #     if request.is_ajax():
 #         effective_date = request.POST.get('effective_date', None)
@@ -126,8 +118,7 @@ class FXOCreateView(CreateView):
     form_class = FXOForm
     model = FXO
     template_name = "swpm/fxo_create.html"
-    make_models_forms = ("FX Option", FXO, FXOForm, None, None,
-                         FXOValuationForm)
+    #make_models_forms = ("FX Option", FXO, FXOForm, None, None, FXOValuationForm)
 
 
 class FXOUpdateView(UpdateView):
@@ -356,7 +347,7 @@ def trade_list(request):
         trades2 = list(Swap.objects.filter(**form_).values())
         search_result = trades1 + trades2
         return render(request, 'swpm/trade-list.html', {
-            'form': TradeSearchForm(),
+            'form': form,
             "search_result": search_result
         })
     else:
@@ -561,7 +552,6 @@ def fx_volatility_table(request):  # for API
             ccy_pair = request.POST['ccy_pair']
             fxv = FXVolatility.objects.filter(ref_date=as_of,
                                               ccy_pair=ccy_pair).first()
-            #ql.Settings.instance().evaluationDate = qlDate(as_of)
             market_data_message = None
             return JsonResponse(
                 {
@@ -617,76 +607,79 @@ def fxo_price(request):  # for API
         try:
             as_of = request.POST['as_of']
             ql.Settings.instance().evaluationDate = qlDate(as_of)
+            mkt = MktDataSet(as_of)
             valuation_message = None
             fxo_form = FXOForm(request.POST, instance=FXO())
             if fxo_form.is_valid():
                 tr = fxo_form.save(commit=False)
-                inst = tr.instrument()
-                engine, process = tr.make_pricing_engine(
-                    as_of, strike=tr.strike_price)
-                inst.setPricingEngine(engine)
-                side = 1.0 if tr.buy_sell == "B" else -1.0
-                spot_0 = tr.ccy_pair.quotes.get(ref_date=as_of).today_rate()
-                spot = tr.ccy_pair.quotes.get(ref_date=as_of).rate
-                vol = process.blackVolatility().blackVol(
-                    qlDate(tr.maturity_date), float(tr.strike_price), True)
+                tr.link_mktdataset(mkt)
+                tr.self_inst()
             else:
                 return JsonResponse({'errors': fxo_form.errors}, status=500)
                 # try try fxo_form.errors.as_json()
             result = {
-                'npv': inst.NPV(),
-                'delta': inst.delta(),
-                'gamma': inst.gamma() * 0.01 / spot_0,
-                'vega': inst.vega() * 0.01,
-                'theta': inst.thetaPerDay(),
-                'rho': inst.rho() * 0.01,
-                'dividendRho': inst.dividendRho() * 0.01,
-                'strikeSensitivity': inst.strikeSensitivity(),
-                'itmCashProbability': inst.itmCashProbability(),
+                'npv': tr.NPV(),
+                'delta': tr.delta(),
+                'gamma': tr.gamma(),
+                'vega': tr.vega(),
+                'theta': tr.thetaPerDay(),
+                'rho': tr.rho() * 0.01,
+                'dividendRho': tr.dividendRho() * 0.01,
+                #'strikeSensitivity': tr.strikeSensitivity(),
+                #'itmCashProbability': tr.itmCashProbability(),
                 # 'impliedVolatility': inst.impliedVolatility(),
-            }
-            result = dict([
-                (x, round(y * side *
-                          tr.notional_1, 2)) if x != 'itmCashProbability' else
-                (x, round(y, 6)) for x, y in result.items()
-            ])
-            parameters = {
-                #'spot_0': spot_0,
-                'spot': spot,
-                'vol': vol * 100,
             }
             return JsonResponse(
                 {
                     'result': result,
-                    'parameters': parameters,
                     'valuation_message': valuation_message
                 }, )
         except RuntimeError as error:
             return JsonResponse({'errors': [error.args]}, status=500)
 
 
-@csrf_exempt
 def load_fxo_mkt(request):
     # request.POST is only for form-encoded data.
     # If you are posting JSON, then you should use request.body instead.
     if request.method == "POST":
-        data = json.loads(request.body.decode('utf-8'))
-        ref_date = data.get('as_of')
-        cp = data.get('ccy_pair')
-        maturity = data.get('maturity_date')
-        strike_price = float(data.get('strike_price'))
-        ccy_pair = CcyPair.objects.get(name=cp)
-        rts, qts = ccy_pair.fx_curves(ref_date)
-        fx_quote = ccy_pair.quotes.get(ref_date=ref_date)  # FxSpotRateQuote
-        fx_quote.set_yts(rts, qts)
-        spot = fx_quote.today_rate()
-        fwd = fx_quote.forward_rate(maturity)
-        fx_vol = FXVolatility.objects.get(ccy_pair=ccy_pair, ref_date=ref_date)
-        fx_vol.set_yts(rts, qts)
-        fx_vol.set_spot(spot)
-        fx_vol_h = fx_vol.handle(strike_price)
-        vol = fx_vol_h.blackVol(qlDate(maturity), strike_price)
-        return JsonResponse({'spot': spot, 'fwd': fwd, 'vol': vol})
+        try:
+            data = json.loads(request.body.decode('utf-8'))
+            ref_date = data.get('as_of')
+            cp = data.get('ccy_pair')
+            maturity = data.get('maturity_date')
+            strike_price = float(data.get('strike_price'))
+            if strike_price <= 0:
+                raise RuntimeError("Strike price must be positive.")
+            if maturity < ref_date:
+                raise RuntimeError(
+                    "Maturity date must not be earlier than pricing date.")
+
+            mkt = MktDataSet(ref_date)
+            fxs = mkt.get_fxspot(cp)
+            spot0 = fxs.today_rate()
+            spot = fxs.rate
+            fwd = fxs.forward_rate(maturity)
+            fxvol = mkt.get_fxvol(cp)
+            vol = fxvol.handle(strike_price).blackVol(qlDate(maturity), 1)
+            qts, rts = mkt.get_fxyts(cp)
+            return JsonResponse({
+                'spot':
+                spot,
+                'spot0':
+                spot0,
+                'fwd':
+                fwd,
+                'vol':
+                vol,
+                'q':
+                qts.zeroRate(qlDate(maturity), ql.Actual365Fixed(),
+                             ql.Continuous).rate(),
+                'r':
+                rts.zeroRate(qlDate(maturity), ql.Actual365Fixed(),
+                             ql.Continuous).rate(),
+            })
+        except RuntimeError as error:
+            return JsonResponse({'errors': [error.args]}, status=500)
 
 
 @csrf_exempt
