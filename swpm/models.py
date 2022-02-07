@@ -111,6 +111,7 @@ class Calendar(models.Model):
     def __str__(self):
         return self.name
 
+    @property
     def calendar(self):
         return QL_CALENDAR.get(self.name)
 
@@ -465,18 +466,33 @@ class FXVolatility(models.Model):
             self.ref_date = ref_date
             self.strike = strike
             self.maturity = qlDate(maturity)
-            self.delta_types = delta_types[0]
-            self.interp = ql.LinearInterpolation(deltas, smile_section)
-            self.spot = spot
+            self.s0 = spot
             self.rDcf = rdf
             self.qDcf = qdf
+            self.t = ql.Actual365Fixed().yearFraction(qlDate(self.ref_date),
+                                                      self.maturity)
+
+            for i, delta_type in enumerate(delta_types):
+                if not delta_type == ql.DeltaVolQuote.Spot:
+                    stdDev = math.sqrt(self.t) * smile_section[i]
+                    calc = ql.BlackDeltaCalculator(ql.Option.Call, delta_type,
+                                                   self.s0, self.rDcf,
+                                                   self.qDcf, stdDev)
+                    k = calc.strikeFromDelta(deltas[i])
+                    calc = ql.BlackDeltaCalculator(ql.Option.Call,
+                                                   ql.DeltaVolQuote.Spot,
+                                                   self.s0, self.rDcf,
+                                                   self.qDcf, stdDev)
+                    deltas[i] = calc.deltaFromStrike(k)
+
+            self.delta_types = ql.DeltaVolQuote.Spot
+            self.interp = ql.LinearInterpolation(deltas, smile_section)
 
         def __call__(self, v0):
             optionType = ql.Option.Call
-            stdDev = math.sqrt(ql.Actual365Fixed().yearFraction(
-                qlDate(self.ref_date), self.maturity)) * v0
+            stdDev = math.sqrt(self.t) * v0
             calc = ql.BlackDeltaCalculator(optionType, self.delta_types,
-                                           self.spot, self.rDcf, self.qDcf,
+                                           self.s0, self.rDcf, self.qDcf,
                                            stdDev)
             d = calc.deltaFromStrike(self.strike)
             v = self.interp(d, allowExtrapolation=True)
@@ -502,11 +518,11 @@ class FXVolatility(models.Model):
             row = -1
             for q in self.quotes.all().order_by('maturity', 'delta'):
                 if q.maturity == prev_t:
-                    surf_vol[row].append(q.vol)
+                    surf_vol[row].append(q.value)
                     surf_delta[row].append(q.delta)
                     surf_delta_type[row].append(QL_DELTA_TYPE[q.delta_type])
                 else:
-                    surf_vol.append([q.vol])
+                    surf_vol.append([q.value])
                     surf_delta.append([q.delta])
                     surf_delta_type.append([QL_DELTA_TYPE[q.delta_type]])
                     maturities.append(q.maturity)
@@ -553,13 +569,11 @@ class FXVolatility(models.Model):
 
         if self.rts == None:  # yts is the slowest part
             ccy = self.ccy_pair.quote_ccy.code
-            cvname = self.ccy_pair.quote_ccy.fx_curve.filter(
-                ref_date=self.ref_date).first().name
+            cvname = self.mktdataset.get_fxyts_name(ccy)
             self.rts = self.mktdataset.get_yts(ccy, cvname)
         if self.qts == None:
             ccy = self.ccy_pair.base_ccy.code
-            cvname = self.ccy_pair.base_ccy.fx_curve.filter(
-                ref_date=self.ref_date).first().name
+            cvname = self.mktdataset.get_fxyts_name(ccy)
             self.qts = self.mktdataset.get_yts(ccy, cvname)
 
         spread = 0.
@@ -619,7 +633,7 @@ class FXVolatilityQuote(models.Model):
     tenor = models.CharField(max_length=6)
     delta = models.FloatField(
         error_messages={'required': 'Delta value is required.'})
-    vol = models.FloatField(validators=[validate_positive])
+    value = models.FloatField(validators=[validate_positive])
     surface = models.ForeignKey(FXVolatility, CASCADE, related_name='quotes')
     delta_type = models.CharField(choices=CHOICE_DELTA_TYPE.choices,
                                   max_length=8,
@@ -633,7 +647,7 @@ class FXVolatilityQuote(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f'({self.ref_date}, {self.tenor}, {self.delta})'
+        return f'{self.ref_date}, {self.tenor}, {self.delta}'
 
 
 class FXOManager(models.Manager):

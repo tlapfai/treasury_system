@@ -829,13 +829,13 @@ def handle_uploaded_file(f=None, text=None):
                     msg.append(
                         f'{fxv.ccy_pair.name} ({fxv.ref_date}) FXVolatility created.'
                     )
-                v, temp_ = FXVolatilityQuote.objects.update_or_create(
+                v, v_created = FXVolatilityQuote.objects.update_or_create(
                     ref_date=str2date(row['Date']),
                     tenor=row['Tenor'],
                     delta=float(row['Delta']),
                     defaults={
                         'delta_type': row['Delta Type'],
-                        'vol': float(row['Volatility']),
+                        'value': float(row['Volatility']),
                         'surface': fxv
                     })
             except KeyError as e:
