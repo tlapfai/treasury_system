@@ -111,7 +111,7 @@ class Calendar(models.Model):
     def __str__(self):
         return self.name
 
-    @property
+    #@property
     def calendar(self):
         return QL_CALENDAR.get(self.name)
 
@@ -803,9 +803,15 @@ def has_make_pricing_engine(trade):
     return trade
 
 
-class BarrierDetail(models.Model):
+class FXOBarrierDetail(models.Model):
+    trade = models.ForeignKey("FXO", CASCADE)
     barrier_start = models.DateField(null=True, blank=True)
     barrier_end = models.DateField(null=True, blank=True)
+    upper_barrier_level = models.FloatField(validators=[validate_positive])
+    lower_barrier_level = models.FloatField(validators=[validate_positive])
+    rebate = models.FloatField(default=0)
+    rebate_at_hit = models.BooleanField()
+    payoff_at_hit = models.BooleanField()
 
 
 @with_mktdataset
@@ -823,7 +829,7 @@ class FXO(Trade):
     exercise_end = models.DateField(null=True, blank=True)
     cp = models.CharField(max_length=1, choices=FXO_CP)
     barrier = models.BooleanField(default=False)
-    barrier_detail = models.OneToOneField(BarrierDetail, CASCADE, null=True)
+    barrier_detail = models.OneToOneField(FXOBarrierDetail, CASCADE, null=True)
     objects = FXOManager()
 
     def __str__(self):

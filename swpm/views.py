@@ -1,3 +1,4 @@
+from re import template
 from weakref import ref
 from QuantLib.QuantLib import as_fixed_rate_coupon
 from django.contrib.auth import REDIRECT_FIELD_NAME, authenticate, login, logout
@@ -841,7 +842,7 @@ def handle_uploaded_file(f=None, text=None):
             except KeyError as e:
                 msg.append(str(e))
             else:
-                msg.append(str(v))
+                msg.append(f'{str(v)} is created.')
     else:
         msg = ['Header is wrong']
     return msg
@@ -999,3 +1000,9 @@ def fxo_detail(request):
 class FXODetailView(DetailView):
     model = FXO
     template_name = 'swpm/trade.html'
+
+
+class FXOBarrierDetailView(CreateView):
+    form_class = FXOBarrierDetailForm
+    model = FXOBarrierDetail
+    template_name = 'swpm/fxo_barrier_detail.html'

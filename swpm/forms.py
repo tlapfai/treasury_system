@@ -51,6 +51,13 @@ class IRTermStructureForm(ModelForm):
     # curve should be setup day-by-day, the page should hv some variable storing the date
 
 
+class FXOBarrierDetailForm(ModelForm):
+
+    class Meta:
+        model = FXOBarrierDetail
+        fields = '__all__'
+
+
 class FXOForm(ModelForm):
     tenor = forms.CharField(required=False)
 

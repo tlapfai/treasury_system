@@ -1,0 +1,14 @@
+<div class="flex-container">
+
+	<div class='barrier-detail flex-item'>
+		<form action="{% url 'index' %}" method="post">
+			<fieldset>
+				<legend>Barrier Detail</legend>
+				<table>{{ form.as_table }}</table>
+				<button type="submit" class="btn btn-primary">Save</button>
+			</fieldset>
+		</form>
+		<span class='ccypair-msg'>{{ message }}<span>
+	</div>
+	
+</div>
