@@ -768,17 +768,18 @@ def handle_uploaded_file(f=None, text=None):
                 if row['Term'][:2] == 'ED':
                     row['Term'] = row['Term'][:4]
                     row['Market Rate'] = 100.0 * float(row['Market Rate'])
+                name = row['Ccy'] + '' + row['Curve'] + ' ' + row['Term']
                 r, temp_ = InterestRateQuote.objects.update_or_create(
-                    name=row['Ccy'] + '' + row['Curve'] + ' ' + row['Term'],
+                    name=name,
                     ref_date=str2date(row['Date']),
                     defaults={
                         'tenor': row['Term'],
                         'instrument': row['Instrument'],
                         'ccy': ccy_,
                         'day_counter': row['Day Counter'],
-                        'rate': float(row['Market Rate']) * 0.01
+                        'rate': float(row['Market Rate']) * 0.01,
+                        'yts': yts,
                     })
-                yts.rates.add(r)
             except KeyError as e:
                 msg.append(str(e))
             else:
@@ -803,15 +804,17 @@ def handle_uploaded_file(f=None, text=None):
                 if created_:
                     msg.append(
                         f'{yts.ccy} {yts.name} {yts.ref_date} is created.')
+                name = row['Ccy'] + ' ' + row['Curve'] + ' ' + row['Term']
                 r, temp_ = InterestRateQuote.objects.update_or_create(
-                    name=row['Ccy'] + ' ' + row['Curve'] + ' ' + row['Term'],
+                    name=name,
                     ref_date=str2date(row['Date']),
                     defaults={
                         'tenor': row['Term'],
                         'instrument': row['Instrument'],
                         'ccy': ccy_,
                         'rate': float(row['Market Rate']),
-                        'ccy_pair': CcyPair.objects.get(name=row['Ccy Pair'])
+                        'yts': yts,
+                        'ccy_pair': CcyPair.objects.get(name=row['Ccy Pair']),
                     })
                 yts.rates.add(r)
             except KeyError as e:
@@ -897,9 +900,9 @@ def yield_curve(request, curve=None, ref_date=None, **kwargs):
             rates = []
             for i, r in enumerate(yts_model.rates.all()):
                 if r.instrument in ['FUT', 'FXSW']:
-                    adj_rate = r.rate
+                    adj_rate = float(r.rate)
                 else:
-                    adj_rate = r.rate * 100.
+                    adj_rate = float(r.rate) * 100.
                 rates.append({
                     'id':
                     r.id,

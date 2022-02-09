@@ -237,7 +237,12 @@ class FxSpotRateQuote(models.Model):
 class InterestRateQuote(models.Model):
     name = models.CharField(max_length=16)  # e.g. USD OIS 12M
     ref_date = models.DateField()
-    rate = models.FloatField()
+    yts = models.ForeignKey("IRTermStructure",
+                            CASCADE,
+                            null=True,
+                            blank=True,
+                            related_name="rates")
+    rate = models.DecimalField(max_digits=12, decimal_places=8)
     tenor = models.CharField(max_length=5)
     instrument = models.CharField(max_length=5)
     ccy = models.ForeignKey(Ccy, CASCADE, related_name="rates")
@@ -266,7 +271,7 @@ class InterestRateQuote(models.Model):
         elif self.mktdataset == None:
             self.mktdataset = MktDataSet(self.ref_date)
 
-        q = ql.QuoteHandle(ql.SimpleQuote(self.rate))
+        q = ql.QuoteHandle(ql.SimpleQuote(float(self.rate)))
         if self.tenor in ['ON', 'TN']:
             tenor_ = ql.Period('1D')
             fixing_days = 0 if self.tenor == 'ON' else 1
@@ -339,7 +344,7 @@ class IRTermStructure(models.Model):
                             related_name="all_curves",
                             null=True,
                             blank=True)
-    rates = models.ManyToManyField(InterestRateQuote, related_name="ts")
+    #rates = models.ManyToManyField(InterestRateQuote, related_name="ts")
     as_fx_curve = models.ForeignKey(Ccy,
                                     CASCADE,
                                     related_name="fx_curve",
