@@ -1190,17 +1190,15 @@ class MktDataSet:
 
     def get_fxyts(self, ccy_pair: str) -> tuple:
         """ return ccy1 yts and ccy2 yts """
+        ccy1, ccy2 = cp.split('/')
         cp = self.ccy_pairs.get(ccy_pair)
 
         if cp == None:
             cp = CcyPair.objects.get(name=ccy_pair)
             self.ccy_pairs[ccy_pair] = cp
 
-        qts = cp.base_ccy.fx_curve.get(ref_date=self.date)
-        rts = cp.quote_ccy.fx_curve.get(ref_date=self.date)
-
-        return (self.get_yts(qts.ccy.code,
-                             qts.name), self.get_yts(rts.ccy.code, rts.name))
+        return (self.get_yts(ccy1, self.get_fxyts_name(ccy1)), 
+                self.get_yts(ccy2, self.get_fxyts_name(ccy2)))
 
     def add_yts(self, ccy, name, yts):
         self.ytss[ccy + " " + name] = yts
