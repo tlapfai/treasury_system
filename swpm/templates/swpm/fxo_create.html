@@ -19,7 +19,8 @@
           <button id="btn-mkt" type="submit" class="btn btn-primary">Load Market Data</button>
           <button id="btn-auto-fill" class="btn btn-primary" formaction="">Auto Fill</button>
           <button id="btn-std-fill" class="btn btn-primary" formaction="">Standard Trade</button>
-          <button id="btn-price" type="submit" class="btn btn-primary">Price</button>
+          <button id="btn-price" class="btn btn-primary">Price</button>
+          <button id="btn-scn" type="submit" formaction="{% url 'fxo_scn' %}" class="btn btn-primary" formmethod="POST" formtarget="_blank">Scenario</button>
           {% if user.is_authenticated %}
             <button type="submit" class="btn btn-primary" formaction="{% url 'pricing-do' %}">Do</button>
           {% endif %}

@@ -7,6 +7,17 @@ function commaNum(x) {
 
 $("#id_as_of").val(new Date().toISOString().split("T")[0]);
 
+// $("#btn-scn").click(function (event) {
+//   event.preventDefault();
+//   let fd = $(".trade-form")[0];
+//   let form_data = new FormData(fd);
+//   let axios_cfg = { headers: { "X-CSRFToken": $.cookie("csrftoken") } };
+//   axios.post("/swpm/trade/fxo/scn", form_data, axios_cfg).then((response) => {
+//     let w = window.open("about:blank", "scn-window");
+//     w.document.write(response);
+//   });
+// });
+
 $("#btn-price").click((event) => {
   event.preventDefault();
   load_fxo_mkt();

@@ -194,9 +194,10 @@ class FxSpotRateQuote(models.Model):
         unique_together = ('ref_date', 'ccy_pair')
 
     def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
         self.rts = None
         self.qts = None
-        super().__init__(*args, **kwargs)
+        self.quote = ql.SimpleQuote(self.rate)
 
     def set_yts(self, rts=None, qts=None):
         if rts:
@@ -204,26 +205,29 @@ class FxSpotRateQuote(models.Model):
         if qts:
             self.qts = qts
 
-    def quote(self):
-        return ql.SimpleQuote(self.rate)
+    def setQuote(self, value):
+        self.quote = ql.SimpleQuote(value)
+
+    def resetQuote(self):
+        self.quote = ql.SimpleQuote(self.rate)
 
     def handle(self):
-        return ql.QuoteHandle(ql.SimpleQuote(self.rate))
+        return ql.QuoteHandle(self.quote)
 
     def spot_date(self):
         return self.ccy_pair.calendar().advance(
             qlDate(self.ref_date), ql.Period(self.ccy_pair.fixing_days,
                                              ql.Days))
 
-    def forward_rate(self, maturity):
+    def forward_rate(self, maturity) -> float:
         sd = self.spot_date()
         if self.rts == None or self.qts == None:
             self.rts, self.qts = self.ccy_pair.fx_curves(self.ref_date)
-        return self.rate / self.rts.discount(
+        return self.quote.value() / self.rts.discount(
             qlDate(maturity)) * self.rts.discount(sd) * self.qts.discount(
                 qlDate(maturity)) / self.qts.discount(sd)
 
-    def today_rate(self):
+    def today_rate(self) -> float:
         return self.forward_rate(self.ref_date)
 
     def spot0_handle(self):
@@ -1199,8 +1203,10 @@ class MktDataSet:
         qts = cp.base_ccy.fx_curve.get(ref_date=self.date)
         rts = cp.quote_ccy.fx_curve.get(ref_date=self.date)
 
-        return (self.get_yts(qts.ccy.code,
-                             qts.name), self.get_yts(rts.ccy.code, rts.name))
+        return {
+            'qts': self.get_yts(qts.ccy.code, qts.name),
+            'rts': self.get_yts(rts.ccy.code, rts.name)
+        }
 
     def add_yts(self, ccy, name, yts):
         self.ytss[ccy + " " + name] = yts
@@ -1246,18 +1252,14 @@ class MktDataSet:
             t.link_mktdataset(self)
 
     def fxo_mkt_data(self, ccy_pair: str) -> dict:
-        ccy1, ccy2 = ccy_pair.split('/')
         spot = self.get_fxspot(ccy_pair)
-        yts1 = Ccy.objects.get(code=ccy1).fx_curve.get(ref_date=self.date).name
-        yts2 = Ccy.objects.get(code=ccy2).fx_curve.get(ref_date=self.date).name
-        qts = self.get_yts(ccy1, yts1)  # is yts, not handle
-        rts = self.get_yts(ccy2, yts2)
+        yts = self.get_fxyts(ccy_pair)
         vol = self.get_fxvol(ccy_pair)
         # fxv is a Django object, invoke vol.hendle(strike)
         return {
             'ccy_pair': ccy_pair,
             'spot': spot,
-            'qts': qts,
-            'rts': rts,
+            'qts': yts.get('qts'),
+            'rts': yts.get('rts'),
             'vol': vol
         }

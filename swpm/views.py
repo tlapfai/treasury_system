@@ -1,3 +1,4 @@
+from os import times
 from re import template
 from weakref import ref
 from QuantLib.QuantLib import as_fixed_rate_coupon
@@ -37,6 +38,7 @@ from rest_framework import viewsets
 import datetime
 import json
 import pandas as pd
+import numpy as np
 
 # def tenor2date(request):
 #     if request.is_ajax():
@@ -603,7 +605,97 @@ def fxo_price2(request):  # for API
             return JsonResponse({'errors': [error.args]}, status=500)
 
 
-def fxo_price(request):  # for API
+def fxo_scn(request):  # for API
+    if request.method == 'POST':
+        try:
+            as_of = request.POST['as_of']
+            ql.Settings.instance().evaluationDate = qlDate(as_of)
+            mkt = MktDataSet(as_of)
+            valuation_message = None
+            fxo_form = FXOForm(request.POST, instance=FXO())
+            if fxo_form.is_valid():
+                tr = fxo_form.save(commit=False)
+                tr.link_mktdataset(mkt)
+                tr.self_inst()
+            else:
+                return JsonResponse({'errors': fxo_form.errors}, status=500)
+
+            data = mkt.fxo_mkt_data(tr.ccy_pair_id)
+            s = data.get('spot')
+            app = DjangoDash('scn_plot')
+            dcc_radio = dcc.RadioItems(id='measure',
+                                       className='form-check',
+                                       value='NPV',
+                                       options=[{
+                                           'label': 'NPV',
+                                           'value': 'NPV'
+                                       }, {
+                                           'label': 'Delta',
+                                           'value': 'Delta'
+                                       }, {
+                                           'label': 'Gamma',
+                                           'value': 'Gamma'
+                                       }, {
+                                           'label': 'Vega',
+                                           'value': 'Vega'
+                                       }])
+            dcc_lower_bound = dcc.Input(id="low-bound",
+                                        type="number",
+                                        value=s.rate * 0.95)
+            dcc_upper_bound = dcc.Input(id="up-bound",
+                                        type="number",
+                                        value=s.rate * 1.05)
+            app.layout = html.Div([
+                dcc.Graph(id="scn-graph"),
+                html.Div(id='scn-control',
+                         children=[
+                             dcc_radio, "Range: ", dcc_lower_bound,
+                             dcc_upper_bound
+                         ],
+                         style={"textAlign": "center"})
+            ],
+                                  className="scn_plot",
+                                  style={"width": "auto"})
+
+            @app.callback(Output('scn-graph', 'figure'),
+                          Input('measure', 'value'),
+                          Input('low-bound', 'value'),
+                          Input('up-bound', 'value'))
+            def update_figure(measure, low, up):
+                if low and up:
+                    x_data = np.linspace(low, up, 21)
+                    y_data = list()
+
+                    measure_dict = {
+                        'NPV': tr.NPV,
+                        'Delta': tr.delta,
+                        'Gamma': tr.gamma,
+                        'Vega': tr.vega
+                    }
+                    fun = measure_dict.get(measure)
+
+                    for x in x_data:
+                        s.setQuote(x)
+                        tr.self_inst()
+                        y_data.append(fun())
+                    s.resetQuote()
+                    fig = px.line(x=x_data,
+                                  y=y_data,
+                                  labels={
+                                      'x': 'Spot',
+                                      'y': measure
+                                  },
+                                  title="Scenario Analysis")
+                    fig.update_layout(transition_duration=500)
+                    return fig
+
+            return render(request, "swpm/fxo_scenario.html")
+
+        except RuntimeError as error:
+            return JsonResponse({'errors': [error.args]}, status=500)
+
+
+def fxo_price(request):  # for API, now in use
     if request.method == 'POST':
         try:
             as_of = request.POST['as_of']
@@ -628,7 +720,6 @@ def fxo_price(request):  # for API
                 'dividendRho': tr.dividendRho() * 0.01,
                 #'strikeSensitivity': tr.strikeSensitivity(),
                 #'itmCashProbability': tr.itmCashProbability(),
-                # 'impliedVolatility': inst.impliedVolatility(),
             }
             return JsonResponse(
                 {
@@ -662,7 +753,7 @@ def load_fxo_mkt(request):
             fwd = fxs.forward_rate(maturity)
             fxvol = mkt.get_fxvol(cp)
             vol = fxvol.handle(strike_price).blackVol(qlDate(maturity), 1)
-            qts, rts = mkt.get_fxyts(cp)
+            yts = mkt.get_fxyts(cp)
             return JsonResponse({
                 'spot':
                 spot,
@@ -673,11 +764,11 @@ def load_fxo_mkt(request):
                 'vol':
                 vol,
                 'q':
-                qts.zeroRate(qlDate(maturity), ql.Actual365Fixed(),
-                             ql.Continuous).rate(),
+                yts.get('qts').zeroRate(qlDate(maturity), ql.Actual365Fixed(),
+                                        ql.Continuous).rate(),
                 'r':
-                rts.zeroRate(qlDate(maturity), ql.Actual365Fixed(),
-                             ql.Continuous).rate(),
+                yts.get('rts').zeroRate(qlDate(maturity), ql.Actual365Fixed(),
+                                        ql.Continuous).rate(),
             })
         except RuntimeError as error:
             return JsonResponse({'errors': [error.args]}, status=500)

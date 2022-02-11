@@ -35,6 +35,7 @@ urlpatterns = [
          views.FXOBarrierDetailView.as_view(),
          name='barrier_detail'),
     path('trade/fxo/price', views.fxo_price, name='fxo_price'),  # api
+    path('trade/fxo/scn', views.fxo_scn, name='fxo_scn'),
     path('load_fxo_mkt', views.load_fxo_mkt, name='load_fxo_mkt'),  # api
     path('fx_volatility_table',
          views.fx_volatility_table,
