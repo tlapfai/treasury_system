@@ -1194,53 +1194,20 @@ class MktDataSet:
 
     def get_fxyts(self, ccy_pair: str) -> tuple:
         """ return ccy1 yts and ccy2 yts """
+        ccy1, ccy2 = ccy_pair.split('/')
         cp = self.ccy_pairs.get(ccy_pair)
 
         if cp == None:
             cp = CcyPair.objects.get(name=ccy_pair)
             self.ccy_pairs[ccy_pair] = cp
 
-        qts = cp.base_ccy.fx_curve.get(ref_date=self.date)
-        rts = cp.quote_ccy.fx_curve.get(ref_date=self.date)
-
         return {
-            'qts': self.get_yts(qts.ccy.code, qts.name),
-            'rts': self.get_yts(rts.ccy.code, rts.name)
+            'qts': self.get_yts(ccy1, self.get_fxyts_name(ccy1)),
+            'rts': self.get_yts(ccy2, self.get_fxyts_name(ccy2))
         }
 
     def add_yts(self, ccy, name, yts):
         self.ytss[ccy + " " + name] = yts
-
-    # def add_ccy_pair(self, ccy_pair):
-    #     """ return 0 if ref_date is not match, 1 if anything added, 2 if nothing added """
-    #     result = 2
-    #     cp = CcyPair.objects.get(name=ccy_pair)
-    #     ccy1, ccy2 = ccy_pair.split('/')
-
-    #     for ccy in [ccy1, ccy2]:
-    #         cv = Ccy.objects.get(code=ccy).fx_curve.get(ref_date=self.date)
-    #         if cv.ref_ccy and cv.ref_curve:
-    #             pass
-    #         cv.link_mktdataset(self)
-    #         if self.ytss.get(ccy):
-    #             self.ytss[ccy].update({cv.name, cv.term_structure()})
-    #         else:
-    #             self.ytss[ccy] = {cv.name, cv.term_structure()}
-    #         result = 1
-
-    #     if self.ccy_pairs.get(ccy_pair) == None:
-    #         self.ccy_pairs[ccy_pair] = cp
-    #         fxq = cp.quotes.get(ref_date=self.date)
-    #         fxq.set_yts(self.get_yts(ccy2, ), self.get_yts(ccy1, ))
-    #         self.spots[ccy_pair] = fxq  # fxq is FxSpotRateQuote
-    #         # fxv
-    #         fxv = FXVolatility.objects.get(ccy_pair=ccy_pair,
-    #                                        ref_date=self.date)
-    #         fxv.set_yts(self.ytss[ccy2], self.ytss[ccy1])
-    #         fxv.set_spot(fxq)  # fxq is FXSpotRateQuote
-    #         self.fxvols[ccy_pair] = fxv  # fxv is a Django object
-    #         result = 1
-    #     return result
 
     def add_ccy_pair_with_trades(self, trades):
         if isinstance(trades, list):
