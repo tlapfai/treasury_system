@@ -1,3 +1,4 @@
+from bdb import effective
 from email.policy import default
 from random import choices
 from django.db.models import fields
@@ -19,6 +20,7 @@ inline_date_attrs = {
     'class': 'form-control',
     'style': 'display: inline'
 }
+number_attrs = {'class': "form-control-sm", 'style': 'text-align: right'}
 
 
 class HorizontalRadioSelect(RadioSelect):
@@ -51,11 +53,64 @@ class IRTermStructureForm(ModelForm):
     # curve should be setup day-by-day, the page should hv some variable storing the date
 
 
-class FXOBarrierDetailForm(ModelForm):
+class CashFlowForm(ModelForm):
+    prefix = 'cashflow'
 
     class Meta:
-        model = FXOBarrierDetail
+        model = CashFlow
+        fields = ['ccy', 'amount', 'value_date']
+        widgets = {
+            'value_date': DateInput(attrs=date_attrs),
+            'amount': TextInput(attrs=number_attrs),
+        }
+
+
+class FXOUpperBarrierDetailForm(ModelForm):
+    prefix = 'up-bar'
+    effect = forms.BooleanField(required=False)
+
+    class Meta:
+        model = FXOUpperBarrierDetail
         fields = '__all__'
+        widgets = {
+            'barrier': TextInput(attrs=number_attrs),
+            'barrier_start': DateInput(attrs=date_attrs),
+            'barrier_end': DateInput(attrs=date_attrs),
+            'rebate': TextInput(attrs=number_attrs),
+        }
+
+    def clean(self):
+        try:
+            cd = super().clean()
+            if cd.get('rebate') and (bool(cd.get('rebate_ccy')) == False):
+                raise ValidationError(_('Missing rebate ccy.'),
+                                      code='unmatch1')
+        except KeyError:
+            raise ValidationError(_('Fields not completed.'), code=KeyError)
+
+
+class FXOLowerBarrierDetailForm(ModelForm):
+    prefix = 'low-bar'
+    effect = forms.BooleanField(required=False)
+
+    class Meta:
+        model = FXOLowerBarrierDetail
+        fields = '__all__'
+        widgets = {
+            'barrier': TextInput(attrs=number_attrs),
+            'barrier_start': DateInput(attrs=date_attrs),
+            'barrier_end': DateInput(attrs=date_attrs),
+            'rebate': TextInput(attrs=number_attrs),
+        }
+
+    def clean(self):
+        try:
+            cd = super().clean()
+            if cd.get('rebate') and (bool(cd.get('rebate_ccy')) == False):
+                raise ValidationError(_('Missing rebate ccy.'),
+                                      code='unmatch1')
+        except KeyError:
+            raise ValidationError(_('Fields not completed.'), code=KeyError)
 
 
 class FXOForm(ModelForm):
@@ -66,7 +121,7 @@ class FXOForm(ModelForm):
         fields = [
             'buy_sell', 'trade_date', 'tenor', 'maturity_date', 'ccy_pair',
             'payoff_type', 'exercise_type', 'cp', 'strike_price', 'notional_1',
-            'notional_2', 'exercise_start', 'exercise_end', 'book',
+            'notional_2', 'exercise_start', 'exercise_end', 'barrier', 'book',
             'counterparty'
         ]
         """ list all the necessary fields and put them in order
@@ -76,9 +131,9 @@ class FXOForm(ModelForm):
             'buy_sell': forms.Select(attrs={'class': "form-control-sm"}),
             'trade_date': DateInput(attrs=date_attrs),
             'maturity_date': DateInput(attrs=date_attrs),
-            'strike_price': TextInput(attrs={'class': "form-control"}),
-            'notional_1': TextInput(attrs={'class': "form-control"}),
-            'notional_2': TextInput(attrs={'class': "form-control"}),
+            'strike_price': TextInput(attrs=number_attrs),
+            'notional_1': TextInput(attrs=number_attrs),
+            'notional_2': TextInput(attrs=number_attrs),
             'exercise_start': DateInput(attrs=date_attrs),
             'exercise_end': DateInput(attrs=date_attrs),
         }
@@ -118,6 +173,9 @@ class FXOForm(ModelForm):
                         'Exercise End must be not earlier than Exercise Start. (form clean check)'
                     ),
                                           code='unmatch1')
+            barrier = cd.get('barrier')
+            if barrier:
+                pass
         except KeyError:
             raise ValidationError(_('Fields not completed.'), code=KeyError)
 

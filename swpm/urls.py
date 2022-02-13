@@ -27,16 +27,12 @@ urlpatterns = [
          name='calendar'),
     path('fxoapi/<int:id>', views.FXODetail.as_view(), name='fxoapi'),
     path('fxodetail', views.fxo_detail, name='fxodetail'),
-    path('trade/fxo/create', views.FXOCreateView.as_view(), name='fxo_create'),
-    path('trade/fxo/<int:pk>',
-         views.FXOUpdateView.as_view(),
-         name='fxo_update'),
-    path('trade/fxo/barrier-detail',
-         views.FXOBarrierDetailView.as_view(),
-         name='barrier_detail'),
+    path('trade/fxo/create', views.FXOView.as_view(), name='fxo_create'),
+    path('trade/fxo/<int:id>', views.FXOView.as_view(), name='fxo_update'),
     path('trade/fxo/price', views.fxo_price, name='fxo_price'),  # api
     path('trade/fxo/scn', views.fxo_scn, name='fxo_scn'),
     path('load_fxo_mkt', views.load_fxo_mkt, name='load_fxo_mkt'),  # api
+    path('tenor2date', views.tenor2date, name='tenor2date'),  # api
     path('fx_volatility_table',
          views.fx_volatility_table,
          name='fx_volatility_table'),  # api

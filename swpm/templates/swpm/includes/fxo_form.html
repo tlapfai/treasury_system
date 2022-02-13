@@ -13,7 +13,7 @@
 {% endif %}
 
 <div class="trade-ticket row" style="margin: 0;">
-    <div class="form-group col-sm-6 col-xs-12">
+    <div class="form-group col-sm-3 col-xs-6">
         <label for="{{ form.buy_sell.id_for_label }}">{{ form.buy_sell.label }}</label>        
         {% if form.is_bound %}
             {% if form.buy_sell.errors %}
@@ -29,35 +29,35 @@
         {% endif %}
     </div>
 
-    <div class="form-group col-sm-6 col-xs-12">
+    <div class="form-group col-sm-3 col-xs-6">
         <label for="{{ form.ccy_pair.id_for_label }}">{{ form.ccy_pair.label }}</label>
         {% if form.is_bound %}
             {% if form.ccy_pair.errors %}
-                {% render_field form.ccy_pair class+="form-control-sm is-invalid" %}
+                {% render_field form.ccy_pair class+="is-invalid" %}
                 {% for error in form.ccy_pair.errors %}
                     <span class="help-block">{{ error }}</span>
                 {% endfor %}
             {% else %}
-                {% render_field form.ccy_pair class+="form-control-sm is-valid" %}
+                {% render_field form.ccy_pair class+="is-valid" %}
             {% endif %}
         {% else %}
-            {% render_field form.ccy_pair class+="form-control-sm" %}
+            {% render_field form.ccy_pair %}
         {% endif %}
     </div>
 
-    <div class="form-group col-sm-12 col-xs-12">
+    <div class="form-group col-sm-6 col-xs-12">
         <label for="{{ form.strike_price.id_for_label }}">{{ form.strike_price.label }}</label>
         {% if form.is_bound %}
             {% if form.strike_price.errors %}
-                {% render_field form.strike_price class+="form-control-sm is-invalid" %}
+                {% render_field form.strike_price class+="is-invalid" %}
                 {% for error in form.strike_price.errors %}
                     <div class="invalid-feedback">{{ error }}</div>
                 {% endfor %}
             {% else %}
-                {% render_field form.strike_price class+="form-control-sm is-valid" %}
+                {% render_field form.strike_price class+="is-valid" %}
             {% endif %}
         {% else %}
-            {% render_field form.strike_price class+="form-control" %}
+            {% render_field form.strike_price %}
         {% endif %}
     </div>
 

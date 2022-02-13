@@ -2,6 +2,10 @@
   font-size: smaller;
 }
 
+legend {
+  font-size: 0.75rem;
+}
+
 .alert-danger {
   color: red;
 }

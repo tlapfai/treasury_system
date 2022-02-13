@@ -1,4 +1,6 @@
+from concurrent.futures import process
 import datetime
+from operator import truediv
 from QuantLib.QuantLib import PiecewiseLogLinearDiscount, RealTimeSeries
 from django.contrib.auth.models import AbstractUser
 from django.db import models
@@ -18,7 +20,7 @@ from numpy import isin
 import pandas as pd
 import math, time
 
-PAYOFF_TYPE = [('VAN', 'Vanilla'), ('DIG', 'Digital'), ("BAR", "Barrier")]
+PAYOFF_TYPE = [('PLA', 'Plain'), ('DIG', 'Digital')]
 
 EXERCISE_TYPE = [("EUR", "European"), ("AME", "American")]
 
@@ -29,9 +31,12 @@ SWAP_PAY_REC = [(ql.VanillaSwap.Receiver, "Receive"),
 
 BUY_SELL = [("B", "Buy"), ("S", "Sell")]
 
+KIKO = [('IN', 'IN'), ('OUT', 'OUT')]
+
 CHOICE_DAY_COUNTER = models.TextChoices(
     'DAY_COUNTER',
     ['Actual360', 'Actual365Fixed', 'ActualActual', 'Thirty360'])
+
 QL_DAY_COUNTER = {
     "Actual360": ql.Actual360(),
     'Actual365Fixed': ql.Actual365Fixed(),
@@ -43,6 +48,7 @@ CHOICE_DAY_RULE = models.TextChoices('DAY_RULE', [
     'Following', 'ModifiedFollowing', 'Preceding', 'ModifiedPreceding',
     'Unadjusted'
 ])
+
 QL_DAY_RULE = {
     'Following': ql.Following,
     'ModifiedFollowing': ql.ModifiedFollowing,
@@ -53,6 +59,7 @@ QL_DAY_RULE = {
 
 CHOICE_DELTA_TYPE = models.TextChoices('DELTA_TYPE',
                                        ['Spot', 'PaSpot', 'Fwd', 'PaFwd'])
+
 QL_DELTA_TYPE = {
     'Spot': ql.DeltaVolQuote.Spot,
     'PaSpot': ql.DeltaVolQuote.PaSpot,
@@ -249,7 +256,7 @@ class InterestRateQuote(models.Model):
     rate = models.DecimalField(max_digits=12, decimal_places=8)
     tenor = models.CharField(max_length=5)
     instrument = models.CharField(max_length=5)
-    ccy = models.ForeignKey(Ccy, CASCADE, related_name="rates")
+    ccy = models.ForeignKey(Ccy, CASCADE, related_name="ir_quotes")
     day_counter = models.CharField(max_length=16,
                                    choices=CHOICE_DAY_COUNTER.choices,
                                    null=True,
@@ -778,9 +785,20 @@ class Trade(models.Model):
 
 
 class CashFlow(models.Model):
-    ccy = models.ForeignKey(Ccy, CASCADE)
-    amount = models.FloatField(default=0)
-    trade = models.ForeignKey(Trade, CASCADE, null=True, blank=True)
+    trade = models.ForeignKey(Trade,
+                              CASCADE,
+                              related_name='cashflows',
+                              editable=False)
+    ccy = models.ForeignKey(Ccy, CASCADE, null=True, blank=True)
+    amount = models.DecimalField(max_digits=32,
+                                 decimal_places=2,
+                                 null=True,
+                                 blank=True)
+    value_date = models.DateField(default=datetime.date.today)
+    cashflow_type = models.CharField(max_length=10, null=True, blank=True)
+
+    def __str__(self) -> str:
+        return f"{self.trade.id}: {self.ccy} {self.amount} on {self.value_date}"
 
 
 class FXOPricingSets:
@@ -813,14 +831,39 @@ def has_make_pricing_engine(trade):
 
 
 class FXOBarrierDetail(models.Model):
-    trade = models.ForeignKey("FXO", CASCADE)
-    barrier_start = models.DateField(null=True, blank=True)
-    barrier_end = models.DateField(null=True, blank=True)
-    upper_barrier_level = models.FloatField(validators=[validate_positive])
-    lower_barrier_level = models.FloatField(validators=[validate_positive])
-    rebate = models.FloatField(default=0)
-    rebate_at_hit = models.BooleanField()
-    payoff_at_hit = models.BooleanField()
+    # barrier_start = models.DateField(null=True, blank=True)
+    # barrier_end = models.DateField(null=True, blank=True)
+    barrier = models.FloatField(validators=[validate_positive],
+                                null=True,
+                                blank=True)
+    knock = models.CharField(max_length=3, choices=KIKO, blank=True)
+    rebate = models.DecimalField(max_digits=24, decimal_places=2, default=0.)
+    rebate_ccy = models.ForeignKey("Ccy",
+                                   CASCADE,
+                                   null=True,
+                                   blank=True,
+                                   related_name='+')
+    rebate_at_hit = models.BooleanField(default=False)
+    payoff_at_hit = models.BooleanField(default=False)
+
+    class Meta:
+        abstract = True
+
+
+class FXOUpperBarrierDetail(FXOBarrierDetail):
+    trade = models.OneToOneField("FXO",
+                                 CASCADE,
+                                 primary_key=True,
+                                 editable=False,
+                                 related_name="upper_barrier_detail")
+
+
+class FXOLowerBarrierDetail(FXOBarrierDetail):
+    trade = models.OneToOneField("FXO",
+                                 CASCADE,
+                                 primary_key=True,
+                                 editable=False,
+                                 related_name="lower_barrier_detail")
 
 
 @with_mktdataset
@@ -828,7 +871,10 @@ class FXO(Trade):
     product_type = models.CharField(max_length=12, default="FXO")
     maturity_date = models.DateField(null=False)
     buy_sell = models.CharField(max_length=1, choices=BUY_SELL, default='B')
-    ccy_pair = models.ForeignKey(CcyPair, models.DO_NOTHING, null=False)
+    ccy_pair = models.ForeignKey(CcyPair,
+                                 models.DO_NOTHING,
+                                 null=False,
+                                 related_name='+')
     strike_price = models.FloatField(validators=[validate_positive])
     notional_1 = models.FloatField(default=1e6, validators=[validate_positive])
     notional_2 = models.FloatField(validators=[validate_positive])
@@ -838,7 +884,6 @@ class FXO(Trade):
     exercise_end = models.DateField(null=True, blank=True)
     cp = models.CharField(max_length=1, choices=FXO_CP)
     barrier = models.BooleanField(default=False)
-    barrier_detail = models.OneToOneField(FXOBarrierDetail, CASCADE, null=True)
     objects = FXOManager()
 
     def __str__(self):
@@ -859,7 +904,7 @@ class FXO(Trade):
 
     def instrument(self):
         cp = ql.Option.Call if self.cp == "C" else ql.Option.Put
-        if self.payoff_type == 'VAN':
+        if self.payoff_type == 'PLA':
             payoff = ql.PlainVanillaPayoff(cp, self.strike_price)
         elif self.payoff_type == 'DIG':
             payoff = ql.CashOrNothingPayoff(cp, self.strike_price, 1.0)
@@ -872,21 +917,64 @@ class FXO(Trade):
             exercise = ql.AmericanExercise(qlDate(self.exercise_start),
                                            qlDate(self.exercise_end))
 
-        self.inst = ql.VanillaOption(payoff, exercise)
+        if self.barrier:
+            _up = False
+            _low = False
+            if hasattr(self, 'upper_barrier_detail'):
+                up_bar = self.upper_barrier_detail
+                _up = True
+            if hasattr(self, 'lower_barrier_detail'):
+                low_bar = self.lower_barrier_detail
+                _low = True
+
+            if _up and _low:
+                if up_bar.knock == "IN" and low_bar.knock == "OUT":
+                    kiko = ql.DoubleBarrier.KIKO
+                elif up_bar.knock == "OUT" and low_bar.knock == "IN":
+                    kiko = ql.DoubleBarrier.KOKI
+                elif up_bar.knock == "OUT" and low_bar.knock == "OUT":
+                    kiko = ql.DoubleBarrier.KnockOut
+                elif up_bar.knock == "IN" and low_bar.knock == "IN":
+                    kiko = ql.DoubleBarrier.KnockIn
+                reb = float(up_bar.rebate) / self.notional_1
+                self.inst = ql.DoubleBarrierOption(kiko, low_bar.barrier,
+                                                   up_bar.barrier, reb, payoff,
+                                                   exercise)
+            elif _up:
+                kiko = ql.Barrier.UpIn if up_bar.knock == "IN" else ql.Barrier.UpOut
+                self.inst = ql.BarrierOption(
+                    kiko, up_bar.barrier,
+                    float(up_bar.rebate) / self.notional_1, payoff, exercise)
+            elif _low:
+                kiko = ql.Barrier.DownIn if low_bar.knock == "IN" else ql.Barrier.DownOut
+                self.inst = ql.BarrierOption(
+                    kiko, low_bar.barrier,
+                    float(low_bar.rebate) / self.notional_1, payoff, exercise)
+        else:
+            self.inst = ql.VanillaOption(payoff, exercise)
         return self.inst
+
+    def make_process(self, **kwargs):
+        if self.mktdataset:
+            mkt = self.mktdataset.fxo_mkt_data(self.ccy_pair.name)
+            qts = ql.YieldTermStructureHandle(mkt.get('qts'))
+            rts = ql.YieldTermStructureHandle(mkt.get('rts'))
+            process = ql.BlackScholesMertonProcess(
+                mkt.get('spot').spot0_handle(), qts, rts,
+                mkt.get('vol').handle(self.strike_price))
+            return process
 
     def make_pricing_engine(self):
         if self.mktdataset:
-            mkt = self.mktdataset.fxo_mkt_data(self.ccy_pair.name)
-            process = ql.BlackScholesMertonProcess(
-                mkt.get('spot').spot0_handle(),
-                ql.YieldTermStructureHandle(mkt.get('qts')),
-                ql.YieldTermStructureHandle(mkt.get('rts')),
-                mkt.get('vol').handle(self.strike_price))
+            process = self.make_process()
+            if isinstance(self.inst, ql.DoubleBarrierOption):
+                return ql.BinomialDoubleBarrierEngine(process, 'tian', 200)
+            elif self.barrier:
+                return ql.BinomialBarrierEngine(process, 'tian', 300)
             if self.exercise_type == "EUR":
                 return ql.AnalyticEuropeanEngine(process)
             elif self.exercise_type == "AME":
-                return ql.BinomialVanillaEngine(process, 'crr', steps=200)
+                return ql.BinomialVanillaEngine(process, 'crr', 300)
 
     def self_inst(self):
         self.inst = self.instrument()
@@ -898,17 +986,25 @@ class FXO(Trade):
 
     def delta(self):
         side = 1. if self.buy_sell == "B" else -1.
+        if isinstance(self.inst, ql.DoubleBarrierOption):
+            return 0.
         return self.inst.delta() * self.notional_1 * side
 
     def gamma(self):
         """ Delta sensitivity respect to 1% change of spot rate """
         side = 1. if self.buy_sell == "B" else -1.
         spot0 = self.mktdataset.get_fxspot(self.ccy_pair_id).today_rate()
+        if isinstance(self.inst, ql.DoubleBarrierOption):
+            return 0.
         return self.inst.gamma() * self.notional_1 * side * 0.01 / spot0
 
     def vega(self):
         side = 1. if self.buy_sell == "B" else -1.
-        if self.exercise_type == "EUR":
+        if isinstance(self.inst, ql.DoubleBarrierOption):
+            return 0.
+        elif self.barrier:
+            return 0.
+        elif self.exercise_type == "EUR":
             return self.inst.vega() * self.notional_1 * side * 0.01
         else:
             npv = self.inst.NPV()
@@ -920,19 +1016,23 @@ class FXO(Trade):
                 mkt.get('vol').handle(self.strike_price, spread=0.0001))
             inst1 = self.instrument()
             inst1.setPricingEngine(
-                ql.BinomialVanillaEngine(process, 'crr', steps=200))
+                ql.BinomialVanillaEngine(process, 'crr', 200))
             return side * self.notional_1 * (inst1.NPV() - npv) / 0.01
 
     def thetaPerDay(self):
         side = 1. if self.buy_sell == "B" else -1.
-        if self.exercise_type == "EUR":
+        if self.barrier:
+            return 0.
+        elif self.exercise_type == "EUR":
             return side * self.notional_1 * self.inst.thetaPerDay()
         else:
             return side * self.notional_1 * self.inst.theta() / 365
 
     def rho(self):
         side = 1. if self.buy_sell == "B" else -1.
-        if self.exercise_type == "EUR":
+        if self.barrier:
+            return 0.
+        elif self.exercise_type == "EUR":
             return self.inst.rho() * self.notional_1 * side * 0.01
         else:
             npv = self.inst.NPV()
@@ -952,7 +1052,9 @@ class FXO(Trade):
 
     def dividendRho(self):
         side = 1. if self.buy_sell == "B" else -1.
-        if self.exercise_type == "EUR":
+        if self.barrier:
+            return 0.
+        elif self.exercise_type == "EUR":
             return self.inst.dividendRho() * self.notional_1 * side * 0.01
         else:
             npv = self.inst.NPV()

@@ -116,12 +116,64 @@ def register(request):
         return render(request, "swpm/register.html")
 
 
-class FXOCreateView(CreateView):
-    # the rendering form must be named as "form"
-    form_class = FXOForm
-    model = FXO
-    template_name = "swpm/fxo_create.html"
-    #make_models_forms = ("FX Option", FXO, FXOForm, None, None, FXOValuationForm)
+# class FXOCreateView(CreateView):
+#     # the rendering form must be named as "form"
+#     form_class = FXOForm
+#     model = FXO
+#     template_name = "swpm/fxo_create.html"
+#     #make_models_forms = ("FX Option", FXO, FXOForm, None, None, FXOValuationForm)
+
+
+class FXOView(View):
+
+    def get(self, request, **kwargs):
+        trade_id = kwargs.get('id')
+        if trade_id:
+            fxo = FXO.objects.get(id=trade_id)
+            form = FXOForm(instance=fxo)
+            prm = CashFlow.objects.get(trade_id=trade_id, cashflow_type="PRM")
+            cashflowform = CashFlowForm(instance=prm)
+            up_bar = FXOUpperBarrierDetail.objects.get(trade_id=trade_id)
+            upper_barrier_detail = FXOUpperBarrierDetailForm(instance=up_bar)
+            low_bar = FXOLowerBarrierDetail.objects.get(trade_id=trade_id)
+            lower_barrier_detail = FXOLowerBarrierDetailForm(instance=low_bar)
+        else:
+            trade_id = None
+            form = FXOForm()
+            cashflowform = CashFlowForm()
+            upper_barrier_detail = FXOUpperBarrierDetailForm()
+            lower_barrier_detail = FXOLowerBarrierDetailForm()
+        return render(
+            request, "swpm/fxo_create.html", {
+                'trade_id': trade_id,
+                'form': form,
+                'cashflowform': cashflowform,
+                'upper_barrier_detail': upper_barrier_detail,
+                'lower_barrier_detail': lower_barrier_detail,
+            })
+
+    def post(self, request, **kwargs):
+        """ optional: commit: boolean """
+        form = FXOForm(request.POST)
+        if form.is_valid():
+            tr = form.save(commit=False)
+            tr.input_user = request.user
+            tr.save()
+            trade_id = tr.id
+            if tr.barrier:
+                upper_form = FXOUpperBarrierDetailForm(request.POST)
+                lower_form = FXOLowerBarrierDetailForm(request.POST)
+                for bf in [upper_form, lower_form]:
+                    if bf.is_valid() and bf.cleaned_data['effective']:
+                        b = bf.save(commit=False)
+                        b.trade_id = trade_id
+                        b.save()
+            premium_form = CashFlowForm(request.POST)
+            prm = premium_form.save(False)
+            prm.trade_id = trade_id
+            prm.cashflow_type = 'PRM'
+            prm.save()
+            return redirect('fxo_update', id=trade_id)
 
 
 class FXOUpdateView(UpdateView):
@@ -168,8 +220,7 @@ class TradeView(CreateView):
                         leg_form_set = modelformset_factory(leg_model,
                                                             leg_form,
                                                             extra=2)
-                        trade_form = inst_form(
-                            initial={'trade_date': datetime.date.today()})
+                        trade_form = inst_form()
                         trade_forms = leg_form_set(
                             queryset=leg_model.objects.none(),
                             initial=[{
@@ -613,8 +664,16 @@ def fxo_scn(request):  # for API
             mkt = MktDataSet(as_of)
             valuation_message = None
             fxo_form = FXOForm(request.POST, instance=FXO())
+            up_bar_form = FXOUpperBarrierDetailForm(request.POST)
+            low_bar_form = FXOLowerBarrierDetailForm(request.POST)
             if fxo_form.is_valid():
-                tr = fxo_form.save(commit=False)
+                tr = fxo_form.save(False)
+                if tr.barrier:
+                    for bar_form in [up_bar_form, low_bar_form]:
+                        if bar_form.is_valid(
+                        ) and bar_form.cleaned_data['effect']:
+                            bar = bar_form.save(False)
+                            bar.trade = tr
                 tr.link_mktdataset(mkt)
                 tr.self_inst()
             else:
@@ -663,7 +722,7 @@ def fxo_scn(request):  # for API
                           Input('up-bound', 'value'))
             def update_figure(measure, low, up):
                 if low and up:
-                    x_data = np.linspace(low, up, 21)
+                    x_data = np.linspace(low, up, 51)
                     y_data = list()
 
                     measure_dict = {
@@ -703,8 +762,19 @@ def fxo_price(request):  # for API, now in use
             mkt = MktDataSet(as_of)
             valuation_message = None
             fxo_form = FXOForm(request.POST, instance=FXO())
+            up_bar_form = FXOUpperBarrierDetailForm(request.POST)
+            low_bar_form = FXOLowerBarrierDetailForm(request.POST)
             if fxo_form.is_valid():
                 tr = fxo_form.save(commit=False)
+                if tr.barrier:
+                    if up_bar_form.is_valid(
+                    ) and up_bar_form.cleaned_data['effect']:
+                        up_bar = up_bar_form.save(False)
+                        up_bar.trade = tr
+                    if low_bar_form.is_valid(
+                    ) and low_bar_form.cleaned_data['effect']:
+                        low_bar = low_bar_form.save(False)
+                        low_bar.trade = tr
                 tr.link_mktdataset(mkt)
                 tr.self_inst()
             else:
@@ -769,6 +839,26 @@ def load_fxo_mkt(request):
                 'r':
                 yts.get('rts').zeroRate(qlDate(maturity), ql.Actual365Fixed(),
                                         ql.Continuous).rate(),
+                'swap_point':
+                fwd - spot,
+            })
+        except RuntimeError as error:
+            return JsonResponse({'errors': [error.args]}, status=500)
+
+
+def tenor2date(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body.decode('utf-8'))
+            trade_date = data.get('trade_date')
+            par = ql.PeriodParser()
+            t = par.parse(data.get('tenor'))
+            cal = CcyPair.objects.get(name=data.get('ccy_pair')).calendar()
+            return JsonResponse({
+                'date':
+                cal.advance(qlDate(trade_date), t).ISO(),
+                'tenor':
+                str(t)
             })
         except RuntimeError as error:
             return JsonResponse({'errors': [error.args]}, status=500)
@@ -1094,9 +1184,3 @@ def fxo_detail(request):
 class FXODetailView(DetailView):
     model = FXO
     template_name = 'swpm/trade.html'
-
-
-class FXOBarrierDetailView(CreateView):
-    form_class = FXOBarrierDetailForm
-    model = FXOBarrierDetail
-    template_name = 'swpm/fxo_barrier_detail.html'

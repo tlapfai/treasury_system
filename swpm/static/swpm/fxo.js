@@ -76,6 +76,33 @@ function fillInputHandle() {
   $(this).val($(this).data("value"));
 }
 
+$("#id_tenor").focusout(function () {
+  let regex1 = /^(\d+[DMYdmy])+$/;
+  let regex2 = /^(\d+[Ww])+$/;
+  tenor_ = $("#id_tenor").val().trim();
+  if (regex1.test(tenor_) || regex2.test(tenor_)) {
+    let axios_cfg = { headers: { "X-CSRFToken": $.cookie("csrftoken") } };
+    axios
+      .post(
+        "/swpm/tenor2date",
+        {
+          ccy_pair: $("#id_ccy_pair").val(),
+          trade_date: $("#id_trade_date").val(),
+          tenor: tenor_,
+        },
+        axios_cfg
+      )
+      .then((response) => {
+        $("#id_maturity_date").val(response.data.date);
+        $("#id_maturity_date").css("color", "blue");
+        $("#id_tenor").val(response.data.tenor);
+        load_fxo_mkt();
+      });
+  } else {
+    $("#id_tenor").val("");
+  }
+});
+
 function load_fxo_mkt() {
   $('[id^="para-"] input').text("");
   var form_alert = document.querySelector("#form-alert");
@@ -125,14 +152,17 @@ function load_fxo_mkt() {
   }
 }
 
+$("#id_maturity_date").change(function () {
+  $("#id_maturity_date").css("color", "");
+  $("#id_tenor").val("");
+});
+
 document.addEventListener("DOMContentLoaded", function () {
   $('[data-bs-toggle="tooltip"]').tooltip();
-
+  // prettier-ignore
   $("#id_notional_1").change(() => {
     if ($.isNumeric($("#id_notional_2").val())) {
-      $("#id_strike_price").val(
-        ($("#id_notional_2").val() / $("#id_notional_1").val()).toFixed(10)
-      );
+      $("#id_strike_price").val(($("#id_notional_2").val() / $("#id_notional_1").val()).toFixed(10));
     }
   });
   $("#id_notional_2").change(() => {
@@ -157,6 +187,7 @@ document.addEventListener("DOMContentLoaded", function () {
   $("#btn-std-fill").click(function (event) {
     event.preventDefault();
     $("input#id_as_of").val("2021-11-18");
+    $("input#id_trade_date").val("2021-11-18");
     const effective_date = new Date();
     effective_date.setDate(effective_date.getDate() + 2);
     var oneyear = new Date();
@@ -171,15 +202,16 @@ document.addEventListener("DOMContentLoaded", function () {
     $("#id_form-0-fixed_rate").val(0.03);
     $('[id*="freq"]').val("3M");
     $("#id_form-0-reset_freq").val("");
-    document.querySelectorAll('[id*="day_counter"]').forEach((d) => {
-      d.value = "Actual360";
-    });
+    $('[id*="day_counter"]').val("Actual360");
     $('[id*="calendar"]').val("UnitedStates");
     $("#id_exercise_type").val("EUR");
-    $("#id_payoff_type").val("VAN");
+    $("#id_payoff_type").val("PLA");
     $("#id_ccy_pair").val("EUR/USD");
     $("#id_cp").val("C");
     $("#id_strike_price").val(1.09);
+    $("#id_cashflow-ccy").val("USD");
+    $("#id_cashflow-amount").val(10000);
+    $("#id_cashflow-value_date").val("2021-11-22");
   });
 
   var triggerTabList = [].slice.call(document.querySelectorAll("#ticketTab a"));
