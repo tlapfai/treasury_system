@@ -47,7 +47,7 @@ $("#btn-price").click((event) => {
         form_alert.append(
           `<div class="alert alert-danger" role="alert">${e[y]}</div>`
         );
-        $(`[name="${y}"]`).addClass("is-invalid"); //document.querySelector(`[name="${y}"]`).classList.add("is-invalid");
+        $(`[name="${y}"]`).addClass("is-invalid");
       }
       $('[id^="val-"]').text("");
     });
@@ -136,8 +136,13 @@ function load_fxo_mkt() {
           let scale = 1.0;
           if (valueInPercentage.includes(key)) scale = 100;
           $(`table.parameters input#${key}`).data("value", value * scale);
+          $(`table.parameters input#${key}`).data("byUser", false);
           $(`table.parameters input#${key}`).val((value * scale).toFixed(6));
           $(`table.parameters input#${key}`).focus(fillInputHandle);
+        });
+        $(`table.parameters input`).change(function () {
+          $(this).css("background-color", "lightBlue");
+          $(this).data("byUser", true);
         });
       })
       .catch((error) => {
@@ -165,11 +170,10 @@ document.addEventListener("DOMContentLoaded", function () {
       $("#id_strike_price").val(($("#id_notional_2").val() / $("#id_notional_1").val()).toFixed(10));
     }
   });
+  // prettier-ignore
   $("#id_notional_2").change(() => {
     if ($.isNumeric($("#id_notional_1").val())) {
-      $("#id_strike_price").val(
-        ($("#id_notional_2").val() / $("#id_notional_1").val()).toFixed(10)
-      );
+      $("#id_strike_price").val(($("#id_notional_2").val() / $("#id_notional_1").val()).toFixed(10));
     }
   });
   $("#id_strike_price").change(() => {

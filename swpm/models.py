@@ -1,6 +1,7 @@
 from concurrent.futures import process
 import datetime
 from operator import truediv
+from tkinter import N
 from QuantLib.QuantLib import PiecewiseLogLinearDiscount, RealTimeSeries
 from django.contrib.auth.models import AbstractUser
 from django.db import models
@@ -19,6 +20,9 @@ import QuantLib as ql
 from numpy import isin
 import pandas as pd
 import math, time
+
+FXO_SUBTYPE = [('VAN', 'VAN'), ('AME', 'AME'), ('DOUB_KO', 'DOUB_KO'),
+               ('DOUB_KI', 'DOUB_KI'), ('KIKO', 'KIKO'), ('KOKI', 'KOKI')]
 
 PAYOFF_TYPE = [('PLA', 'Plain'), ('DIG', 'Digital')]
 
@@ -884,6 +888,11 @@ class FXO(Trade):
     exercise_end = models.DateField(null=True, blank=True)
     cp = models.CharField(max_length=1, choices=FXO_CP)
     barrier = models.BooleanField(default=False)
+    subtype = models.CharField(max_length=8,
+                               editable=False,
+                               choices=FXO_SUBTYPE,
+                               blank=True,
+                               null=True)
     objects = FXOManager()
 
     def __str__(self):
@@ -957,11 +966,15 @@ class FXO(Trade):
     def make_process(self, **kwargs):
         if self.mktdataset:
             mkt = self.mktdataset.fxo_mkt_data(self.ccy_pair.name)
+            spot0 = mkt.get('spot').spot0_handle()
             qts = ql.YieldTermStructureHandle(mkt.get('qts'))
             rts = ql.YieldTermStructureHandle(mkt.get('rts'))
-            process = ql.BlackScholesMertonProcess(
-                mkt.get('spot').spot0_handle(), qts, rts,
-                mkt.get('vol').handle(self.strike_price))
+            vol = mkt.get('vol').handle(self.strike_price)
+            if kwargs.get('vol_spread'):
+                vol_spread = kwargs.get('vol_spread')
+                vol = mkt.get('vol').handle(self.strike_price,
+                                            spread=vol_spread)
+            process = ql.BlackScholesMertonProcess(spot0, qts, rts, vol)
             return process
 
     def make_pricing_engine(self):
@@ -970,11 +983,11 @@ class FXO(Trade):
             if isinstance(self.inst, ql.DoubleBarrierOption):
                 return ql.BinomialDoubleBarrierEngine(process, 'tian', 200)
             elif self.barrier:
-                return ql.BinomialBarrierEngine(process, 'tian', 300)
+                return ql.BinomialBarrierEngine(process, 'tian', 200)
             if self.exercise_type == "EUR":
                 return ql.AnalyticEuropeanEngine(process)
             elif self.exercise_type == "AME":
-                return ql.BinomialVanillaEngine(process, 'crr', 300)
+                return ql.BinomialVanillaEngine(process, 'crr', 200)
 
     def self_inst(self):
         self.inst = self.instrument()
@@ -1006,14 +1019,9 @@ class FXO(Trade):
             return 0.
         elif self.exercise_type == "EUR":
             return self.inst.vega() * self.notional_1 * side * 0.01
-        else:
+        elif self.exercise_type == "AME":
             npv = self.inst.NPV()
-            mkt = self.mktdataset.fxo_mkt_data(self.ccy_pair.name)
-            process = ql.BlackScholesMertonProcess(
-                mkt.get('spot').spot0_handle(),
-                ql.YieldTermStructureHandle(mkt.get('qts')),
-                ql.YieldTermStructureHandle(mkt.get('rts')),
-                mkt.get('vol').handle(self.strike_price, spread=0.0001))
+            process = self.make_process(vol_spread=0.0001)
             inst1 = self.instrument()
             inst1.setPricingEngine(
                 ql.BinomialVanillaEngine(process, 'crr', 200))
