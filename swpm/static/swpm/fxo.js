@@ -21,8 +21,7 @@ $("#id_as_of").val(new Date().toISOString().split("T")[0]);
 $("#btn-price").click((event) => {
   event.preventDefault();
   load_fxo_mkt();
-  let myForm = $(".trade-form")[0];
-  let form_data = new FormData(myForm);
+  let form_data = new FormData($(".trade-form")[0]);
   var form_alert = $("#form-alert");
   form_alert.html("");
   $("input, select").removeClass("is-invalid");
@@ -55,8 +54,7 @@ $("#btn-price").click((event) => {
 
 $("#btn-mkt").click(function (event) {
   event.preventDefault();
-  let myForm = document.querySelector(".trade-form");
-  let fd = new FormData(myForm);
+  let fd = new FormData($(".trade-form")[0]);
   axios({
     method: "post",
     url: "/swpm/fx_volatility_table", // starting from slash to access the root of the site

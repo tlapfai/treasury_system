@@ -528,28 +528,28 @@ class FXVolatility(models.Model):
         return f"{self.ccy_pair} as of {self.ref_date}"
 
     def surface_matrix(self):
-        obj = cache.get(f'{self.ref_date}-{self.ccy_pair}', None)
-        if not obj:
-            maturities = []
-            surf_vol = []
-            surf_delta = []
-            surf_delta_type = []
-            prev_t = None  # datetime.date
-            row = -1
-            for q in self.quotes.all().order_by('maturity', 'delta'):
-                if q.maturity == prev_t:
-                    surf_vol[row].append(q.value)
-                    surf_delta[row].append(q.delta)
-                    surf_delta_type[row].append(QL_DELTA_TYPE[q.delta_type])
-                else:
-                    surf_vol.append([q.value])
-                    surf_delta.append([q.delta])
-                    surf_delta_type.append([QL_DELTA_TYPE[q.delta_type]])
-                    maturities.append(q.maturity)
-                    row += 1
-                prev_t = q.maturity
-            obj = surf_vol, surf_delta, surf_delta_type, maturities
-            cache.set(f'{self.ref_date}-{self.ccy_pair}', obj)
+        #obj = cache.get(f'{self.ref_date}-{self.ccy_pair}', None)
+        #if not obj:
+        maturities = []
+        surf_vol = []
+        surf_delta = []
+        surf_delta_type = []
+        prev_t = None  # datetime.date
+        row = -1
+        for q in self.quotes.all().order_by('maturity', 'delta'):
+            if q.maturity == prev_t:
+                surf_vol[row].append(q.value)
+                surf_delta[row].append(q.delta)
+                surf_delta_type[row].append(QL_DELTA_TYPE[q.delta_type])
+            else:
+                surf_vol.append([q.value])
+                surf_delta.append([q.delta])
+                surf_delta_type.append([QL_DELTA_TYPE[q.delta_type]])
+                maturities.append(q.maturity)
+                row += 1
+            prev_t = q.maturity
+        obj = surf_vol, surf_delta, surf_delta_type, maturities
+        #cache.set(f'{self.ref_date}-{self.ccy_pair}', obj)
         return obj
 
     def set_yts(self, rts, qts):
@@ -605,18 +605,14 @@ class FXVolatility(models.Model):
             target = self.TargetFun(self.ref_date, s0, self.rts.discount(mat),
                                     self.qts.discount(mat), strike,
                                     maturities[i], surf_delta[i],
-                                    surf_delta_type[i], smile)
+                                    surf_delta_type[i],
+                                    [sm + spread for sm in smile])
             guess = smile[2]
-            volatilities.append(
-                solver.solve(target, accuracy, guess, step) + spread)
+            volatilities.append(solver.solve(target, accuracy, guess, step))
         vts = ql.BlackVarianceCurve(qlDate(self.ref_date), qlDate(maturities),
                                     volatilities, ql.Actual365Fixed(), False)
         vts.enableExtrapolation()
-
         return ql.BlackVolTermStructureHandle(vts)
-        # spread = ql.QuoteHandle(ql.SimpleQuote(0.0000))
-        # return ql.BlackVolTermStructureHandle(
-        #     ql.ZeroSpreadedTermStructure(v, spread))
 
     def surface_dataframe(self):
         surf_vol, surf_delta, surf_delta_type, maturities = self.surface_matrix(
@@ -963,15 +959,14 @@ class FXO(Trade):
             self.inst = ql.VanillaOption(payoff, exercise)
         return self.inst
 
-    def make_process(self, **kwargs):
+    def make_process(self, vol_spread=None):
         if self.mktdataset:
             mkt = self.mktdataset.fxo_mkt_data(self.ccy_pair.name)
             spot0 = mkt.get('spot').spot0_handle()
             qts = ql.YieldTermStructureHandle(mkt.get('qts'))
             rts = ql.YieldTermStructureHandle(mkt.get('rts'))
             vol = mkt.get('vol').handle(self.strike_price)
-            if kwargs.get('vol_spread'):
-                vol_spread = kwargs.get('vol_spread')
+            if vol_spread:
                 vol = mkt.get('vol').handle(self.strike_price,
                                             spread=vol_spread)
             process = ql.BlackScholesMertonProcess(spot0, qts, rts, vol)
@@ -999,9 +994,10 @@ class FXO(Trade):
 
     def delta(self):
         side = 1. if self.buy_sell == "B" else -1.
+        spot0 = self.mktdataset.get_fxspot(self.ccy_pair_id).today_rate()
         if isinstance(self.inst, ql.DoubleBarrierOption):
             return 0.
-        return self.inst.delta() * self.notional_1 * side
+        return self.inst.delta() * self.notional_1 * side * spot0
 
     def gamma(self):
         """ Delta sensitivity respect to 1% change of spot rate """
