@@ -972,17 +972,18 @@ class FXO(Trade):
             process = ql.BlackScholesMertonProcess(spot0, qts, rts, vol)
             return process
 
-    def make_pricing_engine(self):
-        if self.mktdataset:
+    def make_pricing_engine(self, process=None):
+        if process == None and self.mktdataset:
             process = self.make_process()
-            if isinstance(self.inst, ql.DoubleBarrierOption):
-                return ql.BinomialDoubleBarrierEngine(process, 'tian', 200)
-            elif self.barrier:
-                return ql.BinomialBarrierEngine(process, 'tian', 200)
-            if self.exercise_type == "EUR":
-                return ql.AnalyticEuropeanEngine(process)
-            elif self.exercise_type == "AME":
-                return ql.BinomialVanillaEngine(process, 'crr', 200)
+
+        if isinstance(self.inst, ql.DoubleBarrierOption):
+            return ql.BinomialDoubleBarrierEngine(process, 'tian', 200)
+        elif self.barrier:
+            return ql.BinomialBarrierEngine(process, 'tian', 200)
+        if self.exercise_type == "EUR":
+            return ql.AnalyticEuropeanEngine(process)
+        elif self.exercise_type == "AME":
+            return ql.BinomialVanillaEngine(process, 'crr', 200)
 
     def self_inst(self):
         self.inst = self.instrument()
@@ -1011,17 +1012,15 @@ class FXO(Trade):
         side = 1. if self.buy_sell == "B" else -1.
         if isinstance(self.inst, ql.DoubleBarrierOption):
             return 0.
-        elif self.barrier:
-            return 0.
-        elif self.exercise_type == "EUR":
-            return self.inst.vega() * self.notional_1 * side * 0.01
-        elif self.exercise_type == "AME":
+        elif self.barrier or self.exercise_type == "AME":
             npv = self.inst.NPV()
             process = self.make_process(vol_spread=0.0001)
+            eng = self.make_pricing_engine(process)
             inst1 = self.instrument()
-            inst1.setPricingEngine(
-                ql.BinomialVanillaEngine(process, 'crr', 200))
+            inst1.setPricingEngine(eng)
             return side * self.notional_1 * (inst1.NPV() - npv) / 0.01
+        elif self.exercise_type == "EUR":
+            return self.inst.vega() * self.notional_1 * side * 0.01
 
     def thetaPerDay(self):
         side = 1. if self.buy_sell == "B" else -1.
