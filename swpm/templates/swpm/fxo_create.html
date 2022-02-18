@@ -7,7 +7,7 @@
 
 <div class="container-fluid">
   <div class="row gx-2">
-    <div class="trade-area col-md-6" style="padding: 1em;">
+    <div class="trade-area col-md-9" style="padding: 1em;">
       <form class="trade-form">
         {% csrf_token %}
         <input type="date" class="as_of" name="as_of" required id="id_as_of">
@@ -86,14 +86,18 @@
       {% include 'swpm/includes/fxo_parameters.html'%}
     </div>
 
-    <div class="valuation col-md-3" style="padding: 1em">
+    <div class="valuation col-md-12" style="padding: 1em; display: none">
       <h4>Valuation</h4>
-      {% include 'swpm/includes/fxo_valuation.html' with form=val_form %}
+      {% include 'swpm/includes/fxo_valuation.html' with form=val_form %}     
     </div>
+    <div id="valuation-table"></div>
     <!-- end of class='valuation'-->
   </div>
 <div>
 <!-- end of class="row"-->
+
+<script src="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.js"></script>
+<link rel="stylesheet" media="screen" href="http://handsontable.com/dist/jquery.handsontable.full.css">
 <script src="{% static 'swpm/fxo.js' %}"></script>
 
 {% endblock %}

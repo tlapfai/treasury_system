@@ -1,5 +1,6 @@
 from os import times
 from re import template
+import re
 from weakref import ref
 from QuantLib.QuantLib import as_fixed_rate_coupon
 from django.contrib.auth import REDIRECT_FIELD_NAME, authenticate, login, logout
@@ -777,10 +778,14 @@ def fxo_price(request):  # for API, now in use
                         low_bar.trade = tr
                 tr.link_mktdataset(mkt)
                 tr.self_inst()
+                pair = tr.ccy_pair
+                ccy1 = pair.base_ccy.code
+                ccy2 = pair.quote_ccy.code
+                spot0 = mkt.get_fxspot(pair.name).today_rate()
             else:
                 return JsonResponse({'errors': fxo_form.errors}, status=500)
                 # try try fxo_form.errors.as_json()
-            result = {
+            result2 = {
                 'npv': tr.NPV(),
                 'delta': tr.delta(),
                 'gamma': tr.gamma(),
@@ -791,11 +796,26 @@ def fxo_price(request):  # for API, now in use
                 #'strikeSensitivity': tr.strikeSensitivity(),
                 #'itmCashProbability': tr.itmCashProbability(),
             }
+            result = []
+            for key, value in result2.items():
+                result.append({
+                    'measure':
+                    key,
+                    ccy1:
+                    round(value / spot0, 2),
+                    ccy2:
+                    round(value, 2),
+                    ccy1 + "%":
+                    round(value / spot0 / tr.notional_1 * 100., 2),
+                    ccy2 + "%":
+                    round(value / tr.notional_2 * 100., 2),
+                })
             return JsonResponse(
                 {
                     'result': result,
                     'valuation_message': valuation_message
-                }, )
+                },
+                safe=False)
         except RuntimeError as error:
             return JsonResponse({'errors': [error.args]}, status=500)
 

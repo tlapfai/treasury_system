@@ -34,6 +34,25 @@ $("#btn-price").click((event) => {
     headers: { "Content-Type": "multipart/form-data" },
   })
     .then((response) => {
+      console.log(JSON.stringify(response.data.result));
+      // prettier-ignore
+      $("#valuation-table").handsontable({
+        data: response.data.result,
+        minSpareRows: 0,
+        colHeaders: true,
+        contextMenu: true,
+        readOnly: true,
+        colHeaders: Object.keys(response.data.result[0]),
+        columns: [
+          { data: 'measure', type: 'text' },
+          { data: 'EUR', type: 'numeric', numericFormat: { pattern: '0,0.00' } },
+          { data: 'USD', type: 'numeric', numericFormat: { pattern: '0,0.00' } },
+          { data: 'EUR%', type: 'numeric' },
+          { data: 'USD%', type: 'numeric' },
+        ],
+        licenseKey: "non-commercial-and-evaluation",
+      });
+
       $.each(response.data.result, function (key, value) {
         $(`#val-${key}`).text(commaNum(value.toFixed(2)));
       });

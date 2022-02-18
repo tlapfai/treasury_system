@@ -1006,7 +1006,8 @@ class FXO(Trade):
         spot0 = self.mktdataset.get_fxspot(self.ccy_pair_id).today_rate()
         if isinstance(self.inst, ql.DoubleBarrierOption):
             return 0.
-        return self.inst.gamma() * self.notional_1 * side * 0.01 / spot0
+        return self.inst.gamma(
+        ) * self.notional_1 * side * 0.01 * spot0 * spot0
 
     def vega(self):
         side = 1. if self.buy_sell == "B" else -1.
