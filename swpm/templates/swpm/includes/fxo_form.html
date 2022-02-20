@@ -12,8 +12,9 @@
   </div>
 {% endif %}
 
-<div class="trade-ticket row" style="margin: 0;">
-    <div class="form-group col-sm-3 col-xs-6">
+<div class="trade-ticket row" style="margin: 0; width: 880px">
+    
+    <div class="form-group" style="width: auto;">
         <label for="{{ form.buy_sell.id_for_label }}">{{ form.buy_sell.label }}</label>        
         {% if form.is_bound %}
             {% if form.buy_sell.errors %}
@@ -29,7 +30,7 @@
         {% endif %}
     </div>
 
-    <div class="form-group col-sm-3 col-xs-6">
+    <div class="form-group" style="width: auto;">
         <label for="{{ form.ccy_pair.id_for_label }}">{{ form.ccy_pair.label }}</label>
         {% if form.is_bound %}
             {% if form.ccy_pair.errors %}
@@ -45,7 +46,7 @@
         {% endif %}
     </div>
 
-    <div class="form-group col-sm-6 col-xs-12">
+    <div class="form-group" style="width: auto;">
         <label for="{{ form.strike_price.id_for_label }}">{{ form.strike_price.label }}</label>
         {% if form.is_bound %}
             {% if form.strike_price.errors %}
@@ -61,57 +62,62 @@
         {% endif %}
     </div>
 
-    <div class="form-group col-sm-6 col-xs-12">
+    <div class="form-group" style="width: auto;">
         <label for="{{ form.notional_1.id_for_label }}">{{ form.notional_1.label }}</label>
         {% if form.is_bound %}
             {% if form.notional_1.errors %}
-                {% render_field form.notional_1 class+="form-control-sm is-invalid" %}
+                {% render_field form.notional_1 class+="is-invalid" %}
                 {% for error in form.notional_1.errors %}
                     <div class="invalid-feedback">{{ error }}</div>
                 {% endfor %}
             {% else %}
-                {% render_field form.notional_1 class+="form-control-sm is-valid" %}
+                {% render_field form.notional_1 class+="is-valid" %}
             {% endif %}
         {% else %}
-            {% render_field form.notional_1 class+="form-control" %}
+            {% render_field form.notional_1 %}
         {% endif %}
     </div>
 
-    <div class="form-group col-sm-6 col-xs-12">
+    <div class="form-group" style="width: auto;">
         <label for="{{ form.notional_2.id_for_label }}">{{ form.notional_2.label }}</label>
         {% if form.is_bound %}
             {% if form.notional_2.errors %}
-                {% render_field form.notional_2 class+="form-control-sm is-invalid" %}
+                {% render_field form.notional_2 class+="is-invalid" %}
                 {% for error in form.notional_2.errors %}
                     <div class="invalid-feedback">{{ error }}</div>
                 {% endfor %}
             {% else %}
-                {% render_field form.notional_2 class+="form-control-sm is-valid" %}
+                {% render_field form.notional_2 class+="is-valid" %}
             {% endif %}
         {% else %}
-            {% render_field form.notional_2 class+="form-control" %}
+            {% render_field form.notional_2 %}
         {% endif %}
     </div>
 
-    <div class="form-group col-sm-6 col-xs-12">
+    <div class="form-group" style="width: auto;">
         <label for="{{ form.maturity_date.id_for_label }}">{{ form.maturity_date.label }}</label>
         {% if form.is_bound %}
             {% if form.maturity_date.errors %}
-                {% render_field form.maturity_date class+="form-control-sm is-invalid" %}
+                {% render_field form.maturity_date class+="is-invalid" %}
                 {% for error in form.maturity_date.errors %}
                     <div class="invalid-feedback">{{ error }}</div>
                 {% endfor %}
             {% else %}
-                {% render_field form.maturity_date class+="form-control-sm is-valid" %}
+                {% render_field form.maturity_date class+="is-valid" %}
             {% endif %}
         {% else %}
-            {% render_field form.maturity_date class+="form-control" %}
+            {% render_field form.maturity_date %}
         {% endif %}
     </div>
 
     {% for field in form.visible_fields %}
         {% if not field.name in "maturity_date, buy_sell, strike_price, notional_1, notional_2, ccy_pair" %}
-            <div class="form-group col-6">
+            {% if field.help_text %}
+              <div class="form-group" style="width: auto;" data-bs-toggle="tooltip" data-bs-placement="left" title="{{ field.help_text }}">
+            {% else %}
+              <div class="form-group" style="width: auto;">
+            {% endif %}
+            
                 {% render_field field.label_tag %}
                 {% if form.is_bound %}
                     {% if field.errors %}
@@ -128,9 +134,7 @@
                     {% render_field field %}
                 {% endif %}
 
-                {% if field.help_text %}
-                    <small class="form-text text-muted">{{ field.help_text }}</small>
-                {% endif %}
+
             </div>
         {% endif %}
     {% endfor %}

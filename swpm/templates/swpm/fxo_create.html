@@ -7,7 +7,7 @@
 
 <div class="container-fluid">
   <div class="row gx-2">
-    <div class="trade-area col-md-9" style="padding: 1em;">
+    <div class="trade-area col-md-12" style="padding: 1em;">
       <form class="trade-form">
         {% csrf_token %}
         <input type="date" class="as_of" name="as_of" required id="id_as_of">
@@ -58,10 +58,9 @@
                   <input type="hidden" name="origin_page" value="{{ request.path }}" />
                 <!--</table>-->
                 <!-- table for form end   -->
-                <div class="panel panel-primary" id="cashflow"><table><fieldset><legend>Premium</legend>{{ cashflowform.as_table }}</fieldset></table></div>
-                <div class="row barrier-panel">
-                  <div class="col-sm-6 panel panel-primary" id="low-barrier"><table><fieldset><legend>Lower Barrier</legend>{{ lower_barrier_detail.as_table }}</fieldset></table></div>
-                  <div class="col-sm-6 panel panel-primary" id="up-barrier"><table><fieldset><legend>Upper Barrier</legend>{{ upper_barrier_detail.as_table }}</fieldset></table></div>
+                <div style="vertical-align: middle;">Premium: {% include 'swpm/includes/cashflow_form.html' with form=cashflowform %}</div>
+                <div>{% include 'swpm/includes/barrier_form.html' with form=lower_barrier_detail_form %}</div>
+                <div>{% include 'swpm/includes/barrier_form.html' with form=upper_barrier_detail_form %}</div>
                 </div>
               </div>
               <!-- terms contents end   -->
@@ -81,17 +80,22 @@
     </div>
     <!--End of class="trade-ticket">-->
 
-    <div class="valuation col-md-3" style="padding: 1em">
-      <h4>Parameters</h4>
-      {% include 'swpm/includes/fxo_parameters.html'%}
+    
+    <!-- end of class='valuation'-->
+  </div>
+  <div class="row gx-2">
+    <div class="col-md-3" style="padding: 1em">
+      <h4>Parameter</h4>
+      <div id="mkt-table"></div>
     </div>
-
-    <div class="valuation col-md-12" style="padding: 1em; display: none">
+    <div class="col-md-9" style="padding: 1em">
+      <h4>Valuation</h4>
+      <div id="valuation-table"></div>
+    </div>
+    <div class="valuation col-md-9" style="padding: 1em; display: none">
       <h4>Valuation</h4>
       {% include 'swpm/includes/fxo_valuation.html' with form=val_form %}     
     </div>
-    <div id="valuation-table"></div>
-    <!-- end of class='valuation'-->
   </div>
 <div>
 <!-- end of class="row"-->

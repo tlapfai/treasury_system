@@ -29,27 +29,29 @@ $("#btn-price").click((event) => {
 
   axios({
     method: "post",
-    url: "/swpm/trade/fxo/price", // starting with slash will use the root of the site
+    url: "/trade/fxo/price", // starting with slash will use the root of the site
     data: form_data,
     headers: { "Content-Type": "multipart/form-data" },
   })
     .then((response) => {
       console.log(JSON.stringify(response.data.result));
+      let hd = response.data.result.headers;
       // prettier-ignore
       $("#valuation-table").handsontable({
-        data: response.data.result,
+        data: response.data.result.values,
         minSpareRows: 0,
         colHeaders: true,
         contextMenu: true,
         readOnly: true,
-        colHeaders: Object.keys(response.data.result[0]),
+        colHeaders: Object.keys(response.data.result.values[0]),
         columns: [
-          { data: 'measure', type: 'text' },
-          { data: 'EUR', type: 'numeric', numericFormat: { pattern: '0,0.00' } },
-          { data: 'USD', type: 'numeric', numericFormat: { pattern: '0,0.00' } },
-          { data: 'EUR%', type: 'numeric' },
-          { data: 'USD%', type: 'numeric' },
+          { data: hd[0], type: 'text' },
+          { data: hd[1], type: 'numeric', numericFormat: { pattern: '0,0.00' } },
+          { data: hd[2], type: 'numeric', numericFormat: { pattern: '0,0.00' } },
+          { data: hd[3], type: 'numeric' },
+          { data: hd[4], type: 'numeric' },
         ],
+        colWidths: [100, 100, 100, 100, 100],
         licenseKey: "non-commercial-and-evaluation",
       });
 
@@ -76,7 +78,7 @@ $("#btn-mkt").click(function (event) {
   let fd = new FormData($(".trade-form")[0]);
   axios({
     method: "post",
-    url: "/swpm/fx_volatility_table", // starting from slash to access the root of the site
+    url: "/fx_volatility_table", // starting from slash to access the root of the site
     data: fd,
     headers: { "Content-Type": "multipart/form-data" },
   }).then((response) => {
@@ -101,7 +103,7 @@ $("#id_tenor").focusout(function () {
     let axios_cfg = { headers: { "X-CSRFToken": $.cookie("csrftoken") } };
     axios
       .post(
-        "/swpm/tenor2date",
+        "/tenor2date",
         {
           ccy_pair: $("#id_ccy_pair").val(),
           trade_date: $("#id_trade_date").val(),
@@ -138,7 +140,7 @@ function load_fxo_mkt() {
     let axios_cfg = { headers: { "X-CSRFToken": $.cookie("csrftoken") } };
     axios
       .post(
-        "/swpm/load_fxo_mkt",
+        "/load_fxo_mkt",
         {
           as_of: as_of,
           ccy_pair: ccy_pair,
@@ -148,14 +150,31 @@ function load_fxo_mkt() {
         axios_cfg
       )
       .then((response) => {
-        let valueInPercentage = ["vol", "r", "q"];
-        $.each(response.data, function (key, value) {
-          let scale = 1.0;
-          if (valueInPercentage.includes(key)) scale = 100;
-          $(`table.parameters input#${key}`).data("value", value * scale);
-          $(`table.parameters input#${key}`).data("byUser", false);
-          $(`table.parameters input#${key}`).val((value * scale).toFixed(6));
-          $(`table.parameters input#${key}`).focus(fillInputHandle);
+        // let valueInPercentage = ["vol", "r", "q"];
+        // $.each(response.data, function (key, value) {
+        //   let scale = 1.0;
+        //   if (valueInPercentage.includes(key)) scale = 100;
+        //   $(`table.parameters input#${key}`).data("value", value * scale);
+        //   $(`table.parameters input#${key}`).data("byUser", false);
+        //   $(`table.parameters input#${key}`).val((value * scale).toFixed(6));
+        //   $(`table.parameters input#${key}`).focus(fillInputHandle);
+        // });
+        console.log(JSON.stringify(response.data.result));
+        let hd = response.data.result.headers;
+        // prettier-ignore
+        $("#mkt-table").handsontable({
+          data: response.data.result.values,
+          minSpareRows: 0,
+          colHeaders: true,
+          contextMenu: true,
+          readOnly: false,
+          colHeaders: Object.keys(response.data.result.values[0]),
+          columns: [
+            { data: hd[0], type: "text" },
+            { data: hd[1], type: "numeric", numericFormat: { pattern: "0,0.0000" } },
+          ],
+          colWidths: [100, 100],
+          licenseKey: "non-commercial-and-evaluation",
         });
         $(`table.parameters input`).change(function () {
           $(this).css("background-color", "lightBlue");
@@ -179,7 +198,7 @@ $("#id_maturity_date").change(function () {
   $("#id_tenor").val("");
 });
 
-document.addEventListener("DOMContentLoaded", function () {
+$(document).ready(function () {
   $('[data-bs-toggle="tooltip"]').tooltip();
   // prettier-ignore
   $("#id_notional_1").change(() => {

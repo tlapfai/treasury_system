@@ -134,23 +134,33 @@ class FXOView(View):
             form = FXOForm(instance=fxo)
             prm = CashFlow.objects.get(trade_id=trade_id, cashflow_type="PRM")
             cashflowform = CashFlowForm(instance=prm)
-            up_bar = FXOUpperBarrierDetail.objects.get(trade_id=trade_id)
-            upper_barrier_detail = FXOUpperBarrierDetailForm(instance=up_bar)
-            low_bar = FXOLowerBarrierDetail.objects.get(trade_id=trade_id)
-            lower_barrier_detail = FXOLowerBarrierDetailForm(instance=low_bar)
+            up_bar = FXOUpperBarrierDetail.objects.filter(trade_id=trade_id)
+            if up_bar:
+                upper_barrier_detail_form = FXOUpperBarrierDetailForm(
+                    instance=up_bar[0])
+                upper_barrier_detail_form.initial['effect'] = True
+            else:
+                upper_barrier_detail_form = FXOUpperBarrierDetailForm()
+            low_bar = FXOLowerBarrierDetail.objects.filter(trade_id=trade_id)
+            if low_bar:
+                lower_barrier_detail_form = FXOLowerBarrierDetailForm(
+                    instance=low_bar[0])
+                lower_barrier_detail_form.initial['effect'] = True
+            else:
+                lower_barrier_detail_form = FXOLowerBarrierDetailForm()
         else:
             trade_id = None
             form = FXOForm()
             cashflowform = CashFlowForm()
-            upper_barrier_detail = FXOUpperBarrierDetailForm()
-            lower_barrier_detail = FXOLowerBarrierDetailForm()
+            upper_barrier_detail_form = FXOUpperBarrierDetailForm()
+            lower_barrier_detail_form = FXOLowerBarrierDetailForm()
         return render(
             request, "swpm/fxo_create.html", {
                 'trade_id': trade_id,
                 'form': form,
                 'cashflowform': cashflowform,
-                'upper_barrier_detail': upper_barrier_detail,
-                'lower_barrier_detail': lower_barrier_detail,
+                'upper_barrier_detail_form': upper_barrier_detail_form,
+                'lower_barrier_detail_form': lower_barrier_detail_form,
             })
 
     def post(self, request, **kwargs):
@@ -165,7 +175,7 @@ class FXOView(View):
                 upper_form = FXOUpperBarrierDetailForm(request.POST)
                 lower_form = FXOLowerBarrierDetailForm(request.POST)
                 for bf in [upper_form, lower_form]:
-                    if bf.is_valid() and bf.cleaned_data['effective']:
+                    if bf.is_valid() and bf.cleaned_data.get('effect'):
                         b = bf.save(commit=False)
                         b.trade_id = trade_id
                         b.save()
@@ -175,6 +185,9 @@ class FXOView(View):
             prm.cashflow_type = 'PRM'
             prm.save()
             return redirect('fxo_update', id=trade_id)
+
+    def put(self, request):
+        pass
 
 
 class FXOUpdateView(UpdateView):
@@ -791,8 +804,8 @@ def fxo_price(request):  # for API, now in use
                 'gamma': tr.gamma(),
                 'vega': tr.vega(),
                 'theta': tr.thetaPerDay(),
-                'rho': tr.rho() * 0.01,
-                'dividendRho': tr.dividendRho() * 0.01,
+                'rho': tr.rho(),
+                'dividendRho': tr.dividendRho(),
                 #'strikeSensitivity': tr.strikeSensitivity(),
                 #'itmCashProbability': tr.itmCashProbability(),
             }
@@ -812,7 +825,11 @@ def fxo_price(request):  # for API, now in use
                 })
             return JsonResponse(
                 {
-                    'result': result,
+                    'result': {
+                        'headers':
+                        ['measure', ccy1, ccy2, ccy1 + "%", ccy2 + "%"],
+                        'values': result
+                    },
                     'valuation_message': valuation_message
                 },
                 safe=False)
@@ -844,24 +861,39 @@ def load_fxo_mkt(request):
             fxvol = mkt.get_fxvol(cp)
             vol = fxvol.handle(strike_price).blackVol(qlDate(maturity), 1)
             yts = mkt.get_fxyts(cp)
-            return JsonResponse({
-                'spot':
-                spot,
-                'spot0':
-                spot0,
-                'fwd':
-                fwd,
-                'vol':
-                vol,
-                'q':
-                yts.get('qts').zeroRate(qlDate(maturity), ql.Actual365Fixed(),
-                                        ql.Continuous).rate(),
-                'r':
-                yts.get('rts').zeroRate(qlDate(maturity), ql.Actual365Fixed(),
-                                        ql.Continuous).rate(),
-                'swap_point':
-                fwd - spot,
-            })
+            q = yts.get('qts').zeroRate(qlDate(maturity), ql.Actual365Fixed(),
+                                        ql.Continuous).rate()
+            r = yts.get('rts').zeroRate(qlDate(maturity), ql.Actual365Fixed(),
+                                        ql.Continuous).rate()
+            return JsonResponse(
+                {
+                    'result': {
+                        'headers': ['data', 'value'],
+                        'values': [{
+                            'data': 'spot',
+                            'value': spot
+                        }, {
+                            'data': 'spot0',
+                            'value': spot0
+                        }, {
+                            'data': 'fwd',
+                            'value': fwd
+                        }, {
+                            'data': 'vol',
+                            'value': vol
+                        }, {
+                            'data': 'q',
+                            'value': q
+                        }, {
+                            'data': 'r',
+                            'value': r
+                        }, {
+                            'data': 'swap_point',
+                            'value': fwd - spot
+                        }]
+                    }
+                },
+                safe=False)
         except RuntimeError as error:
             return JsonResponse({'errors': [error.args]}, status=500)
 

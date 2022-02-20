@@ -9,6 +9,7 @@ from django.db.models import query_utils
 from django.db.models.base import Model
 from django.db.models.deletion import CASCADE, DO_NOTHING, SET_NULL, SET_DEFAULT
 from django.db.models.fields.related import ForeignKey
+from django.db.models.fields import DecimalField
 from django.utils import timezone
 from django.utils.translation import gettext as _
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
@@ -20,6 +21,7 @@ import QuantLib as ql
 from numpy import isin
 import pandas as pd
 import math, time
+import re
 
 FXO_SUBTYPE = [('VAN', 'VAN'), ('AME', 'AME'), ('DOUB_KO', 'DOUB_KO'),
                ('DOUB_KI', 'DOUB_KI'), ('KIKO', 'KIKO'), ('KOKI', 'KOKI')]
@@ -82,10 +84,19 @@ QL_CALENDAR = {
     'UnitedKingdom': ql.UnitedKingdom()
 }
 
+period_regex1 = re.compile(r"^(\d+[DMYdmy])+$")
+period_regex2 = re.compile(r"^(\d+[Ww])+$")
+
 
 def validate_positive(value):
-    if value <= 0:
+    if float(value) <= 0:
         raise ValidationError(_('Must be positive'), code='non_positive')
+
+
+def validate_period(s):
+    if not period_regex1.match(s) and not period_regex2.match(s):
+        raise ValidationError(_('Period is not correct'),
+                              code='incorrect_period')
 
 
 # class PositiveFloatField(models.Field):
@@ -199,7 +210,7 @@ def with_mktdataset(mktdata):
 class FxSpotRateQuote(models.Model):
     ref_date = models.DateField()
     rate = models.FloatField()
-    ccy_pair = models.ForeignKey(CcyPair, CASCADE, related_name="quotes")
+    ccy_pair = ForeignKey(CcyPair, CASCADE, related_name="quotes")
 
     class Meta:
         unique_together = ('ref_date', 'ccy_pair')
@@ -250,27 +261,35 @@ class FxSpotRateQuote(models.Model):
 
 @with_mktdataset
 class InterestRateQuote(models.Model):
-    name = models.CharField(max_length=16)  # e.g. USD OIS 12M
+    """ name is the full name e.g. USD OIS 12M """
+
+    def limit_choices_yts():
+        return None
+
+    name = models.CharField(max_length=16)
     ref_date = models.DateField()
-    yts = models.ForeignKey("IRTermStructure",
-                            CASCADE,
-                            null=True,
-                            blank=True,
-                            related_name="rates")
+    yts = ForeignKey('IRTermStructure',
+                     CASCADE,
+                     null=True,
+                     blank=True,
+                     related_name="rates")
     rate = models.DecimalField(max_digits=12, decimal_places=8)
     tenor = models.CharField(max_length=5)
     instrument = models.CharField(max_length=5)
-    ccy = models.ForeignKey(Ccy, CASCADE, related_name="ir_quotes")
+    ccy = ForeignKey(Ccy, CASCADE, related_name="ir_quotes")
     day_counter = models.CharField(max_length=16,
                                    choices=CHOICE_DAY_COUNTER.choices,
                                    null=True,
                                    blank=True)
-    ccy_pair = models.ForeignKey(CcyPair, CASCADE, null=True, blank=True)
-
-    # index = models.ForeignKey(RateIndex, DO_NOTHING, null=True, blank=True) # RateIndex is not defined yet above this model
+    ccy_pair = ForeignKey(CcyPair, CASCADE, null=True, blank=True)
+    index = ForeignKey('RateIndex',
+                       DO_NOTHING,
+                       null=True,
+                       blank=True,
+                       related_name='quotes')
 
     class Meta:
-        unique_together = ('name', 'tenor', 'ref_date')
+        unique_together = ('name', 'ref_date')
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -352,6 +371,7 @@ class InterestRateQuote(models.Model):
 
 @with_mktdataset
 class IRTermStructure(models.Model):
+    """ name: e.g. LIBOR, OIS, FOREX """
     name = models.CharField(max_length=16)
     ref_date = models.DateField()
     ccy = models.ForeignKey(Ccy,
@@ -359,19 +379,20 @@ class IRTermStructure(models.Model):
                             related_name="all_curves",
                             null=True,
                             blank=True)
-    #rates = models.ManyToManyField(InterestRateQuote, related_name="ts")
-    as_fx_curve = models.ForeignKey(Ccy,
-                                    CASCADE,
-                                    related_name="fx_curve",
-                                    null=True,
-                                    blank=True)
-    as_rf_curve = models.ForeignKey(Ccy,
-                                    CASCADE,
-                                    related_name="rf_curve",
-                                    null=True,
-                                    blank=True)
-    ref_ccy = models.ForeignKey(Ccy, CASCADE, null=True, blank=True)
+    as_fx_curve = ForeignKey(Ccy,
+                             CASCADE,
+                             related_name="fx_curve",
+                             null=True,
+                             blank=True)
+    as_rf_curve = ForeignKey(Ccy,
+                             CASCADE,
+                             related_name="rf_curve",
+                             null=True,
+                             blank=True)
+    ref_ccy = ForeignKey(Ccy, CASCADE, null=True, blank=True)
     ref_curve = models.CharField(max_length=16, null=True, blank=True)
+
+    # ref_curve: only curve name, e.g. OIS
 
     class Meta:
         unique_together = ('name', 'ref_date', 'ccy')
@@ -379,7 +400,9 @@ class IRTermStructure(models.Model):
     def __init__(self, *args, **kwargs) -> None:
         self.yts = None
         super().__init__(*args, **kwargs)
-        print(f'Called __init__() of {self.name} {self.ref_date} {self.ccy}')
+        print(
+            f'Called __init__() of {self.name} {self.ref_date} {self.ccy} ({hex(id(self))})'
+        )
 
     def term_structure(self):
         if self.yts:
@@ -408,9 +431,9 @@ class IRTermStructure(models.Model):
 
 class RateIndex(models.Model):
     name = models.CharField(max_length=16, primary_key=True)
-    ccy = models.ForeignKey(Ccy, CASCADE, related_name="rate_indexes")
-    index = models.CharField(max_length=16)
-    tenor = models.CharField(max_length=16)
+    ccy = ForeignKey(Ccy, CASCADE, related_name="rate_indexes")
+    #index = models.CharField(max_length=16)
+    tenor = models.CharField(max_length=16, validators=[validate_period])
     day_counter = models.CharField(max_length=16,
                                    choices=CHOICE_DAY_COUNTER.choices,
                                    null=True,
@@ -424,22 +447,25 @@ class RateIndex(models.Model):
         return self.name
 
     def get_index(self, ref_date=None, eff_date=None):
-        if 'USD LIBOR' in self.name:
+        if self.name == 'OIS':
+            idx_cls = ql.OvernightIndex
+        elif self.name == 'LIBOR' and self.ccy.code == 'USD':
             idx_cls = ql.USDLibor
-        elif 'USD EFFR' in self.name:
+        elif self.name == 'OIS' and self.ccy.code == 'USD':
             idx_cls = ql.OvernightIndex
 
         if ref_date:
             yts = IRTermStructure.objects.get(
-                name=self.yts, ref_date=ref_date).term_structure()
+                name=self.yts, ccy=self.ccy,
+                ref_date=ref_date).term_structure()
 
-        if 'USD LIBOR' in self.name:
+        if self.name == 'LIBOR' and self.ccy.code == 'USD':
             if yts:
                 idx_obj = idx_cls(ql.Period(self.tenor),
                                   ql.YieldTermStructureHandle(yts))
             else:
                 idx_obj = idx_cls(ql.Period(self.tenor))
-        elif 'USD EFFR' in self.name:
+        elif self.name == 'EFFR' and self.ccy.code == 'USD':
             if yts:
                 idx_obj = idx_cls('USD EFFR', 1, ql.USDCurrency(),
                                   ql.Actual360(),
@@ -561,7 +587,7 @@ class FXVolatility(models.Model):
     def set_spot(self, spot: FxSpotRateQuote):
         self.spot = spot  # FxSpotRateQuote
 
-    def handle(self, strike, **kwargs):
+    def handle(self, strike, spread=None):
 
         surf_vol, surf_delta, surf_delta_type, maturities = self.surface_matrix(
         )
@@ -596,9 +622,7 @@ class FXVolatility(models.Model):
             cvname = self.mktdataset.get_fxyts_name(ccy)
             self.qts = self.mktdataset.get_yts(ccy, cvname)
 
-        spread = 0.
-        if kwargs.get('spread'):
-            spread = kwargs.get('spread')
+        spread = spread if spread else 0.
 
         for i, smile in enumerate(surf_vol):
             mat = qlDate(maturities[i])
@@ -747,22 +771,22 @@ class Trade(models.Model):
     create_time = models.DateTimeField(auto_now_add=True)
     trade_date = models.DateField(null=False, default=datetime.date.today)
     value_date = models.DateField(null=False, default=datetime.date.today)
-    pl_ccy = models.ForeignKey(Ccy, CASCADE, null=True, blank=True)
+    pl_ccy = ForeignKey(Ccy, CASCADE, null=True, blank=True)
     detail = models.OneToOneField(TradeDetail, CASCADE, null=True)
-    book = models.ForeignKey(Book,
-                             SET_NULL,
-                             null=True,
-                             blank=True,
-                             related_name="trades")
-    input_user = models.ForeignKey(User,
-                                   SET_NULL,
-                                   null=True,
-                                   related_name='input_trades')
-    counterparty = models.ForeignKey(Counterparty,
-                                     SET_NULL,
-                                     related_name="trade_set",
-                                     null=True,
-                                     blank=True)
+    book = ForeignKey(Book,
+                      SET_NULL,
+                      null=True,
+                      blank=True,
+                      related_name="trades")
+    input_user = ForeignKey(User,
+                            SET_NULL,
+                            null=True,
+                            related_name='input_trades')
+    counterparty = ForeignKey(Counterparty,
+                              SET_NULL,
+                              related_name="trade_set",
+                              null=True,
+                              blank=True)
 
     def delete(self, *args, **kwargs):
         super().delete(*args, **kwargs)
@@ -785,11 +809,11 @@ class Trade(models.Model):
 
 
 class CashFlow(models.Model):
-    trade = models.ForeignKey(Trade,
-                              CASCADE,
-                              related_name='cashflows',
-                              editable=False)
-    ccy = models.ForeignKey(Ccy, CASCADE, null=True, blank=True)
+    trade = ForeignKey(Trade,
+                       CASCADE,
+                       related_name='cashflows',
+                       editable=False)
+    ccy = ForeignKey(Ccy, CASCADE, null=True, blank=True)
     amount = models.DecimalField(max_digits=32,
                                  decimal_places=2,
                                  null=True,
@@ -799,6 +823,9 @@ class CashFlow(models.Model):
 
     def __str__(self) -> str:
         return f"{self.trade.id}: {self.ccy} {self.amount} on {self.value_date}"
+
+    def cashflow(self):
+        return ql.SimpleCashFlow(float(self.amount), qlDate(self.value_date))
 
 
 class FXOPricingSets:
@@ -959,16 +986,19 @@ class FXO(Trade):
             self.inst = ql.VanillaOption(payoff, exercise)
         return self.inst
 
-    def make_process(self, vol_spread=None):
+    def make_process(self, vol_spread=None, q_spread=None, r_spread=None):
         if self.mktdataset:
             mkt = self.mktdataset.fxo_mkt_data(self.ccy_pair.name)
             spot0 = mkt.get('spot').spot0_handle()
-            qts = ql.YieldTermStructureHandle(mkt.get('qts'))
-            rts = ql.YieldTermStructureHandle(mkt.get('rts'))
-            vol = mkt.get('vol').handle(self.strike_price)
-            if vol_spread:
-                vol = mkt.get('vol').handle(self.strike_price,
-                                            spread=vol_spread)
+            ytsh = ql.YieldTermStructureHandle
+            zsts = ql.ZeroSpreadedTermStructure
+            qts = ytsh(mkt.get('qts'))
+            rts = ytsh(mkt.get('rts'))
+            if q_spread:
+                qts = ytsh(zsts(qts, ql.QuoteHandle(ql.SimpleQuote(q_spread))))
+            if r_spread:
+                rts = ytsh(zsts(rts, ql.QuoteHandle(ql.SimpleQuote(r_spread))))
+            vol = mkt.get('vol').handle(self.strike_price, spread=vol_spread)
             process = ql.BlackScholesMertonProcess(spot0, qts, rts, vol)
             return process
 
@@ -1006,8 +1036,8 @@ class FXO(Trade):
         spot0 = self.mktdataset.get_fxspot(self.ccy_pair_id).today_rate()
         if isinstance(self.inst, ql.DoubleBarrierOption):
             return 0.
-        return self.inst.gamma(
-        ) * self.notional_1 * side * 0.01 * spot0 * spot0
+        return self.notional_1 * side * 0.01 * spot0 * spot0 * self.inst.gamma(
+        )
 
     def vega(self):
         side = 1. if self.buy_sell == "B" else -1.
@@ -1033,6 +1063,7 @@ class FXO(Trade):
             return side * self.notional_1 * self.inst.theta() / 365
 
     def rho(self):
+        """ 1% sensitivity """
         side = 1. if self.buy_sell == "B" else -1.
         if self.barrier:
             return 0.
@@ -1040,21 +1071,14 @@ class FXO(Trade):
             return self.inst.rho() * self.notional_1 * side * 0.01
         else:
             npv = self.inst.NPV()
-            mkt = self.mktdataset.fxo_mkt_data(self.ccy_pair.name)
-            spread = ql.QuoteHandle(ql.SimpleQuote(0.0001))
-            spreaded_rts = ql.ZeroSpreadedTermStructure(
-                ql.YieldTermStructureHandle(mkt.get('rts')), spread)
-            process = ql.BlackScholesMertonProcess(
-                mkt.get('spot').spot0_handle(),
-                ql.YieldTermStructureHandle(mkt.get('qts')),
-                ql.YieldTermStructureHandle(spreaded_rts),
-                mkt.get('vol').handle(self.strike_price))
+            process = self.make_process(r_spread=0.0001)
+            eng = self.make_pricing_engine(process)
             inst1 = self.instrument()
-            inst1.setPricingEngine(
-                ql.BinomialVanillaEngine(process, 'crr', steps=200))
+            inst1.setPricingEngine(eng)
             return side * self.notional_1 * (inst1.NPV() - npv) * 100.
 
     def dividendRho(self):
+        """ 1% sensitivity """
         side = 1. if self.buy_sell == "B" else -1.
         if self.barrier:
             return 0.
@@ -1062,18 +1086,10 @@ class FXO(Trade):
             return self.inst.dividendRho() * self.notional_1 * side * 0.01
         else:
             npv = self.inst.NPV()
-            mkt = self.mktdataset.fxo_mkt_data(self.ccy_pair.name)
-            spread = ql.QuoteHandle(ql.SimpleQuote(0.0001))
-            spreaded_qts = ql.ZeroSpreadedTermStructure(
-                ql.YieldTermStructureHandle(mkt.get('qts')), spread)
-            process = ql.BlackScholesMertonProcess(
-                mkt.get('spot').spot0_handle(),
-                ql.YieldTermStructureHandle(spreaded_qts),
-                ql.YieldTermStructureHandle(mkt.get('rts')),
-                mkt.get('vol').handle(self.strike_price))
+            process = self.make_process(q_spread=0.0001)
+            eng = self.make_pricing_engine(process)
             inst1 = self.instrument()
-            inst1.setPricingEngine(
-                ql.BinomialVanillaEngine(process, 'crr', steps=200))
+            inst1.setPricingEngine(eng)
             return side * self.notional_1 * (inst1.NPV() - npv) * 100.
 
 
@@ -1081,6 +1097,21 @@ class FXO(Trade):
 #    pass
 
 
+class VanillaSwap(Trade):
+    # objects = SwapManager()
+    product_type = models.CharField(max_length=12, default="SWAP")
+    start_date = models.DateField(null=True, blank=True)
+    maturity_date = models.DateField(null=True, blank=True)
+    notional = models.DecimalField(max_digits=24,
+                                   decimal_places=2,
+                                   default=1e6,
+                                   validators=[validate_positive])
+
+    def __str__(self):
+        return f"SWAP ID: {self.id}"
+
+
+@with_mktdataset
 class Swap(Trade):
     # objects = SwapManager()
     product_type = models.CharField(max_length=12, default="SWAP")
@@ -1092,112 +1123,147 @@ class Swap(Trade):
         is_pay = [leg.pay_rec > 0 for leg in self.legs.all()]
         return ql.Swap(legs, is_pay)
 
-    def make_pricing_engine(self, as_of):
-        leg = self.legs.get(pay_rec=-1)
-        yts1 = leg.ccy.rf_curve.filter(ref_date=as_of).first().term_structure()
-        return ql.DiscountingSwapEngine(ql.YieldTermStructureHandle(yts1))
+    # def make_pricing_engine(self, as_of):
+    #     leg = self.legs.get(pay_rec=-1)
+    #     yts1 = leg.ccy.rf_curve.filter(ref_date=as_of).first().term_structure()
+    #     return ql.DiscountingSwapEngine(ql.YieldTermStructureHandle(yts1))
 
-    def __str__(self):
-        return f"Swap ID: {self.id}, Notional={self.legs.first().notional:.0f} {self.legs.first().ccy} vs {self.legs.last().notional:.0f} {self.legs.last().ccy}"
+    def make_pricing_engine(self):
+        if self.mktdataset:
+            ccy = self.ccy.code
+            name = self.mktdataset.get_rfyts_name(ccy)
+            yts = self.mktdataset.get_yts(ccy, name)
+        ytsh = ql.YieldTermStructureHandle
+        return ql.DiscountingSwapEngine(ytsh(yts))
+
+    def self_inst(self):
+        self.inst = self.instrument()
+        self.inst.setPricingEngine(self.make_pricing_engine())
+
+    #def __str__(self):
+    #    return f"Swap ID: {self.id}, Notional={self.legs.first().notional:.0f} {self.legs.first().ccy} vs {self.legs.last().notional:.0f} {self.legs.last().ccy}"
 
     def delete(self, *args, **kwargs):
-        super().delete(*args, **kwargs)
         if self.detail:
             self.detail.delete()
+        for leg in self.legs.all():
+            leg.delete()
+        super().delete(*args, **kwargs)
 
 
-class SwapLeg(models.Model):
-    trade = ForeignKey(Swap,
-                       CASCADE,
-                       null=True,
-                       blank=True,
-                       related_name="legs")
-    ccy = ForeignKey(Ccy, CASCADE)
-    effective_date = models.DateField(default=datetime.date.today)
-    tenor = models.CharField(max_length=8, null=True, blank=True)
-    maturity_date = models.DateField()
-    notional = models.FloatField(default=1e6, validators=[validate_positive])
-    pay_rec = models.IntegerField(choices=SWAP_PAY_REC)
-    fixed_rate = models.FloatField(null=True, blank=True)
-    index = models.ForeignKey(RateIndex, SET_NULL, null=True, blank=True)
-    spread = models.FloatField(null=True, blank=True)
-    reset_freq = models.CharField(max_length=16,
-                                  validators=[RegexValidator],
-                                  null=True,
-                                  blank=True)
-    payment_freq = models.CharField(max_length=16, validators=[RegexValidator])
-    calendar = models.ForeignKey(Calendar,
-                                 SET_NULL,
-                                 null=True,
-                                 blank=True,
-                                 default=None)
-    day_counter = models.CharField(max_length=16,
-                                   choices=CHOICE_DAY_COUNTER.choices)
+class Schedule(models.Model):
+    start_date = models.DateField()
+    end_date = models.DateField(null=True, blank=True)
+    freq = models.CharField(max_length=16,
+                            validators=[validate_period],
+                            null=True,
+                            blank=True)
     day_rule = models.CharField(max_length=24,
                                 choices=CHOICE_DAY_RULE.choices,
                                 default='ModifiedFollowing')
+    calendar = ForeignKey(Calendar,
+                          SET_NULL,
+                          null=True,
+                          blank=True,
+                          default=None)
+
+    def __str__(self):
+        return f"{self.start_date}~{self.end_date} {self.freq}"
+
+    def schedule(self):
+        cdr = self.calendar.calendar()
+        return ql.MakeSchedule(qlDate(self.start_date),
+                               qlDate(self.end_date),
+                               ql.Period(self.freq),
+                               rule=QL_DAY_RULE[self.day_rule],
+                               calendar=cdr)
+
+
+@with_mktdataset
+class SwapLeg(models.Model):
+    trade = ForeignKey(Swap, CASCADE, related_name="legs")
+    ccy = ForeignKey(Ccy, CASCADE, related_name='+')
+    tenor = models.CharField(max_length=8,
+                             null=True,
+                             blank=True,
+                             validators=[validate_period])
+    notional = DecimalField(max_digits=16,
+                            decimal_places=2,
+                            validators=[validate_positive])
+    pay_rec = models.IntegerField(choices=SWAP_PAY_REC)
+    fixed_rate = DecimalField(max_digits=10, decimal_places=8, default=0.0)
+    index = ForeignKey(RateIndex, SET_NULL, null=True)
+    spread = DecimalField(max_digits=10, decimal_places=8, default=0.0)
+    day_counter = models.CharField(max_length=16,
+                                   choices=CHOICE_DAY_COUNTER.choices)
+    schedule = ForeignKey(Schedule, CASCADE)
 
     def save(self, *args, **kwargs):
         if self.day_counter is None:
             self.day_counter = self.ccy.rate_day_counter
-        if self.calendar is None:
-            self.calendar = self.ccy.cal
+        #if self.calendar is None:
+        #    self.calendar = self.ccy.cal
         super(SwapLeg, self).save(*args, **kwargs)
 
-    def get_schedule(self):
-        cdr = self.calendar.calendar()
-        return ql.MakeSchedule(qlDate(self.effective_date),
-                               qlDate(self.maturity_date),
-                               ql.Period(self.payment_freq),
-                               rule=QL_DAY_RULE[self.day_rule],
-                               calendar=cdr)
-
-    def leg(self, as_of):
-        sch = self.get_schedule()
+    def leg(self, as_of):  # need as_of??
+        schd = self.schedule.schedule()
         dc = QL_DAY_COUNTER[self.day_counter]
+        ntl = float(self.notional)
         # day_rule = QL_DAY_RULE[self.day_rule]
         if self.index:
             leg_idx = self.index.get_index(
                 ref_date=as_of, eff_date=self.effective_date)  # need to fix
             if 'IBOR' in self.index.name:
                 leg = ql.IborLeg([self.notional],
-                                 sch,
+                                 schd,
                                  leg_idx,
                                  dc,
                                  fixingDays=[leg_idx.fixingDays()],
                                  spreads=[float(self.spread or 0.0)])
             elif 'OIS' in self.index.name:
-                leg = ql.OvernightLeg([self.notional],
-                                      sch,
+                leg = ql.OvernightLeg([ntl],
+                                      schd,
                                       leg_idx,
                                       dc,
                                       BusinessDayConvention=self.day_rule,
                                       gearing=[1],
                                       spread=self.spread,
                                       TelescopicValueDates=True)
+            elif 'SOFR' in self.index.name:
+                pass
             else:
                 pass  # other floating leg
         else:  # self.index==None
-            leg = ql.FixedRateLeg(sch, QL_DAY_COUNTER[self.day_counter],
-                                  [self.notional], [self.fixed_rate * 0.01])
-
+            leg = ql.FixedRateLeg(schd, QL_DAY_COUNTER[self.day_counter],
+                                  [ntl], [float(self.fixed_rate)])
         return leg
 
-    def make_pricing_engine(self, as_of):
-        yts = self.ccy.rf_curve.get(ref_date=as_of).term_structure()
-        return ql.DiscountingSwapEngine(ql.YieldTermStructureHandle(yts))
+    def make_pricing_engine(self):
+        if self.mktdataset:
+            ccy = self.ccy.code
+            name = self.mktdataset.get_rfyts_name(ccy)
+            yts = self.mktdataset.get_yts(ccy, name)
+        ytsh = ql.YieldTermStructureHandle
+        return ql.DiscountingSwapEngine(ytsh(yts))
 
-    def discounting_curve(self, as_of):
-        # return self.ccy.rf_curve.filter(ref_date=as_of).term_structure()
-        return IRTermStructure.objects.filter(
-            ref_date=as_of,
-            name=self.ccy.risk_free_curve).first().term_structure()
+    # def discounting_curve(self, as_of):
+    #     # return self.ccy.rf_curve.filter(ref_date=as_of).term_structure()
+    #     return IRTermStructure.objects.filter(
+    #         ref_date=as_of,
+    #         name=self.ccy.risk_free_curve).first().term_structure()
 
-    def npv(self, as_of, discounting_curve=None):
+    def NPV(self, as_of, discounting_curve=None):
         yts = discounting_curve if discounting_curve else self.discounting_curve(
             as_of)
         return ql.CashFlows.npv(self.leg(as_of),
                                 ql.YieldTermStructureHandle(yts))
+
+
+@with_mktdataset
+class Swaption(Trade):
+    product_type = models.CharField(max_length=12, default="SWAPTION")
+    exercise_date = models.DateField(null=False)
+    buy_sell = models.CharField(max_length=1, choices=BUY_SELL, default='B')
 
 
 class MktDataSet:
@@ -1228,6 +1294,7 @@ class MktDataSet:
         self.date = str2date(date)
         self.ccy_pairs = dict()  # Ccypair
         self.fxytss = dict()
+        self.rfytss = dict()
         self.ytss = dict()
         self.spots = dict()  # FxSpotRateQuote
         self.fxvols = dict()
@@ -1253,6 +1320,16 @@ class MktDataSet:
             yts.link_mktdataset(self)
             name = yts.name
             self.fxytss[ccy] = name
+            self.ytss[ccy + " " + name] = yts.term_structure()
+        return name
+
+    def get_rfyts_name(self, ccy: str) -> str:
+        name = self.rfytss.get(ccy)
+        if name == None:
+            yts = Ccy.objects.get(code=ccy).rf_curve.get(ref_date=self.date)
+            yts.link_mktdataset(self)
+            name = yts.name
+            self.rfytss[ccy] = name
             self.ytss[ccy + " " + name] = yts.term_structure()
         return name
 

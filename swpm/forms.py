@@ -14,10 +14,10 @@ from django_plotly_dash.dash_wrapper import wid2str
 from .models import *
 
 CHOICE_TRADE_TYPE = [('FXO', 'FXO'), ('SWAP', 'SWAP')]
-date_attrs = {'type': 'date', 'class': "form-control"}
+date_attrs = {'type': 'date', 'class': "form-control-sm"}
 inline_date_attrs = {
     'type': 'date',
-    'class': 'form-control',
+    'class': 'form-control-sm',
     'style': 'display: inline'
 }
 number_attrs = {'class': "form-control-sm", 'style': 'text-align: right'}
@@ -67,11 +67,11 @@ class CashFlowForm(ModelForm):
 
 class FXOUpperBarrierDetailForm(ModelForm):
     prefix = 'up-bar'
-    effect = forms.BooleanField(required=False)
+    effect = forms.BooleanField(required=False, label="Upper Barrier")
 
     class Meta:
         model = FXOUpperBarrierDetail
-        fields = '__all__'
+        fields = ['effect', 'barrier', 'rebate', 'rebate_ccy']
         widgets = {
             'barrier': TextInput(attrs=number_attrs),
             'barrier_start': DateInput(attrs=date_attrs),
@@ -91,11 +91,11 @@ class FXOUpperBarrierDetailForm(ModelForm):
 
 class FXOLowerBarrierDetailForm(ModelForm):
     prefix = 'low-bar'
-    effect = forms.BooleanField(required=False)
+    effect = forms.BooleanField(required=False, label="Lower Barrier")
 
     class Meta:
         model = FXOLowerBarrierDetail
-        fields = '__all__'
+        fields = ['effect', 'barrier', 'rebate', 'rebate_ccy']
         widgets = {
             'barrier': TextInput(attrs=number_attrs),
             'barrier_start': DateInput(attrs=date_attrs),
@@ -114,7 +114,8 @@ class FXOLowerBarrierDetailForm(ModelForm):
 
 
 class FXOForm(ModelForm):
-    tenor = forms.CharField(required=False)
+    #tenor = forms.CharField(required=False, help_text='Use D, W, M and Y')
+    tenor = forms.CharField(required=False, validators=[validate_period])
 
     class Meta:
         model = FXO
@@ -142,7 +143,9 @@ class FXOForm(ModelForm):
             'cp': 'Call/Put',
         }
         help_texts = {
-            # 'ccy_pair': 'Choose a pair'
+            'ccy_pair': 'Choose a pair',
+            'tenor': 'Use D, W, M and Y',
+            'book': 'Book'
         }
 
     def clean(self):
@@ -200,39 +203,35 @@ class SwapLegForm(ModelForm):
 
     class Meta:
         model = SwapLeg
-        fields = [
-            'ccy', 'effective_date', 'maturity_date', 'tenor', 'notional',
-            'pay_rec', 'fixed_rate', 'index', 'spread', 'reset_freq',
-            'payment_freq', 'day_rule', 'calendar', 'day_counter'
-        ]
+        fields = '__all__'
         widgets = {
-            'effective_date': DateInput(attrs={'type': 'date'}),
-            'maturity_date': DateInput(attrs={'type': 'date'}),
+            #'effective_date': DateInput(attrs={'type': 'date'}),
+            #'maturity_date': DateInput(attrs={'type': 'date'}),
         }
-        labels = {'pay_rec': 'Pay/Receive', 'calendar': 'Payment calendar'}
+        #labels = {'pay_rec': 'Pay/Receive', 'calendar': 'Payment calendar'}
 
-    def clean(self):
-        cleaned_data = super().clean()
-        if cleaned_data.get('calendar') is None:
-            cleaned_data['calendar'] = cleaned_data.get('ccy').calendar
-        effective_date = cleaned_data.get('effective_date')
-        maturity_date = cleaned_data.get('maturity_date')
-        fixed_rate = cleaned_data.get('fixed_rate')
-        spread = cleaned_data.get('spread')
-        index = cleaned_data.get('index')
-        reset_freq = cleaned_data.get('reset_freq')
-        if fixed_rate and reset_freq:
-            raise ValidationError(_('Fixed leg has no Reset Freq.'),
-                                  code='term_unmatch1')
-        elif fixed_rate and spread:
-            raise ValidationError(_('Fixed leg has no Spread'),
-                                  code='term_unmatch1')
-        elif fixed_rate and index:
-            raise ValidationError(_('Fixed Rate and Index cannot coexist'),
-                                  code='term_unmatch1')
-        elif maturity_date <= effective_date:
-            raise ValidationError(_('Maturity must later than Effective Date'),
-                                  code='term_unmatch1')
+    # def clean(self):
+    #     cleaned_data = super().clean()
+    #     if cleaned_data.get('calendar') is None:
+    #         cleaned_data['calendar'] = cleaned_data.get('ccy').calendar
+    #     effective_date = cleaned_data.get('effective_date')
+    #     maturity_date = cleaned_data.get('maturity_date')
+    #     fixed_rate = cleaned_data.get('fixed_rate')
+    #     spread = cleaned_data.get('spread')
+    #     index = cleaned_data.get('index')
+    #     reset_freq = cleaned_data.get('reset_freq')
+    #     if fixed_rate and reset_freq:
+    #         raise ValidationError(_('Fixed leg has no Reset Freq.'),
+    #                               code='term_unmatch1')
+    #     elif fixed_rate and spread:
+    #         raise ValidationError(_('Fixed leg has no Spread'),
+    #                               code='term_unmatch1')
+    #     elif fixed_rate and index:
+    #         raise ValidationError(_('Fixed Rate and Index cannot coexist'),
+    #                               code='term_unmatch1')
+    #     elif maturity_date <= effective_date:
+    #         raise ValidationError(_('Maturity must later than Effective Date'),
+    #                               code='term_unmatch1')
 
 
 class SwapForm(ModelForm):
