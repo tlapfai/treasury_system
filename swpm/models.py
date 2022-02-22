@@ -1205,7 +1205,7 @@ class SwapLeg(models.Model):
         #    self.calendar = self.ccy.cal
         super(SwapLeg, self).save(*args, **kwargs)
 
-    def leg(self, as_of):  # need as_of??
+    def leg(self, as_of=None):  # need as_of??
         schd = self.schedule.schedule()
         dc = QL_DAY_COUNTER[self.day_counter]
         ntl = float(self.notional)

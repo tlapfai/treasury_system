@@ -718,23 +718,29 @@ def fxo_scn(request):  # for API
             dcc_upper_bound = dcc.Input(id="up-bound",
                                         type="number",
                                         value=s.rate * 1.05)
+
+            loading_style = {'width': '100%', 'align-self': 'center'}
             app.layout = html.Div([
-                dcc.Graph(id="scn-graph"),
+                dcc.Loading(parent_style=loading_style,
+                            id='loading',
+                            children=dcc.Graph(id="scn-graph"),
+                            className="scn_plot",
+                            style={"width": "auto"}),
                 html.Div(id='scn-control',
                          children=[
                              dcc_radio, "Range: ", dcc_lower_bound,
                              dcc_upper_bound
                          ],
                          style={"textAlign": "center"})
-            ],
-                                  className="scn_plot",
-                                  style={"width": "auto"})
+            ])
 
-            @app.callback(Output('scn-graph', 'figure'),
-                          Input('measure', 'value'),
-                          Input('low-bound', 'value'),
+            @app.callback([
+                Output('scn-graph', 'figure'),
+                Output('loading', 'parent_style')
+            ], Input('measure', 'value'), Input('low-bound', 'value'),
                           Input('up-bound', 'value'))
             def update_figure(measure, low, up):
+                new_loading_style = loading_style
                 if low and up:
                     x_data = np.linspace(low, up, 51)
                     y_data = list()
@@ -760,7 +766,7 @@ def fxo_scn(request):  # for API
                                   },
                                   title="Scenario Analysis")
                     fig.update_layout(transition_duration=500)
-                    return fig
+                    return fig, new_loading_style
 
             return render(request, "swpm/fxo_scenario.html")
 

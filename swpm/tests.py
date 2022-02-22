@@ -138,7 +138,6 @@ class SwapTestCase(TestCase):
                                                  ccy=usd,
                                                  day_counter='Actual360')
         swap = Swap.objects.create()
-        print(swap)
         sch6m = Schedule.objects.create(start_date=d,
                                         end_date=md,
                                         freq="6M",
@@ -163,7 +162,9 @@ class SwapTestCase(TestCase):
         d = datetime.date(2021, 11, 18)
         mkt = MktDataSet(d)
         tr = Swap.objects.get(id=1)
-        tr.link_mktdataset(mkt)
-        tr.instrument(d)
-        eng = tr.make_pricing_engine()
-        npv = tr.npv()
+        leg = tr.legs.get(id=1)
+        leg.link_mktdataset(mkt)
+        leg_inst = leg.leg()
+        eng = leg.make_pricing_engine()
+        leg_inst.setPricingEngine(eng)
+        npv = leg.npv()
