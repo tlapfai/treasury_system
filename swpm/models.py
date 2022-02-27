@@ -111,7 +111,7 @@ def qlDate(d) -> ql.Date:
     elif isinstance(d, list):
         return [qlDate(dd) for dd in d]
     else:
-        return ql.DateParser.parseISO(d.isoformat())
+        return ql.DateParser.parseISO(d.strftime('%Y-%m-%d'))
 
 
 def str2date(s):
@@ -485,7 +485,7 @@ class RateIndex(models.Model):
 
 class RateIndexFixing(models.Model):
     value = models.FloatField()
-    index = models.ForeignKey(RateIndex, CASCADE, related_name="fixings")
+    index = ForeignKey(RateIndex, CASCADE, related_name="fixings")
     ref_date = models.DateField()
 
     class Meta:
@@ -499,7 +499,7 @@ class RateIndexFixing(models.Model):
 class FXVolatility(models.Model):
     """ use .quotes to get quotes """
     ref_date = models.DateField()
-    ccy_pair = models.ForeignKey(CcyPair, CASCADE, related_name='vol')
+    ccy_pair = ForeignKey(CcyPair, CASCADE, related_name='vol')
 
     class Meta:
         verbose_name_plural = "FX volatilities"
@@ -521,11 +521,11 @@ class FXVolatility(models.Model):
             for i, delta_type in enumerate(delta_types):
                 if not delta_type == ql.DeltaVolQuote.Spot:
                     stdDev = math.sqrt(self.t) * smile_section[i]
-                    calc = ql.BlackDeltaCalculator(ql.Option.Call, delta_type,
+                    calc = ql.BlackDeltaCalculator(ql.Option.Put, delta_type,
                                                    self.s0, self.rDcf,
                                                    self.qDcf, stdDev)
                     k = calc.strikeFromDelta(deltas[i])
-                    calc = ql.BlackDeltaCalculator(ql.Option.Call,
+                    calc = ql.BlackDeltaCalculator(ql.Option.Put,
                                                    ql.DeltaVolQuote.Spot,
                                                    self.s0, self.rDcf,
                                                    self.qDcf, stdDev)
@@ -535,7 +535,7 @@ class FXVolatility(models.Model):
             self.interp = ql.LinearInterpolation(deltas, smile_section)
 
         def __call__(self, v0):
-            optionType = ql.Option.Call
+            optionType = ql.Option.Put
             stdDev = math.sqrt(self.t) * v0
             calc = ql.BlackDeltaCalculator(optionType, self.delta_types,
                                            self.s0, self.rDcf, self.qDcf,
@@ -639,8 +639,7 @@ class FXVolatility(models.Model):
         return ql.BlackVolTermStructureHandle(vts)
 
     def surface_dataframe(self):
-        surf_vol, surf_delta, surf_delta_type, maturities = self.surface_matrix(
-        )
+        surf_vol, surf_delta, _, maturities = self.surface_matrix()
         smiles_temp = [
             pd.DataFrame([smile], columns=surf_delta[i], index=[maturities[i]])
             for i, smile in enumerate(surf_vol)
@@ -681,9 +680,11 @@ class FXVolatilityQuote(models.Model):
     maturity = models.DateField(null=True, blank=True)
 
     def save(self, *args, **kwargs):
-        self.maturity = (qlDate(self.ref_date) + ql.Period(self.tenor)).ISO()
-        if self.delta < 0:
-            self.delta = round(1.0 + self.delta, 8)
+        cal = self.surface.ccy_pair.calendar()
+        self.maturity = cal.advance(qlDate(self.ref_date),
+                                    ql.Period(self.tenor)).ISO()
+        if self.delta > 0:
+            self.delta = round(self.delta - 1.0, 8)
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -986,10 +987,17 @@ class FXO(Trade):
             self.inst = ql.VanillaOption(payoff, exercise)
         return self.inst
 
-    def make_process(self, vol_spread=None, q_spread=None, r_spread=None):
+    def make_process(self,
+                     spot_ptc_chg=None,
+                     vol_spread=None,
+                     q_spread=None,
+                     r_spread=None):
         if self.mktdataset:
             mkt = self.mktdataset.fxo_mkt_data(self.ccy_pair.name)
-            spot0 = mkt.get('spot').spot0_handle()
+            spot = mkt.get('spot')
+            if spot_ptc_chg:
+                spot.setQuote(spot.today_rate() * (spot_ptc_chg + 1.))
+            spot0 = spot.spot0_handle()
             ytsh = ql.YieldTermStructureHandle
             zsts = ql.ZeroSpreadedTermStructure
             qts = ytsh(mkt.get('qts'))
@@ -1024,32 +1032,42 @@ class FXO(Trade):
         return self.inst.NPV() * self.notional_1 * side
 
     def delta(self):
+        """ in ccy2 """
         side = 1. if self.buy_sell == "B" else -1.
         spot0 = self.mktdataset.get_fxspot(self.ccy_pair_id).today_rate()
-        if isinstance(self.inst, ql.DoubleBarrierOption):
-            return 0.
+        #if isinstance(self.inst, ql.DoubleBarrierOption):
+        #    return 0.
         return self.inst.delta() * self.notional_1 * side * spot0
 
     def gamma(self):
-        """ Delta sensitivity respect to 1% change of spot rate """
+        """ Delta sensitivity respect to 1% change of spot rate 
+         this Delta is in ccy2 """
         side = 1. if self.buy_sell == "B" else -1.
-        spot0 = self.mktdataset.get_fxspot(self.ccy_pair_id).today_rate()
+        spot_quote = self.mktdataset.get_fxspot(self.ccy_pair_id)
+        spot0 = spot_quote.today_rate()
         if isinstance(self.inst, ql.DoubleBarrierOption):
-            return 0.
-        return self.notional_1 * side * 0.01 * spot0 * spot0 * self.inst.gamma(
-        )
-
-    def vega(self):
-        side = 1. if self.buy_sell == "B" else -1.
-        if isinstance(self.inst, ql.DoubleBarrierOption):
-            return 0.
-        elif self.barrier or self.exercise_type == "AME":
-            npv = self.inst.NPV()
-            process = self.make_process(vol_spread=0.0001)
+            d0 = self.inst.delta()
+            process = self.make_process(spot_ptc_chg=0.001)
             eng = self.make_pricing_engine(process)
             inst1 = self.instrument()
             inst1.setPricingEngine(eng)
-            return side * self.notional_1 * (inst1.NPV() - npv) / 0.01
+            d1 = inst1.delta()
+            spot_quote.resetQuote()
+            return 0.01 * (d1 - d0) / (
+                spot0 * 0.001) * self.notional_1 * side * spot0 * spot0
+        gamma = self.inst.gamma()
+        return gamma * self.notional_1 * side * 0.01 * spot0 * spot0
+
+    def vega(self):
+        side = 1. if self.buy_sell == "B" else -1.
+        if isinstance(self.inst, ql.DoubleBarrierOption
+                      ) or self.barrier or self.exercise_type == "AME":
+            npv = self.inst.NPV()
+            process = self.make_process(vol_spread=0.01)
+            eng = self.make_pricing_engine(process)
+            inst1 = self.instrument()
+            inst1.setPricingEngine(eng)
+            return side * self.notional_1 * (inst1.NPV() - npv)
         elif self.exercise_type == "EUR":
             return self.inst.vega() * self.notional_1 * side * 0.01
 

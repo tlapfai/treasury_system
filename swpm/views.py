@@ -694,6 +694,7 @@ def fxo_scn(request):  # for API
                 return JsonResponse({'errors': fxo_form.errors}, status=500)
 
             data = mkt.fxo_mkt_data(tr.ccy_pair_id)
+            ccy1, ccy2 = tr.ccy_pair_id.split('/')
             s = data.get('spot')
             app = DjangoDash('scn_plot')
             dcc_radio = dcc.RadioItems(id='measure',
@@ -706,12 +707,34 @@ def fxo_scn(request):  # for API
                                            'label': 'Delta',
                                            'value': 'Delta'
                                        }, {
+                                           'label': 'Prm Delta',
+                                           'value': 'Prm Delta'
+                                       }, {
                                            'label': 'Gamma',
                                            'value': 'Gamma'
                                        }, {
                                            'label': 'Vega',
                                            'value': 'Vega'
                                        }])
+            dcc_unit = html.Div([
+                "Unit: ",
+                dcc.RadioItems(id='unit',
+                               className='form-check',
+                               value='Ccy2',
+                               options=[{
+                                   'label': ccy1,
+                                   'value': 'Ccy1'
+                               }, {
+                                   'label': ccy2,
+                                   'value': 'Ccy2'
+                               }, {
+                                   'label': ccy1 + "%",
+                                   'value': 'Ccy1%'
+                               }, {
+                                   'label': ccy2 + "%",
+                                   'value': 'Ccy2%'
+                               }])
+            ])
             dcc_lower_bound = dcc.Input(id="low-bound",
                                         type="number",
                                         value=s.rate * 0.95)
@@ -728,7 +751,7 @@ def fxo_scn(request):  # for API
                             style={"width": "auto"}),
                 html.Div(id='scn-control',
                          children=[
-                             dcc_radio, "Range: ", dcc_lower_bound,
+                             dcc_radio, dcc_unit, "Range: ", dcc_lower_bound,
                              dcc_upper_bound
                          ],
                          style={"textAlign": "center"})
@@ -737,9 +760,26 @@ def fxo_scn(request):  # for API
             @app.callback([
                 Output('scn-graph', 'figure'),
                 Output('loading', 'parent_style')
-            ], Input('measure', 'value'), Input('low-bound', 'value'),
+            ], Input('measure', 'value'), Input('unit', 'value'),
+                          Input('low-bound', 'value'),
                           Input('up-bound', 'value'))
-            def update_figure(measure, low, up):
+            def update_figure(measure, unit, low, up):
+
+                def prmDelta():
+                    return tr.delta() - tr.NPV()
+
+                def inCcy2(x, s):
+                    return x
+
+                def inCcy2Pct(x, s):
+                    return x / tr.notional_2
+
+                def inCcy1(x, s):
+                    return x / s
+
+                def inCcy1Pct(x, s):
+                    return x / s / tr.notional_1
+
                 new_loading_style = loading_style
                 if low and up:
                     x_data = np.linspace(low, up, 51)
@@ -748,15 +788,23 @@ def fxo_scn(request):  # for API
                     measure_dict = {
                         'NPV': tr.NPV,
                         'Delta': tr.delta,
+                        'Prm Delta': prmDelta,
                         'Gamma': tr.gamma,
                         'Vega': tr.vega
                     }
                     fun = measure_dict.get(measure)
+                    unit_dict = {
+                        'Ccy1': inCcy1,
+                        'Ccy2': inCcy2,
+                        'Ccy1%': inCcy1Pct,
+                        'Ccy2%': inCcy2Pct,
+                    }
+                    unit_fun = unit_dict.get(unit)
 
                     for x in x_data:
                         s.setQuote(x)
                         tr.self_inst()
-                        y_data.append(fun())
+                        y_data.append(unit_fun(fun(), x))
                     s.resetQuote()
                     fig = px.line(x=x_data,
                                   y=y_data,

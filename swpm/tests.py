@@ -142,7 +142,6 @@ class SwapTestCase(TestCase):
                                         end_date=md,
                                         freq="6M",
                                         calendar=unitedstates)
-        print(sch6m.schedule().calendar())
         leg_fix = SwapLeg.objects.create(trade=swap,
                                          pay_rec=1,
                                          ccy=usd,
@@ -159,11 +158,50 @@ class SwapTestCase(TestCase):
                                           notional=1000000)
 
     def test_npv(self):
+
         d = datetime.date(2021, 11, 18)
         mkt = MktDataSet(d)
         tr = Swap.objects.get(id=1)
         tr.link_mktdataset(mkt)
-        leg_inst = leg.leg()
-        eng = leg.make_pricing_engine()
-        leg_inst.setPricingEngine(eng)
-        npv = leg.npv()
+
+        ql.Settings.instance().evaluationDate = qlDate(d)
+        yts = mkt.get_yts('USD', 'OIS')
+        ytseur = ql.FlatForward(qlDate(d),
+                                ql.QuoteHandle(ql.SimpleQuote(0.05)),
+                                ql.Actual360(), ql.Compounded, ql.Annual)
+        engine = ql.DiscountingSwapEngine(ql.YieldTermStructureHandle(yts))
+
+        tenor = ql.Period('1Y')
+        usdlibor = ql.USDLibor(ql.Period('3M'),
+                               ql.YieldTermStructureHandle(yts))
+        usdlibor.addFixing(ql.Date(18, 11, 2021), 0.01)
+        euribor = ql.Euribor(ql.Period('3M'),
+                             ql.YieldTermStructureHandle(ytseur))
+        euribor.addFixing(ql.Date(18, 11, 2021), 0.05)
+        fixedRate = 0.05
+        forwardStart = ql.Period("2D")
+
+        # irs = ql.MakeVanillaSwap(tenor,
+        #                          usdlibor,
+        #                          fixedRate,
+        #                          forwardStart,
+        #                          Nominal=1e6,
+        #                          swapType=ql.VanillaSwap.Payer)
+        notional = 1e6
+        sch = ql.MakeSchedule(qlDate(d) + ql.Period('2D'),
+                              terminationDate=qlDate(d) + ql.Period('1Y'),
+                              frequency=ql.Quarterly,
+                              rule=ql.ModifiedFollowing,
+                              calendar=ql.UnitedStates())
+        irs = ql.FloatFloatSwap(ql.VanillaSwap.Payer,
+                                [notional] * (len(sch) - 1),
+                                [notional * 1.12] * (len(sch) - 1), sch,
+                                usdlibor, ql.Actual360(), sch, euribor,
+                                ql.Actual360(), False, False)
+        irs.setPricingEngine(engine)
+        print(f'NPV={irs.NPV():.2f}')
+
+        #leg_inst = leg.leg()
+        #eng = leg.make_pricing_engine()
+        #leg_inst.setPricingEngine(eng)
+        #npv = leg.npv()

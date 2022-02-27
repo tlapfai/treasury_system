@@ -71,7 +71,7 @@ class FXOUpperBarrierDetailForm(ModelForm):
 
     class Meta:
         model = FXOUpperBarrierDetail
-        fields = ['effect', 'barrier', 'rebate', 'rebate_ccy']
+        fields = ['effect', 'barrier', 'knock', 'rebate', 'rebate_ccy']
         widgets = {
             'barrier': TextInput(attrs=number_attrs),
             'barrier_start': DateInput(attrs=date_attrs),
@@ -95,7 +95,7 @@ class FXOLowerBarrierDetailForm(ModelForm):
 
     class Meta:
         model = FXOLowerBarrierDetail
-        fields = ['effect', 'barrier', 'rebate', 'rebate_ccy']
+        fields = ['effect', 'barrier', 'knock', 'rebate', 'rebate_ccy']
         widgets = {
             'barrier': TextInput(attrs=number_attrs),
             'barrier_start': DateInput(attrs=date_attrs),
