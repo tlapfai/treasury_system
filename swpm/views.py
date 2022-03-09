@@ -715,7 +715,8 @@ def fxo_scn(request):  # for API
                                        }, {
                                            'label': 'Vega',
                                            'value': 'Vega'
-                                       }])
+                                       }],
+                                       style={"display": "inline"})
             dcc_unit = html.Div([
                 "Unit: ",
                 dcc.RadioItems(id='unit',
@@ -733,7 +734,8 @@ def fxo_scn(request):  # for API
                                }, {
                                    'label': ccy2 + "%",
                                    'value': 'Ccy2%'
-                               }])
+                               }],
+                               style={"display": "inline"})
             ])
             dcc_lower_bound = dcc.Input(id="low-bound",
                                         type="number",
@@ -1114,25 +1116,37 @@ def handle_uploaded_file(f=None, text=None):
             arg_upd = {}
             try:
                 ccy_pair_ = CcyPair.objects.get(name=row['Ccy Pair'])
-                fxv, created_ = FXVolatility.objects.update_or_create(
+                fxv, fxv_created = FXVolatility.objects.update_or_create(
                     ref_date=str2date(row['Date']), ccy_pair=ccy_pair_)
-                if created_:
+                if fxv_created:
                     msg.append(
-                        f'{fxv.ccy_pair.name} ({fxv.ref_date}) FXVolatility created.'
+                        f'{fxv.ccy_pair.name} ({fxv.ref_date.date().isoformat()}) FXVolatility created.'
                     )
-                v, v_created = FXVolatilityQuote.objects.update_or_create(
-                    ref_date=str2date(row['Date']),
-                    tenor=row['Tenor'],
-                    delta=float(row['Delta']),
-                    defaults={
-                        'delta_type': row['Delta Type'],
-                        'value': float(row['Volatility']),
-                        'surface': fxv
-                    })
+                if row['Delta'] == 'ATM':
+                    vq, vq_created = FXVolatilityQuote.objects.update_or_create(
+                        ref_date=str2date(row['Date']),
+                        tenor=row['Tenor'],
+                        is_atm=True,
+                        surface=fxv,
+                        defaults={
+                            'atm_type': row['Delta Type'],
+                            'value': float(row['Volatility']),
+                        })
+                else:
+                    vq, vq_created = FXVolatilityQuote.objects.update_or_create(
+                        ref_date=str2date(row['Date']),
+                        tenor=row['Tenor'],
+                        delta=float(row['Delta']),
+                        surface=fxv,
+                        defaults={
+                            'delta_type': row['Delta Type'],
+                            'value': float(row['Volatility']),
+                            'is_atm': False,
+                        })
             except KeyError as e:
                 msg.append(str(e))
             else:
-                msg.append(f'{str(v)} is created.')
+                msg.append(f'{str(vq)} is created.')
     else:
         msg = ['Header is wrong']
     return msg

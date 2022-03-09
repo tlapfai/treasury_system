@@ -73,6 +73,15 @@ QL_DELTA_TYPE = {
     'Fwd': ql.DeltaVolQuote.Fwd
 }
 
+CHOICE_ATM_TYPE = models.TextChoices('ATM_TYPE',
+                                     ['Spot', 'Fwd', 'DeltaNeutral'])
+
+QL_ATM_TYPE = {
+    'Spot': ql.DeltaVolQuote.AtmSpot,
+    'Fwd': ql.DeltaVolQuote.AtmFwd,
+    'DeltaNeutral': ql.DeltaVolQuote.AtmDeltaNeutral,
+}
+
 # https://docs.djangoproject.com/en/3.2/ref/models/fields/#enumeration-types
 
 QL_CALENDAR = {
@@ -507,8 +516,25 @@ class FXVolatility(models.Model):
 
     class TargetFun:
 
+        def toSpotDelta(self, vol, delta, delta_type):
+            if delta_type == ql.DeltaVolQuote.Spot:
+                return delta
+            else:
+                sd = math.sqrt(self.t) * vol
+                put = ql.Option.Put
+                calc = ql.BlackDeltaCalculator(put, self.delta_type, self.s0,
+                                               self.rDcf, self.qDcf, sd)
+                k = calc.strikeFromDelta(delta)
+                calc = ql.BlackDeltaCalculator(put, ql.DeltaVolQuote.Spot,
+                                               self.s0, self.rDcf, self.qDcf,
+                                               sd)
+                return calc.deltaFromStrike(k)
+
         def __init__(self, ref_date, spot, rdf, qdf, strike, maturity, deltas,
-                     delta_types, smile_section):
+                     delta_type, atm_vol, atm_type, smile_section):
+            """ 
+            delta_type is same along the smile
+            """
             self.ref_date = ref_date
             self.strike = strike
             self.maturity = qlDate(maturity)
@@ -517,32 +543,36 @@ class FXVolatility(models.Model):
             self.qDcf = qdf
             self.t = ql.Actual365Fixed().yearFraction(qlDate(self.ref_date),
                                                       self.maturity)
+            self.deltas = []
+            self.smile = smile_section.copy()
+            self.delta_type = ql.DeltaVolQuote.Spot
 
-            for i, delta_type in enumerate(delta_types):
-                if not delta_type == ql.DeltaVolQuote.Spot:
-                    stdDev = math.sqrt(self.t) * smile_section[i]
-                    calc = ql.BlackDeltaCalculator(ql.Option.Put, delta_type,
-                                                   self.s0, self.rDcf,
-                                                   self.qDcf, stdDev)
-                    k = calc.strikeFromDelta(deltas[i])
-                    calc = ql.BlackDeltaCalculator(ql.Option.Put,
-                                                   ql.DeltaVolQuote.Spot,
-                                                   self.s0, self.rDcf,
-                                                   self.qDcf, stdDev)
-                    deltas[i] = calc.deltaFromStrike(k)
+            for ss, delta in zip(smile_section, deltas):
+                self.deltas.append(self.toSpotDelta(ss, delta, delta_type))
 
-            self.delta_types = ql.DeltaVolQuote.Spot
-            self.interp = ql.LinearInterpolation(deltas, smile_section)
+            sd = math.sqrt(self.t) * atm_vol
+            calc = ql.BlackDeltaCalculator(ql.Option.Put, delta_type, spot,
+                                           rdf, qdf, sd)
+            atm_k = calc.atmStrike(atm_type)
+            calc = ql.BlackDeltaCalculator(ql.Option.Put,
+                                           ql.DeltaVolQuote.Spot, spot, rdf,
+                                           qdf, sd)
+            self.smile.insert(2, atm_vol)
+            self.deltas.insert(2, calc.deltaFromStrike(atm_k))
+            self.interp = ql.LinearInterpolation(self.deltas, self.smile)
 
         def __call__(self, v0):
-            optionType = ql.Option.Put
-            stdDev = math.sqrt(self.t) * v0
-            calc = ql.BlackDeltaCalculator(optionType, self.delta_types,
-                                           self.s0, self.rDcf, self.qDcf,
-                                           stdDev)
+            opt_type = ql.Option.Put
+            sd = math.sqrt(self.t) * v0
+            calc = ql.BlackDeltaCalculator(opt_type, self.delta_type, self.s0,
+                                           self.rDcf, self.qDcf, sd)
             d = calc.deltaFromStrike(self.strike)
             v = self.interp(d, allowExtrapolation=True)
-            return (v - v0)
+            if abs(v - v0) > 1e-8:
+                return self.__call__(v)
+            else:
+                return v
+            #return (v - v0)
 
     def __init__(self, *args, **kwargs) -> None:
         self.rts = None
@@ -554,28 +584,29 @@ class FXVolatility(models.Model):
         return f"{self.ccy_pair} as of {self.ref_date}"
 
     def surface_matrix(self):
-        #obj = cache.get(f'{self.ref_date}-{self.ccy_pair}', None)
-        #if not obj:
         maturities = []
-        surf_vol = []
-        surf_delta = []
-        surf_delta_type = []
+        vol = []
+        delta, delta_type = [], []
+        atm_vols, atm_types = [], []
         prev_t = None  # datetime.date
         row = -1
-        for q in self.quotes.all().order_by('maturity', 'delta'):
+        for q in self.quotes.exclude(is_atm=True).order_by(
+                'maturity', 'delta'):
             if q.maturity == prev_t:
-                surf_vol[row].append(q.value)
-                surf_delta[row].append(q.delta)
-                surf_delta_type[row].append(QL_DELTA_TYPE[q.delta_type])
+                vol[row].append(q.value)
+                delta[row].append(q.delta)
+                delta_type[row].append(QL_DELTA_TYPE[q.delta_type])
             else:
-                surf_vol.append([q.value])
-                surf_delta.append([q.delta])
-                surf_delta_type.append([QL_DELTA_TYPE[q.delta_type]])
+                vol.append([q.value])
+                delta.append([q.delta])
+                delta_type.append([QL_DELTA_TYPE[q.delta_type]])
                 maturities.append(q.maturity)
                 row += 1
             prev_t = q.maturity
-        obj = surf_vol, surf_delta, surf_delta_type, maturities
-        #cache.set(f'{self.ref_date}-{self.ccy_pair}', obj)
+        for q in self.quotes.filter(is_atm=True).order_by('maturity'):
+            atm_vols.append(q.value)
+            atm_types.append(QL_ATM_TYPE[q.atm_type])
+        obj = vol, delta, delta_type, atm_vols, atm_types, maturities
         return obj
 
     def set_yts(self, rts, qts):
@@ -589,14 +620,14 @@ class FXVolatility(models.Model):
 
     def handle(self, strike, spread=None):
 
-        surf_vol, surf_delta, surf_delta_type, maturities = self.surface_matrix(
+        volx, deltax, delta_typex, atm_vols, atm_types, mats = self.surface_matrix(
         )
 
         if self.mktdataset == None:
             self.mktdataset = MktDataSet(self.ref_date)
 
         solver = ql.Brent()
-        accuracy = 1e-12
+        accuracy = 1e-8
         step = 1e-6
         volatilities = []
         """if kwargs.get('maturity'):
@@ -613,7 +644,7 @@ class FXVolatility(models.Model):
             self.spot = self.mktdataset.get_fxspot(self.ccy_pair.name)
         s0 = self.spot.today_rate()
 
-        if self.rts == None:  # yts is the slowest part
+        if self.rts == None:
             ccy = self.ccy_pair.quote_ccy.code
             cvname = self.mktdataset.get_fxyts_name(ccy)
             self.rts = self.mktdataset.get_yts(ccy, cvname)
@@ -624,71 +655,66 @@ class FXVolatility(models.Model):
 
         spread = spread if spread else 0.
 
-        for i, smile in enumerate(surf_vol):
-            mat = qlDate(maturities[i])
+        for i, smile in enumerate(volx):
+            mat = qlDate(mats[i])
             target = self.TargetFun(self.ref_date, s0, self.rts.discount(mat),
-                                    self.qts.discount(mat), strike,
-                                    maturities[i], surf_delta[i],
-                                    surf_delta_type[i],
+                                    self.qts.discount(mat), strike, mats[i],
+                                    deltax[i], delta_typex[i][0], atm_vols[i],
+                                    atm_types[i],
                                     [sm + spread for sm in smile])
-            guess = smile[2]
-            volatilities.append(solver.solve(target, accuracy, guess, step))
-        vts = ql.BlackVarianceCurve(qlDate(self.ref_date), qlDate(maturities),
+            guess = atm_vols[i]
+            volatilities.append(target(guess))
+            #volatilities.append(solver.solve(target, accuracy, guess, step))
+        print(volatilities)
+        vts = ql.BlackVarianceCurve(qlDate(self.ref_date), qlDate(mats),
                                     volatilities, ql.Actual365Fixed(), False)
         vts.enableExtrapolation()
         return ql.BlackVolTermStructureHandle(vts)
 
     def surface_dataframe(self):
-        surf_vol, surf_delta, _, maturities = self.surface_matrix()
+        volx, deltax, _, atm_vols, atm_types, maturities = self.surface_matrix(
+        )
         smiles_temp = [
-            pd.DataFrame([smile], columns=surf_delta[i], index=[maturities[i]])
-            for i, smile in enumerate(surf_vol)
+            pd.DataFrame([smile], columns=deltax[i], index=[maturities[i]])
+            for i, smile in enumerate(volx)
         ]
         return pd.concat(smiles_temp)
-
-
-""" class FXVolatilitySmile(models.Model):
-    CHOICE_ATM_TYPE = models.TextChoices(
-        'ATM_TYPE', ['Spot', 'Fwd', 'PaSpot', 'PaFwd'])
-    tenor = models.CharField(max_length=6)
-    fx_volatility = models.ForeignKey(
-        FXVolatility, CASCADE, related_name='smiles')
-    delta_type = models.CharField(max_length=6, choices=CHOICE_ATM_TYPE)
-    atm_type = models.CharField(max_length=20, choices=[
-                                'AtmNull', 'AtmSpot', 'AtmFwd', 'AtmDeltaNeutral'])
-
-    def __str__(self):
-        return f"{self.fx_volatility.ccy_pair} {self.tenor} smile"
-
-    def ql_period(self):
-        return ql.Period(self.tenor)
-
-    def ql_delta_vol_quote(self):
-        return ql.DeltaVolQuote() """
 
 
 class FXVolatilityQuote(models.Model):
     ref_date = models.DateField()
     tenor = models.CharField(max_length=6)
-    delta = models.FloatField(
-        error_messages={'required': 'Delta value is required.'})
+    delta = models.FloatField(null=True, blank=True)
     value = models.FloatField(validators=[validate_positive])
     surface = models.ForeignKey(FXVolatility, CASCADE, related_name='quotes')
     delta_type = models.CharField(choices=CHOICE_DELTA_TYPE.choices,
                                   max_length=8,
-                                  null=True)
+                                  null=True,
+                                  blank=True)
     maturity = models.DateField(null=True, blank=True)
+    is_atm = models.BooleanField(default=True)
+    atm_type = models.CharField(choices=CHOICE_ATM_TYPE.choices,
+                                max_length=12,
+                                null=True, blank=True)
 
     def save(self, *args, **kwargs):
         cal = self.surface.ccy_pair.calendar()
         self.maturity = cal.advance(qlDate(self.ref_date),
                                     ql.Period(self.tenor)).ISO()
-        if self.delta > 0:
-            self.delta = round(self.delta - 1.0, 8)
+        if self.is_atm:
+            self.delta = None
+            self.delta_type = None
+        else:
+            self.atm_type = None
+            if self.delta > 0:
+                self.delta = round(self.delta - 1.0, 8)
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.ref_date}, {self.tenor}, {self.delta}'
+        if self.is_atm:
+            return f'{self.ref_date.isoformat()}, {self.tenor}, ATM, {self.atm_type}'
+        else:
+            return f'{self.ref_date.isoformat()}, {self.tenor}, {self.delta}, {self.delta_type}'
 
 
 class FXOManager(models.Manager):
@@ -1115,6 +1141,7 @@ class FXO(Trade):
 #    pass
 
 
+@with_mktdataset
 class VanillaSwap(Trade):
     # objects = SwapManager()
     product_type = models.CharField(max_length=12, default="SWAP")
@@ -1127,6 +1154,17 @@ class VanillaSwap(Trade):
 
     def __str__(self):
         return f"SWAP ID: {self.id}"
+
+    def instrument(self):
+        self.inst = ql.MakeVanillaSwap()
+        return self.inst
+
+    def make_pricing_engine(self):
+        return ql.DiscountingSwapEngine()
+
+    def self_inst(self) -> None:
+        self.inst = self.instrument()
+        self.inst.setPricingEngine(self.make_pricing_engine())
 
 
 @with_mktdataset

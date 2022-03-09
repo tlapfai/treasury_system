@@ -34,14 +34,7 @@ class CcyPairAdmin(admin.ModelAdmin):
 
 
 class FXVolatilityQuoteAdmin(admin.ModelAdmin):
-    all_fields = [
-        'ref_date', 'tenor', 'delta', 'delta_type', 'value', 'surface',
-        'maturity'
-    ]
-    fields = ('ref_date', 'tenor', 'delta', 'delta_type', 'value', 'surface',
-              'maturity')
-    list_display = all_fields
-    ordering = all_fields
+    search_fields = ['ref_date']
 
 
 class IRTermStructureAdmin(admin.ModelAdmin):
