@@ -9,7 +9,7 @@ from django.db.models import query_utils
 from django.db.models.base import Model
 from django.db.models.deletion import CASCADE, DO_NOTHING, SET_NULL, SET_DEFAULT
 from django.db.models.fields.related import ForeignKey
-from django.db.models.fields import DecimalField
+from django.db.models.fields import DecimalField, CharField
 from django.utils import timezone
 from django.utils.translation import gettext as _
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
@@ -148,18 +148,17 @@ class Calendar(models.Model):
 
 
 class Ccy(models.Model):
-    code = models.CharField(max_length=3, blank=False, primary_key=True)
+    code = CharField(max_length=3, blank=False, primary_key=True)
     fixing_days = models.PositiveIntegerField(default=2)
-    cal = models.ForeignKey(Calendar, DO_NOTHING, null=True)
-    risk_free_curve = models.CharField(max_length=16, blank=True,
+    cal = ForeignKey(Calendar, DO_NOTHING, null=True)
+    risk_free_curve = CharField(max_length=16, blank=True,
+                                null=True)  # free text
+    foreign_exchange_curve = CharField(max_length=16, blank=True,
                                        null=True)  # free text
-    foreign_exchange_curve = models.CharField(max_length=16,
-                                              blank=True,
-                                              null=True)  # free text
-    rate_day_counter = models.CharField(max_length=24,
-                                        blank=True,
-                                        null=True,
-                                        default=None)  # free text
+    rate_day_counter = CharField(max_length=24,
+                                 blank=True,
+                                 null=True,
+                                 default=None)  # free text
 
     def __str__(self):
         return self.code
@@ -174,12 +173,9 @@ class Ccy(models.Model):
 class CcyPair(models.Model):
     """ .quotes to get FxSpotRateQuote """
     name = models.CharField(max_length=7, primary_key=True)
-    base_ccy = models.ForeignKey(Ccy, CASCADE, related_name="as_base_ccy")
-    quote_ccy = models.ForeignKey(Ccy, CASCADE, related_name="as_quote_ccy")
-    cal = models.ForeignKey(Calendar,
-                            SET_NULL,
-                            related_name="ccy_pairs",
-                            null=True)
+    base_ccy = ForeignKey(Ccy, CASCADE, related_name="as_base_ccy")
+    quote_ccy = ForeignKey(Ccy, CASCADE, related_name="as_quote_ccy")
+    cal = ForeignKey(Calendar, SET_NULL, related_name="ccy_pairs", null=True)
     fixing_days = models.PositiveIntegerField(default=2)
 
     def check_order():
@@ -334,6 +330,8 @@ class InterestRateQuote(models.Model):
             if self.tenor[:2] == 'ED':
                 return ql.FuturesRateHelper(q, ql.IMM.date(self.tenor[2:4]),
                                             ql.USDLibor(ql.Period('3M'))), q
+        elif self.instrument == "SOFRFUT":
+            return ql.SofrFutureRateHelper(), q
         elif self.instrument == "SWAP":
             if self.ccy.code == "USD":  # https://quant.stackexchange.com/questions/32345/quantlib-python-dual-curve-bootstrapping-example
                 swapIndex = ql.UsdLiborSwapIsdaFixAm(tenor_)
@@ -572,7 +570,6 @@ class FXVolatility(models.Model):
                 return self.__call__(v)
             else:
                 return v
-            #return (v - v0)
 
     def __init__(self, *args, **kwargs) -> None:
         self.rts = None
@@ -583,9 +580,24 @@ class FXVolatility(models.Model):
     def __str__(self):
         return f"{self.ccy_pair} as of {self.ref_date}"
 
+    def vol_dict(self):
+        vols = list()
+        for q in self.quotes.filter(is_atm=True).order_by('maturity'):
+            vols.append({'tenor': q.tenor, 'atm': q.value * 100})
+        for q in self.quotes.exclude(is_atm=True):
+            for v in vols:
+                if v['tenor'] == q.tenor:
+                    v[str(q.delta * -1)] = q.value * 100
+        return vols
+
+    def type_dict(self):
+        x = self.quotes.filter(is_atm=True).first()
+        y = self.quotes.filter(is_atm=False).first()
+        return x.atm_type, y.delta_type
+
     def surface_matrix(self):
         maturities = []
-        vol = []
+        volx = []
         delta, delta_type = [], []
         atm_vols, atm_types = [], []
         prev_t = None  # datetime.date
@@ -593,12 +605,12 @@ class FXVolatility(models.Model):
         for q in self.quotes.exclude(is_atm=True).order_by(
                 'maturity', 'delta'):
             if q.maturity == prev_t:
-                vol[row].append(q.value)
-                delta[row].append(q.delta)
+                volx[row].append(q.value)
+                delta[row].append(q.delta * 0.01)
                 delta_type[row].append(QL_DELTA_TYPE[q.delta_type])
             else:
-                vol.append([q.value])
-                delta.append([q.delta])
+                volx.append([q.value])
+                delta.append([q.delta * 0.01])
                 delta_type.append([QL_DELTA_TYPE[q.delta_type]])
                 maturities.append(q.maturity)
                 row += 1
@@ -606,7 +618,7 @@ class FXVolatility(models.Model):
         for q in self.quotes.filter(is_atm=True).order_by('maturity'):
             atm_vols.append(q.value)
             atm_types.append(QL_ATM_TYPE[q.atm_type])
-        obj = vol, delta, delta_type, atm_vols, atm_types, maturities
+        obj = volx, delta, delta_type, atm_vols, atm_types, maturities
         return obj
 
     def set_yts(self, rts, qts):
@@ -626,11 +638,11 @@ class FXVolatility(models.Model):
         if self.mktdataset == None:
             self.mktdataset = MktDataSet(self.ref_date)
 
-        solver = ql.Brent()
+        volatilities = []
+        """solver = ql.Brent()
         accuracy = 1e-8
         step = 1e-6
-        volatilities = []
-        """if kwargs.get('maturity'):
+        if kwargs.get('maturity'):
             mat = kwargs.get('maturity')
             ii = []
             ii.append(max([j for j, m in maturities if m <= qlDate(mat)]))
@@ -665,7 +677,7 @@ class FXVolatility(models.Model):
             guess = atm_vols[i]
             volatilities.append(target(guess))
             #volatilities.append(solver.solve(target, accuracy, guess, step))
-        print(volatilities)
+        #print(volatilities)
         vts = ql.BlackVarianceCurve(qlDate(self.ref_date), qlDate(mats),
                                     volatilities, ql.Actual365Fixed(), False)
         vts.enableExtrapolation()
@@ -684,7 +696,7 @@ class FXVolatility(models.Model):
 class FXVolatilityQuote(models.Model):
     ref_date = models.DateField()
     tenor = models.CharField(max_length=6)
-    delta = models.FloatField(null=True, blank=True)
+    delta = models.IntegerField(null=True, blank=True)
     value = models.FloatField(validators=[validate_positive])
     surface = models.ForeignKey(FXVolatility, CASCADE, related_name='quotes')
     delta_type = models.CharField(choices=CHOICE_DELTA_TYPE.choices,
@@ -695,26 +707,28 @@ class FXVolatilityQuote(models.Model):
     is_atm = models.BooleanField(default=True)
     atm_type = models.CharField(choices=CHOICE_ATM_TYPE.choices,
                                 max_length=12,
-                                null=True, blank=True)
+                                null=True,
+                                blank=True)
 
     def save(self, *args, **kwargs):
         cal = self.surface.ccy_pair.calendar()
         self.maturity = cal.advance(qlDate(self.ref_date),
                                     ql.Period(self.tenor)).ISO()
+        self.tenor = self.tenor.upper()
         if self.is_atm:
             self.delta = None
             self.delta_type = None
         else:
             self.atm_type = None
             if self.delta > 0:
-                self.delta = round(self.delta - 1.0, 8)
+                self.delta = round(self.delta - 100)
         super().save(*args, **kwargs)
 
     def __str__(self):
         if self.is_atm:
-            return f'{self.ref_date.isoformat()}, {self.tenor}, ATM, {self.atm_type}'
+            return f'{self.surface}, {self.tenor}, ATM, {self.atm_type}'
         else:
-            return f'{self.ref_date.isoformat()}, {self.tenor}, {self.delta}, {self.delta_type}'
+            return f'{self.surface}, {self.tenor}, {self.delta}, {self.delta_type}'
 
 
 class FXOManager(models.Manager):

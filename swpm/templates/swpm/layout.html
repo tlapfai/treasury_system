@@ -8,25 +8,9 @@
   <title>{% block title %}Treasury System{% endblock %}</title>
 
   <link href="{% static 'swpm/styles.css' %}" rel="stylesheet" />
-  <style>
-    @media (max-width: 1024px) {
-      body {
-	      margin: 0;
-        padding: 0;
-      }
-    }
-    li.nav-item {
-      width: auto;
-    }
-    a.nav-link {
-      text-align: center;
-    }
-  </style>
-
   <!-- IN SITE JS -->
   <script src="{% static 'swpm/jquery-3.6.0.slim.min.js' %}"></script>
   <script src="{% static 'swpm/jquery.cookie.js' %}"></script>
-  <script src="{% static 'swpm/trade.js' %}"></script>
   <!-- IN SITE JS -->
   <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
 
@@ -46,8 +30,8 @@
 </head>
 
 <body>
-  <!-- https://getbootstrap.com/docs/5.1/components/navbar/ -->
-  <div class="container-fluid">
+
+  <div class="pg-head container-lg">
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark" style="padding: 10px">
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
         aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
@@ -118,7 +102,7 @@
                 <a class="dropdown-item" href="{% url 'yield_curve_search' %}">Interest Rate</a>
               </li>
               <div class="dropdown-divider"></div>
-              <li><a class="dropdown-item" href="#">FX Volatility</a></li>
+              <li><a class="dropdown-item" href="{% url 'mkt_fxv' %}">FX Volatility</a></li>
               <li>
                 <a class="dropdown-item" href="#">Interest Rate Volatility</a>
               </li>
@@ -232,11 +216,11 @@
     </nav>
   </div>
 
-  {% block body %} 
-  {% endblock %}
-  <!-- <div class="full-screen" style="display: none">
-			<div class="loader"></div>
-		</div> -->
+  <div class="pg-body container-lg">
+    {% block body %} 
+    {% endblock %}
+  </div>
+
 </body>
 {% plotly_footer %}
 {% block footer %}

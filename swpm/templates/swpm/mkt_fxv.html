@@ -1,0 +1,41 @@
+{% extends "swpm/layout.html" %}
+{% load static %}
+{% load humanize %} 
+{% debug %} 
+{% block body %}
+
+<div class="selection-area" style="padding: 1em;">
+  <form action="{% url 'mkt_fxv' %}" method="GET">
+    <label for="date">Date: </label>
+    {% if date %}
+      <input type="date" id="date" name="date" value='{{ date }}'/>
+    {% else %}
+      <input type="date" id="date" name="date"/>
+    {% endif %}
+    <label for="ccy_pair">Currency Pair: </label>
+    {% if ccy_pair %}
+      <input type="text" id="ccy_pair" name="ccy_pair" value='{{ ccy_pair }}'/>
+    {% else %}
+      <input type="text" id="ccy_pair" name="ccy_pair"/>
+    {% endif %}
+    <input type="submit" value="Choose"/>
+  </form>
+</div>
+<div class="data-area" style="padding: 1em;">
+  <div>
+    {{ fxv_setting.as_p }}
+  </div>
+  <div class="fxv-table">
+  </div>
+  <input type="button" id="save" value="Save"/>
+</div>
+<div class="message-area" style="padding: 1em;"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.js"></script>
+<link rel="stylesheet" media="screen" href="http://handsontable.com/dist/jquery.handsontable.full.css">
+<script src="{% static 'swpm/fxv.js' %}"></script>
+
+{% endblock %}
+
+{% block script %}
+{% endblock %}

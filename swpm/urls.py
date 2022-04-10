@@ -13,8 +13,8 @@ urlpatterns = [
     path("logout", views.logout_view, name="logout"),
     path("register", views.register, name="register"),
     path('new_trade', views.new_trade),
-    path('pricing', views.pricing, name='pricing'),
-    path('pricing/do', views.pricing, {'commit': True}, name='pricing-do'),
+    #path('pricing', views.pricing, name='pricing'),
+    #path('pricing/do', views.pricing, {'commit': True}, name='pricing-do'),
     path('ccypair', views.save_ccypair, name='ccypair'),
     path('trade_list', views.trade_list, name='trade_list'),
     path('calendar', views.CalendarList.as_view(), name='calendar'),
@@ -25,13 +25,18 @@ urlpatterns = [
     path('fxodetail', views.fxo_detail, name='fxodetail'),
     path('trade/fxo/create', views.FXOView.as_view(), name='fxo_create'),
     path('trade/fxo/<int:id>', views.FXOView.as_view(), name='fxo_update'),
-    path('trade/fxo/price', views.fxo_price, name='fxo_price'),  # api
+    path('api/trade/fxo/price', views.fxo_price, name='fxo_price'),  # api
     path('trade/fxo/scn', views.fxo_scn, name='fxo_scn'),
+    path('mkt/fxv', views.FXVolView.as_view(), name='mkt_fxv'),
+    re_path(r'^mkt/fxv/(?P<ccy_pair>[A-Z]+)/(?P<date>\d{4}-\d{2}-\d{2})$',
+            views.FXVolView.as_view(),
+            name='mkt_fxv_get'),
+    re_path(
+        r'^api/mkt/fxv/atm/(?P<ccy_pair>[A-Z]+)/(?P<date>\d{4}-\d{2}-\d{2})$',
+        views.api_fxv),
+    path('api/mkt/fxv', views.api_fxv),
     path('load_fxo_mkt', views.load_fxo_mkt, name='load_fxo_mkt'),  # api
-    path('tenor2date', views.tenor2date, name='tenor2date'),  # api
-    path('fx_volatility_table',
-         views.fx_volatility_table,
-         name='fx_volatility_table'),  # api
+    path('api/tenor2date', views.tenor2date, name='tenor2date'),  # api
     path('yield_curve/search', views.yield_curve, name='yield_curve_search'),
     #re_path(r'^yield_curve/(?P<curve>[-\w\s]+)/(?P<ref_date>\d{4}-\d{2}-\d{2})$', views.yield_curve, name='yield_curve'),
     # \s is for whitespace
@@ -45,9 +50,6 @@ urlpatterns = [
          views.market_data_import,
          name='market_data_import'),
     path('load_market_data', views.load_market_data, name='load_market_data'),
-    #path('tenor2date', views.tenor2date, name='tenor2date'),
     re_path(r'api/', include(router.urls)),
-    path('api-auth/', include('rest_framework.urls',
-                              namespace='rest_framework')),
     path('fxo_price', views.fxo_price, name='fxo_price'),
 ]

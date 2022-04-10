@@ -17,8 +17,42 @@ legend {
   text-align: right;
 } */
 
+.pg-body {
+  padding: 10px;
+}
+
 .main-body {
   padding: 1px;
+}
+
+.btn-list {
+  padding: 1em;
+}
+
+.val-result,
+.trade-area {
+  padding: 1em;
+  margin: auto;
+}
+
+.subset-header {
+  display: flex;
+  align-items: center;
+  font-weight: bold;
+}
+
+[type="checkbox"] {
+  vertical-align: middle;
+}
+
+div[class^="trade-ticket"] {
+  padding: 1em;
+}
+
+.val-result-block {
+  padding: 1em;
+  float: left;
+  width: auto;
 }
 
 nav.navbar li a {
@@ -153,4 +187,11 @@ table.valuation td {
   float: right;
   clear: both;
   text-align: right;
+}
+
+li.nav-item {
+  width: auto;
+}
+a.nav-link {
+  text-align: center;
 }

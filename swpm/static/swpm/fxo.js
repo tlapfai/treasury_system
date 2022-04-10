@@ -18,83 +18,18 @@ $("#id_as_of").val(new Date().toISOString().split("T")[0]);
 //   });
 // });
 
-$("#btn-price").click((event) => {
-  event.preventDefault();
-  load_fxo_mkt();
-  let form_data = new FormData($(".trade-form")[0]);
-  var form_alert = $("#form-alert");
-  form_alert.html("");
-  $("input, select").removeClass("is-invalid");
-  $('[id^="val-"]').text("");
-
-  axios({
-    method: "post",
-    url: "/trade/fxo/price", // starting with slash will use the root of the site
-    data: form_data,
-    headers: { "Content-Type": "multipart/form-data" },
-  })
-    .then((response) => {
-      console.log(JSON.stringify(response.data.result));
-      let hd = response.data.result.headers;
-      // prettier-ignore
-      $("#valuation-table").handsontable({
-        data: response.data.result.values,
-        minSpareRows: 0,
-        colHeaders: true,
-        contextMenu: true,
-        readOnly: true,
-        colHeaders: Object.keys(response.data.result.values[0]),
-        columns: [
-          { data: hd[0], type: 'text' },
-          { data: hd[1], type: 'numeric', numericFormat: { pattern: '0,0.00' } },
-          { data: hd[2], type: 'numeric', numericFormat: { pattern: '0,0.00' } },
-          { data: hd[3], type: 'numeric' },
-          { data: hd[4], type: 'numeric' },
-        ],
-        colWidths: [100, 100, 100, 100, 100],
-        licenseKey: "non-commercial-and-evaluation",
-      });
-
-      $.each(response.data.result, function (key, value) {
-        $(`#val-${key}`).text(commaNum(value.toFixed(2)));
-      });
-      $("#val-alert").text(response.data.valuation_message);
-    })
-    .catch((error) => {
-      console.log(error);
-      var e = error.response.data.errors;
-      for (var y in e) {
-        form_alert.append(
-          `<div class="alert alert-danger" role="alert">${e[y]}</div>`
-        );
-        $(`[name="${y}"]`).addClass("is-invalid");
-      }
-      $('[id^="val-"]').text("");
-    });
-});
-
 $("#btn-mkt").click(function (event) {
   event.preventDefault();
-  let fd = new FormData($(".trade-form")[0]);
-  axios({
-    method: "post",
-    url: "/fx_volatility_table", // starting from slash to access the root of the site
-    data: fd,
-    headers: { "Content-Type": "multipart/form-data" },
-  }).then((response) => {
-    $("#mktdata").html(response.data.result);
-  });
+  const date = $("#id_as_of").val();
+  const ccy_pair = $("#id_ccy_pair").val().replace("/", "");
+  window.open("/mkt/fxv/" + ccy_pair + "/" + date);
 });
-
-$("input#id_as_of").focusout(load_fxo_mkt);
-$("#id_ccy_pair").change(load_fxo_mkt);
-$("#id_maturity_date").focusout(load_fxo_mkt);
-$("#id_strike_price").change(load_fxo_mkt);
 
 function fillInputHandle() {
   $(this).val($(this).data("value"));
 }
 
+// prettier-ignore
 $("#id_tenor").focusout(function () {
   let regex1 = /^(\d+[DMYdmy])+$/;
   let regex2 = /^(\d+[Ww])+$/;
@@ -102,9 +37,7 @@ $("#id_tenor").focusout(function () {
   if (regex1.test(tenor_) || regex2.test(tenor_)) {
     let axios_cfg = { headers: { "X-CSRFToken": $.cookie("csrftoken") } };
     axios
-      .post(
-        "/tenor2date",
-        {
+      .post("/api/tenor2date", {
           ccy_pair: $("#id_ccy_pair").val(),
           trade_date: $("#id_trade_date").val(),
           tenor: tenor_,
@@ -115,83 +48,12 @@ $("#id_tenor").focusout(function () {
         $("#id_maturity_date").val(response.data.date);
         $("#id_maturity_date").css("color", "blue");
         $("#id_tenor").val(response.data.tenor);
-        load_fxo_mkt();
+        updateMktTable();
       });
   } else {
     $("#id_tenor").val("");
   }
 });
-
-function load_fxo_mkt() {
-  $('[id^="para-"] input').text("");
-  var form_alert = document.querySelector("#form-alert");
-  form_alert.innerHTML = "";
-  const as_of = $("input#id_as_of").val();
-  const ccy_pair = $("#id_ccy_pair").val();
-  const maturity_date = $("#id_maturity_date").val();
-  const strike_price = $("#id_strike_price").val();
-  if (
-    as_of &&
-    ccy_pair &&
-    maturity_date &&
-    strike_price &&
-    maturity_date > as_of
-  ) {
-    let axios_cfg = { headers: { "X-CSRFToken": $.cookie("csrftoken") } };
-    axios
-      .post(
-        "/load_fxo_mkt",
-        {
-          as_of: as_of,
-          ccy_pair: ccy_pair,
-          maturity_date: maturity_date,
-          strike_price: strike_price,
-        },
-        axios_cfg
-      )
-      .then((response) => {
-        // let valueInPercentage = ["vol", "r", "q"];
-        // $.each(response.data, function (key, value) {
-        //   let scale = 1.0;
-        //   if (valueInPercentage.includes(key)) scale = 100;
-        //   $(`table.parameters input#${key}`).data("value", value * scale);
-        //   $(`table.parameters input#${key}`).data("byUser", false);
-        //   $(`table.parameters input#${key}`).val((value * scale).toFixed(6));
-        //   $(`table.parameters input#${key}`).focus(fillInputHandle);
-        // });
-        console.log(JSON.stringify(response.data.result));
-        let hd = response.data.result.headers;
-        // prettier-ignore
-        $("#mkt-table").handsontable({
-          data: response.data.result.values,
-          minSpareRows: 0,
-          colHeaders: true,
-          contextMenu: true,
-          readOnly: false,
-          colHeaders: Object.keys(response.data.result.values[0]),
-          columns: [
-            { data: hd[0], type: "text" },
-            { data: hd[1], type: "numeric", numericFormat: { pattern: "0,0.0000" } },
-          ],
-          colWidths: [100, 100],
-          licenseKey: "non-commercial-and-evaluation",
-        });
-        $(`table.parameters input`).change(function () {
-          $(this).css("background-color", "lightBlue");
-          $(this).data("byUser", true);
-        });
-      })
-      .catch((error) => {
-        var e = error.response.data.errors;
-        for (var y in e) {
-          var li = document.createElement("div");
-          li.innerHTML = `<div class="alert alert-danger" role="alert">${e[y]}</div>`;
-          form_alert.appendChild(li);
-          document.querySelector(`[name="${y}"]`).classList.add("is-invalid");
-        }
-      });
-  }
-}
 
 $("#id_maturity_date").change(function () {
   $("#id_maturity_date").css("color", "");
@@ -200,34 +62,94 @@ $("#id_maturity_date").change(function () {
 
 $(document).ready(function () {
   $('[data-bs-toggle="tooltip"]').tooltip();
-  // prettier-ignore
-  $("#id_notional_1").change(() => {
-    if ($.isNumeric($("#id_notional_2").val())) {
-      $("#id_strike_price").val(($("#id_notional_2").val() / $("#id_notional_1").val()).toFixed(10));
+
+  const n1 = $("#id_notional_1");
+  const n2 = $("#id_notional_2");
+  const kk = $("#id_strike_price");
+
+  n1.change(() => {
+    $.isNumeric(n2.val()) && kk.val((n2.val() / n1.val()).toFixed(10));
+  });
+
+  n2.change(() => {
+    $.isNumeric(n1.val()) && kk.val((n2.val() / n1.val()).toFixed(10));
+  });
+
+  kk.change(() => {
+    if ($.isNumeric(n1.val())) {
+      n2.val((n1.val() * kk.val()).toFixed(2));
+    } else if ($.isNumeric(n2.val())) {
+      n1.val((n2.val() / kk.val()).toFixed(2));
     }
   });
-  // prettier-ignore
-  $("#id_notional_2").change(() => {
-    if ($.isNumeric($("#id_notional_1").val())) {
-      $("#id_strike_price").val(($("#id_notional_2").val() / $("#id_notional_1").val()).toFixed(10));
+
+  $("input#id_barrier").change(function () {
+    if ($("input#id_barrier").prop("checked")) {
+      $("div.trade-ticket-bar-up, div.trade-ticket-bar-dn").show();
+    } else {
+      $("div.trade-ticket-bar-up, div.trade-ticket-bar-dn").hide();
     }
   });
-  $("#id_strike_price").change(() => {
-    if ($.isNumeric($("#id_notional_1").val())) {
-      $("#id_notional_2").val(
-        ($("#id_notional_1").val() * $("#id_strike_price").val()).toFixed(2)
-      );
-    } else if ($.isNumeric($("#id_notional_2").val())) {
-      $("#id_notional_1").val(
-        ($("#id_notional_2").val() / $("#id_strike_price").val()).toFixed(2)
-      );
-    }
+
+  const valuationTable = new Handsontable($("#valuation-table")[0], {
+    startRows: 7,
+    startCols: 5,
+    minSpareRows: 0,
+    contextMenu: true,
+    readOnly: true,
+    colHeaders: ["Measure", "CCY1", "CCY2", "CCY1%", "CCY2%"],
+    data: [
+      { measure: "npv" },
+      { measure: "delta" },
+      { measure: "gamma" },
+      { measure: "vega" },
+      { measure: "theta" },
+      { measure: "rho" },
+      { measure: "dividendRho" },
+    ],
+    // prettier-ignore
+    columns: [
+      { data: "measure", type: "text" },
+      { data: "ccy1", type: "numeric", numericFormat: { pattern: "0,0.00" },},
+      { data: "ccy2", type: "numeric", numericFormat: { pattern: "0,0.00" },},
+      { data: "ccy1Pct", type: "numeric", numericFormat: { pattern: "0,0.00" }, },
+      { data: "ccy2Pct", type: "numeric", numericFormat: { pattern: "0,0.00" }, },
+    ],
+    colWidths: [100, 100, 100, 100, 100],
+    licenseKey: "non-commercial-and-evaluation",
+  });
+
+  const mktTable = new Handsontable($("#mkt-table")[0], {
+    startRows: 7,
+    startCols: 2,
+    minSpareRows: 0,
+    contextMenu: true,
+    readOnly: false,
+    colHeaders: ["Data", "Value"],
+    data: [
+      { data: "spot", value: "" },
+      { data: "spot0", value: "" },
+      { data: "fwd", value: "" },
+      { data: "vol", value: "" },
+      { data: "q", value: "" },
+      { data: "r", value: "" },
+      { data: "swap_point", value: "" },
+    ],
+    columns: [
+      { data: "data", type: "text" },
+      {
+        data: "value",
+        type: "numeric",
+        numericFormat: { pattern: "0,0.0000" },
+      },
+    ],
+    colWidths: [100, 100, 100, 100, 100],
+    licenseKey: "non-commercial-and-evaluation",
   });
 
   $("#btn-std-fill").click(function (event) {
     event.preventDefault();
-    $("input#id_as_of").val("2021-11-18");
-    $("input#id_trade_date").val("2021-11-18");
+    $("input#id_as_of, input#id_trade_date").val("2021-11-18");
     const effective_date = new Date();
     effective_date.setDate(effective_date.getDate() + 2);
     var oneyear = new Date();
@@ -254,38 +176,135 @@ $(document).ready(function () {
     $("#id_cashflow-value_date").val("2021-11-22");
   });
 
-  var triggerTabList = [].slice.call(document.querySelectorAll("#ticketTab a"));
-  triggerTabList.forEach(function (triggerEl) {
-    var tabTrigger = new bootstrap.Tab(triggerEl);
+  function load_fxo_mkt() {
+    $("#form-alert").html("");
+    const as_of = $("input#id_as_of").val();
+    const ccy_pair = $("#id_ccy_pair").val();
+    const maturity_date = $("#id_maturity_date").val();
+    const strike_price = $("#id_strike_price").val();
+    if (
+      as_of &&
+      ccy_pair &&
+      maturity_date &&
+      strike_price &&
+      maturity_date > as_of
+    ) {
+      let axios_cfg = { headers: { "X-CSRFToken": $.cookie("csrftoken") } };
+      axios
+        .post(
+          "/load_fxo_mkt",
+          {
+            as_of: as_of,
+            ccy_pair: ccy_pair,
+            maturity_date: maturity_date,
+            strike_price: strike_price,
+          },
+          axios_cfg
+        )
+        .then((response) => {
+          //console.log(JSON.stringify(response.data.result));
+          let hd = response.data.result.headers;
+          mktTable.updateData(response.data.result.values);
+          // prettier-ignore
+          $("#mkt-table").handsontable({
+            data: response.data.result.values,
+            minSpareRows: 0,
+            colHeaders: true,
+            contextMenu: true,
+            readOnly: false,
+            colHeaders: Object.keys(response.data.result.values[0]),
+            columns: [
+              { data: hd[0], type: "text" },
+              { data: hd[1], type: "numeric", numericFormat: { pattern: "0,0.0000" }, },
+            ],
+            colWidths: [100, 100],
+            licenseKey: "non-commercial-and-evaluation",
+          });
+          $(`table.parameters input`).change(function () {
+            $(this).css("background-color", "lightBlue");
+            $(this).data("byUser", true);
+          });
+        })
+        .catch((error) => {
+          var e = error.response.data.errors;
+          for (var y in e) {
+            var li = document.createElement("div");
+            li.innerHTML = `<div class="alert alert-danger" role="alert">${e[y]}</div>`;
+            form_alert.appendChild(li);
+            document.querySelector(`[name="${y}"]`).classList.add("is-invalid");
+          }
+        });
+    }
+  }
 
-    triggerEl.addEventListener("click", function (event) {
-      event.preventDefault();
-      tabTrigger.show();
+  async function load_fxo_mkt2() {
+    // return a promise
+    const as_of = $("input#id_as_of").val();
+    const ccy_pair = $("#id_ccy_pair").val();
+    const maturity_date = $("#id_maturity_date").val();
+    const strike_price = $("#id_strike_price").val();
+    if (
+      as_of &&
+      ccy_pair &&
+      maturity_date &&
+      strike_price &&
+      maturity_date > as_of
+    ) {
+      let axios_cfg = { headers: { "X-CSRFToken": $.cookie("csrftoken") } };
+      let data = {
+        as_of: as_of,
+        ccy_pair: ccy_pair,
+        maturity_date: maturity_date,
+        strike_price: strike_price,
+      };
+      return await axios.post("/load_fxo_mkt", data, axios_cfg);
+    }
+  }
+
+  function updateMktTable() {
+    load_fxo_mkt2().then((response) => {
+      mktTable.updateData(response.data.result.values);
     });
-  });
+  }
+
+  async function price_fxo2() {
+    let form_data = new FormData($(".trade-form")[0]); // use [0] to convert jquery obj to DOM
+    var form_alert = $("#form-alert");
+    form_alert.html("");
+    $("input, select").removeClass("is-invalid");
+    return await axios({
+      method: "post",
+      url: "/api/trade/fxo/price", // starting with slash will use the root of the site
+      data: form_data,
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  }
+
+  function updateValuationTable(event) {
+    event.preventDefault();
+    updateMktTable();
+    price_fxo2()
+      .then((response) => {
+        valuationTable.updateData(response.data.result.values);
+        valuationTable.updateSettings({
+          colHeaders: response.data.result.headers,
+        });
+      })
+      .catch((error) => {
+        var e = error.response.data.errors;
+        for (var y in e) {
+          form_alert.append(
+            // append is add a element at the end inside the tag
+            `<div class="alert alert-danger" role="alert">${e[y]}</div>`
+          );
+          $(`[name="${y}"]`).addClass("is-invalid");
+        }
+      });
+  }
+
+  $("#id_maturity_date, input#id_as_of").focusout(updateMktTable);
+  $("#id_strike_price, #id_ccy_pair").change(updateMktTable);
+  $("#btn-price").click(updateValuationTable);
 
   // https://studygyaan.com/django/render-html-as-you-type-with-django-and-ajax
-  // function updateTextView(_obj){
-  // var num = getNumber(_obj.val());
-  // if(num==0){
-  // _obj.val('');
-  // }else{
-  // _obj.val(num.toLocaleString());
-  // }
-  // }
-  // function getNumber(_str){
-  // var arr = _str.split('');
-  // var out = new Array();
-  // for(var cnt=0;cnt<arr.length;cnt++){
-  // if(isNaN(arr[cnt])==false){
-  // out.push(arr[cnt]);
-  // }
-  // }
-  // return Number(out.join(''));
-  // }
-  // $(document).ready(function(){
-  // $('input[type=number]').on('keyup',function(){
-  // updateTextView($(this));
-  // });
-  // });
 });

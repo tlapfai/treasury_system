@@ -4,101 +4,47 @@
 {% debug %} 
 {% block body %}
 
+<div class="trade-area container-fluid">
+  <form class="trade-form align-items-center">
+    {% csrf_token %}
+    <input type="hidden" name="trade_type" value="{{ trade_type }}" />
+    <input type="hidden" name="origin_page" value="{{ request.path }}" />
 
-<div class="container-fluid">
-  <div class="row gx-2">
-    <div class="trade-area col-md-12" style="padding: 1em;">
-      <form class="trade-form">
-        {% csrf_token %}
-        <input type="date" class="as_of" name="as_of" required id="id_as_of">
-        <span id="trade-id">ID: {{ trade_id }}<span>
-        <fieldset>
-          <legend>{{ trade_type }}</legend>
-          {% if valuation_message %}
-            <div class="callout"><span>{{ valuation_message }}</span></div>
-          {% endif %}
-          <button id="btn-mkt" type="submit" class="btn btn-primary">Load Market Data</button>
-          <button id="btn-auto-fill" class="btn btn-primary" formaction="">Auto Fill</button>
-          <button id="btn-std-fill" class="btn btn-secondary" formaction="">Standard Trade</button>
-          <button id="btn-price" class="btn btn-primary">Price</button>
-          <button id="btn-scn" type="submit" formaction="{% url 'fxo_scn' %}" class="btn btn-primary" formmethod="POST" formtarget="scn_window">Scenario</button>
-          {% if user.is_authenticated %}
-            <button type="submit" class="btn btn-primary" formaction="{% url 'fxo_create' %}" formmethod="POST">Do</button>
-          {% endif %}
-          <!-- tab set start -->
-          <nav>
-            <ul class="nav nav-tabs" id="ticketTab" role="tablist">
-              <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="terms-tab" data-bs-toggle="tab" data-bs-target="#terms"
-                  type="button" role="tab" aria-controls="terms" aria-selected="true">
-                  Terms
-                </button>
-              </li>
-              <li class="nav-item" role="presentation">
-                <button class="nav-link" id="profile-tab" data-bs-toggle="tab"
-                  data-bs-target="#profile" type="button" role="tab" aria-controls="profile" aria-selected="false">
-                  Profile
-                </button>
-              </li>
-              <li class="nav-item" role="presentation">
-                <button class="nav-link" id="mktdata-tab" data-bs-toggle="tab" data-bs-target="#mktdata"
-                  type="button" role="tab" aria-controls="mktdata" aria-selected="false">
-                  Market Data
-                </button>
-              </li>
-            </ul>
-            <div class="tab-content" ifd="ticketTabContent">
-              <!-- terms contents start -->
-              <div class="tab-pane fade show active" id="terms" role="tabpanel" aria-labelledby="terms-tab">
-                <!-- table for form start -->
-                <!--<table style="width: 100%; border: solid 2px red">-->
-                  <div id="form-alert"></div>
-                  {% include 'swpm/includes/fxo_form.html' with form=form %}
-                  <input type="hidden" name="trade_type" value="{{ trade_type }}" />
-                  <input type="hidden" name="origin_page" value="{{ request.path }}" />
-                <!--</table>-->
-                <!-- table for form end   -->
-                <div style="vertical-align: middle;">Premium: {% include 'swpm/includes/cashflow_form.html' with form=cashflowform %}</div>
-                <div>{% include 'swpm/includes/barrier_form.html' with form=lower_barrier_detail_form %}</div>
-                <div>{% include 'swpm/includes/barrier_form.html' with form=upper_barrier_detail_form %}</div>
-                </div>
-              </div>
-              <!-- terms contents end   -->
-              <div class="tab-pane fade" id="profile" role="tabpanel" aria-labelledby="profile-tab">
-                <h4>Cashflows</h4>
-              </div>
-              <div class="tab-pane fade" id="mktdata" role="tabpanel" aria-labelledby="mktdata-tab">
-                <table>
-                  {{ market_data_form.fx_spot.as_table }}
-                </table>
-              </div>
-            </div>
-            <!-- tab set end  -->
-          </nav>
-        </fieldset>
-      </form>
+    <input type="date" class="as_of" name="as_of" required id="id_as_of">
+    <span id="trade-id">ID: {{ trade_id }}</span>
+    {% if valuation_message %}
+      <div class="callout"><span>{{ valuation_message }}</span></div>
+    {% endif %}
+    <div class="btn-list">
+      <button id="btn-mkt" class="btn btn-primary">Load Market Data</button>
+      <button id="btn-auto-fill" class="btn btn-primary" formaction="">Auto Fill</button>
+      <button id="btn-std-fill" class="btn btn-secondary" formaction="">Standard Trade</button>
+      <button id="btn-price" class="btn btn-primary">Price</button>
+      <button id="btn-scn" type="submit" formaction="{% url 'fxo_scn' %}" class="btn btn-primary" formmethod="POST" formtarget="scn_window">Scenario</button>
+      {% if user.is_authenticated %}
+        <button type="submit" class="btn btn-primary" formaction="{% url 'fxo_create' %}" formmethod="POST">Do</button>
+      {% endif %}
     </div>
-    <!--End of class="trade-ticket">-->
-
-    
-    <!-- end of class='valuation'-->
+    <div id="form-alert"></div>
+    {% include 'swpm/includes/fxo_form.html' with form=form %}
+    <div class="trade-ticket-permium row g-2" style="vertical-align: middle;">
+      <div class="subset-header col-lg-1">Premium: </div>
+      {% include 'swpm/includes/cashflow_form.html' with form=cashflowform %}
+    </div>
+    <div class="trade-ticket-bar-up row g-2" style="display: none;">{% include 'swpm/includes/barrier_form.html' with form=lower_barrier_detail_form %}</div>
+    <div class="trade-ticket-bar-dn row g-2" style="display: none;">{% include 'swpm/includes/barrier_form.html' with form=upper_barrier_detail_form %}</div>
+  </form>
+</div>
+<div class="val-result container-fluid">
+  <div class="val-result-block" style="min-width: 216px; height: 235px;">
+    <h4>Parameter</h4>
+    <div id="mkt-table"></div>
   </div>
-  <div class="row gx-2">
-    <div class="col-md-3" style="padding: 1em">
-      <h4>Parameter</h4>
-      <div id="mkt-table"></div>
-    </div>
-    <div class="col-md-9" style="padding: 1em">
-      <h4>Valuation</h4>
-      <div id="valuation-table"></div>
-    </div>
-    <div class="valuation col-md-9" style="padding: 1em; display: none">
-      <h4>Valuation</h4>
-      {% include 'swpm/includes/fxo_valuation.html' with form=val_form %}     
-    </div>
+  <div class="val-result-block" style="min-width: 516px; height: 235px;">
+    <h4>Valuation</h4>
+    <div id="valuation-table"></div>
   </div>
-<div>
-<!-- end of class="row"-->
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.js"></script>
 <link rel="stylesheet" media="screen" href="http://handsontable.com/dist/jquery.handsontable.full.css">

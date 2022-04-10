@@ -125,6 +125,23 @@ def register(request):
 #     #make_models_forms = ("FX Option", FXO, FXOForm, None, None, FXOValuationForm)
 
 
+class FXVolView(View):
+
+    def get(self, request, **kwargs):
+        if request.GET.get('date') and request.GET.get('ccy_pair'):
+            return redirect('mkt_fxv_get',
+                            date=request.GET.get('date'),
+                            ccy_pair=request.GET.get('ccy_pair'))
+        date = kwargs.get('date')
+        ccy_pair = kwargs.get('ccy_pair')
+        return render(
+            request, "swpm/mkt_fxv.html", {
+                'date': date,
+                'ccy_pair': ccy_pair,
+                'fxv_setting': FXVolatilitySettingForm(),
+            })
+
+
 class FXOView(View):
 
     def get(self, request, **kwargs):
@@ -613,25 +630,61 @@ def pricing(request, commit=False):
                          leg_tables=leg_tables)
 
 
-def fx_volatility_table(request):  # for API
-    if request.method == 'POST':
+def api_fxv(request):
+    if request.method == 'GET':
         try:
-            as_of = request.POST['as_of']
-            ccy_pair = request.POST['ccy_pair']
-            fxv = FXVolatility.objects.filter(ref_date=as_of,
+            date = request.GET.get('date')
+            ccy_pair = request.GET.get('ccy_pair')
+            ccy_pair = ccy_pair[:3] + '/' + ccy_pair[-3:]
+            fxv = FXVolatility.objects.filter(ref_date=date,
                                               ccy_pair=ccy_pair).first()
-            market_data_message = None
-            return JsonResponse(
-                {
-                    'result':
-                    fxv.surface_dataframe().to_html(
-                        classes='table fx-vol table-striped',
-                        na_rep='',
-                        border='1px',
-                        col_space='5em'),
-                    'message':
-                    market_data_message
-                }, )
+            atm_type, delta_type = fxv.type_dict()
+            return JsonResponse({
+                'result': fxv.vol_dict(),
+                'atm_type': atm_type,
+                'delta_type': delta_type
+            })
+        except RuntimeError as error:
+            return JsonResponse({'errors': [error.args]}, status=500)
+    elif request.method == 'POST':
+        try:
+            data = json.loads(request.body.decode('utf-8'))
+            date = data.get('date')
+            ref_date = str2date(date)
+            ccy_pair = data.get('ccy_pair')
+            ccy_pair = ccy_pair[:3] + '/' + ccy_pair[-3:]
+            atm_type = data.get('atm_type')
+            delta_type = data.get('delta_type')
+            fxv, fxvCtd = FXVolatility.objects.get_or_create(
+                ref_date=date, ccy_pair_id=ccy_pair)
+            fxv.quotes.all().delete()
+            fxvq = data.get('fxv')
+            deltas = ['', '', 10, 25, 75, 90]
+            for q in fxvq:
+                tn = q[0]
+                FXVolatilityQuote.objects.create(
+                    ref_date=ref_date,
+                    tenor=tn,
+                    is_atm=True,
+                    surface=fxv,
+                    atm_type=atm_type,
+                    value=float(q[1] * 0.01),
+                )
+                for i in range(2, 6):
+                    FXVolatilityQuote.objects.create(
+                        ref_date=ref_date,
+                        tenor=tn,
+                        is_atm=False,
+                        surface=fxv,
+                        delta=deltas[i],
+                        delta_type=delta_type,
+                        value=float(q[i] * 0.01),
+                    )
+            if fxvCtd:
+                message = str(fxv) + ' created.'
+            else:
+                message = str(fxv) + ' updated.'
+            return JsonResponse({'message': message})
         except RuntimeError as error:
             return JsonResponse({'errors': [error.args]}, status=500)
 
@@ -641,7 +694,6 @@ def fxo_price2(request):  # for API
         try:
             as_of = request.POST['as_of']
             ql.Settings.instance().evaluationDate = qlDate(as_of)
-            valuation_message = None
             fxo_form = FXOForm(request.POST, instance=FXO())
             if fxo_form.is_valid():
                 tr = fxo_form.save(commit=False)
@@ -662,10 +714,7 @@ def fxo_price2(request):  # for API
                 }
                 result = dict([(x, y * side * tr.notional_1)
                                for x, y in result.items()])
-            return JsonResponse({
-                'result': result,
-                'message': valuation_message
-            })
+            return JsonResponse({'result': result, 'message': None})
         except RuntimeError as error:
             return JsonResponse({'errors': [error.args]}, status=500)
 
@@ -676,7 +725,6 @@ def fxo_scn(request):  # for API
             as_of = request.POST['as_of']
             ql.Settings.instance().evaluationDate = qlDate(as_of)
             mkt = MktDataSet(as_of)
-            valuation_message = None
             fxo_form = FXOForm(request.POST, instance=FXO())
             up_bar_form = FXOUpperBarrierDetailForm(request.POST)
             low_bar_form = FXOLowerBarrierDetailForm(request.POST)
@@ -830,7 +878,7 @@ def fxo_price(request):  # for API, now in use
             as_of = request.POST['as_of']
             ql.Settings.instance().evaluationDate = qlDate(as_of)
             mkt = MktDataSet(as_of)
-            valuation_message = None
+            message = None
             fxo_form = FXOForm(request.POST, instance=FXO())
             up_bar_form = FXOUpperBarrierDetailForm(request.POST)
             low_bar_form = FXOLowerBarrierDetailForm(request.POST)
@@ -870,23 +918,23 @@ def fxo_price(request):  # for API, now in use
                 result.append({
                     'measure':
                     key,
-                    ccy1:
+                    'ccy1':
                     round(value / spot0, 2),
-                    ccy2:
+                    'ccy2':
                     round(value, 2),
-                    ccy1 + "%":
+                    'ccy1Pct':
                     round(value / spot0 / tr.notional_1 * 100., 2),
-                    ccy2 + "%":
+                    'ccy2Pct':
                     round(value / tr.notional_2 * 100., 2),
                 })
             return JsonResponse(
                 {
                     'result': {
                         'headers':
-                        ['measure', ccy1, ccy2, ccy1 + "%", ccy2 + "%"],
+                        ['Measure', ccy1, ccy2, ccy1 + "%", ccy2 + "%"],
                         'values': result
                     },
-                    'valuation_message': valuation_message
+                    'message': message
                 },
                 safe=False)
         except RuntimeError as error:
@@ -1119,9 +1167,7 @@ def handle_uploaded_file(f=None, text=None):
                 fxv, fxv_created = FXVolatility.objects.update_or_create(
                     ref_date=str2date(row['Date']), ccy_pair=ccy_pair_)
                 if fxv_created:
-                    msg.append(
-                        f'{fxv.ccy_pair.name} ({fxv.ref_date.date().isoformat()}) FXVolatility created.'
-                    )
+                    msg.append(f'FXVolatility {str(fxv)} created.')
                 if row['Delta'] == 'ATM':
                     vq, vq_created = FXVolatilityQuote.objects.update_or_create(
                         ref_date=str2date(row['Date']),

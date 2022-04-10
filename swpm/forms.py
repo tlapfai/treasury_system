@@ -1,6 +1,7 @@
 from bdb import effective
 from email.policy import default
 from random import choices
+from select import select
 from django.db.models import fields
 from django.forms import ModelForm, modelformset_factory, SelectDateWidget, DateInput, NumberInput, RadioSelect, ModelMultipleChoiceField, widgets, TextInput
 from django import forms
@@ -21,6 +22,7 @@ inline_date_attrs = {
     'style': 'display: inline'
 }
 number_attrs = {'class': "form-control-sm", 'style': 'text-align: right'}
+select_atts = {'class': "form-control-sm"}
 
 
 class HorizontalRadioSelect(RadioSelect):
@@ -129,7 +131,8 @@ class FXOForm(ModelForm):
         https://stackoverflow.com/questions/43067707/why-doesnt-my-django-template-render-a-modelforms-id-or-pk-field
         The id field automatically has editable=False, which means by default it doesn't show up in any model forms."""
         widgets = {
-            'buy_sell': forms.Select(attrs={'class': "form-control-sm"}),
+            'buy_sell': forms.Select(attrs=select_atts),
+            'ccy_pair': forms.Select(attrs=select_atts),
             'trade_date': DateInput(attrs=date_attrs),
             'maturity_date': DateInput(attrs=date_attrs),
             'strike_price': TextInput(attrs=number_attrs),
@@ -321,3 +324,9 @@ class TradeSearchForm(forms.Form):
                                       required=False)
     book = forms.CharField(max_length=16, required=False)
     #trade_type = forms.MultipleChoiceField(choices=CHOICE_TRADE_TYPE,required=False)
+
+
+class FXVolatilitySettingForm(forms.Form):
+    atm_type = forms.ChoiceField(label="ATM Type",
+                                 choices=CHOICE_ATM_TYPE.choices)
+    delta_type = forms.ChoiceField(choices=CHOICE_DELTA_TYPE.choices)
