@@ -268,6 +268,12 @@ $(document).ready(function () {
   }
 
   async function price_fxo2() {
+    if (
+      $("#id_up-bar-effect").prop("checked") == false &&
+      $("#id_low-bar-effect").prop("checked") == false
+    ) {
+      $("#id_barrier").prop("checked", false);
+    }
     let form_data = new FormData($(".trade-form")[0]); // use [0] to convert jquery obj to DOM
     var form_alert = $("#form-alert");
     form_alert.html("");

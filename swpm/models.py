@@ -137,7 +137,7 @@ class User(AbstractUser):
 
 
 class Calendar(models.Model):
-    name = models.CharField(max_length=24, primary_key=True)
+    name = CharField(max_length=24, primary_key=True)
 
     def __str__(self):
         return self.name
@@ -172,7 +172,7 @@ class Ccy(models.Model):
 
 class CcyPair(models.Model):
     """ .quotes to get FxSpotRateQuote """
-    name = models.CharField(max_length=7, primary_key=True)
+    name = CharField(max_length=7, primary_key=True)
     base_ccy = ForeignKey(Ccy, CASCADE, related_name="as_base_ccy")
     quote_ccy = ForeignKey(Ccy, CASCADE, related_name="as_quote_ccy")
     cal = ForeignKey(Calendar, SET_NULL, related_name="ccy_pairs", null=True)
@@ -271,7 +271,7 @@ class InterestRateQuote(models.Model):
     def limit_choices_yts():
         return None
 
-    name = models.CharField(max_length=16)
+    name = CharField(max_length=16)
     ref_date = models.DateField()
     yts = ForeignKey('IRTermStructure',
                      CASCADE,
@@ -279,13 +279,13 @@ class InterestRateQuote(models.Model):
                      blank=True,
                      related_name="rates")
     rate = models.DecimalField(max_digits=12, decimal_places=8)
-    tenor = models.CharField(max_length=5)
-    instrument = models.CharField(max_length=5)
+    tenor = CharField(max_length=5, validators=[validate_period])
+    instrument = CharField(max_length=5)
     ccy = ForeignKey(Ccy, CASCADE, related_name="ir_quotes")
-    day_counter = models.CharField(max_length=16,
-                                   choices=CHOICE_DAY_COUNTER.choices,
-                                   null=True,
-                                   blank=True)
+    day_counter = CharField(max_length=16,
+                            choices=CHOICE_DAY_COUNTER.choices,
+                            null=True,
+                            blank=True)
     ccy_pair = ForeignKey(CcyPair, CASCADE, null=True, blank=True)
     index = ForeignKey('RateIndex',
                        DO_NOTHING,
@@ -315,17 +315,21 @@ class InterestRateQuote(models.Model):
             tenor_ = ql.Period('1D')
             fixing_days = 0 if self.tenor == 'ON' else 1
         else:
-            tenor_ = None if self.instrument == "FUT" else ql.Period(
-                self.tenor)
+            if self.instrument == "FUT":
+                tenor_ = None
+            else:
+                tenor_ = ql.Period(self.tenor)
             fixing_days = None
 
         if self.instrument == "DEPO":
             fixing_days = self.ccy.fixing_days
             convention = ql.ModifiedFollowing
-            ccy = Ccy.objects.get(code=self.ccy)
-            return ql.DepositRateHelper(self.rate, tenor_, fixing_days,
-                                        ccy.calendar(), convention, False,
-                                        QL_DAY_COUNTER[self.day_counter]), q
+            ccy = Ccy.objects.get(code=self.ccy)  # may build ccy in mktdataset
+            self.helper_obj = ql.DepositRateHelper(
+                q, tenor_, fixing_days, ccy.calendar(), convention, False,
+                QL_DAY_COUNTER[self.day_counter])
+            return self.helper_obj, q
+
         elif self.instrument == "FUT":
             if self.tenor[:2] == 'ED':
                 return ql.FuturesRateHelper(q, ql.IMM.date(self.tenor[2:4]),
@@ -341,14 +345,19 @@ class InterestRateQuote(models.Model):
                                              ref_curve), q
                 else:
                     return ql.SwapRateHelper(q, swapIndex), q
-        elif self.instrument == "OIS":
+        elif self.instrument in ["OIS", "SOFROIS"]:
+            if self.instrument == "OIS":
+                overnight_index = ql.FedFunds()
+            else:
+                overnight_index = ql.Sofr()
+
             if self.ccy.code == "USD":
                 if self.tenor == '1D':
-                    return ql.DepositRateHelper(q, tenor_, 0, ql.TARGET(),
+                    return ql.DepositRateHelper(q, tenor_, 0,
+                                                ql.UnitedStates(),
                                                 ql.Following, False,
                                                 ql.Actual360()), q
                 else:
-                    overnight_index = ql.FedFunds()
                     settlementDays = 2
                     self.helper_obj = ql.OISRateHelper(
                         2,
@@ -379,13 +388,13 @@ class InterestRateQuote(models.Model):
 @with_mktdataset
 class IRTermStructure(models.Model):
     """ name: e.g. LIBOR, OIS, FOREX """
-    name = models.CharField(max_length=16)
+    name = CharField(max_length=16)
     ref_date = models.DateField()
-    ccy = models.ForeignKey(Ccy,
-                            CASCADE,
-                            related_name="all_curves",
-                            null=True,
-                            blank=True)
+    ccy = ForeignKey(Ccy,
+                     CASCADE,
+                     related_name="all_curves",
+                     null=True,
+                     blank=True)
     as_fx_curve = ForeignKey(Ccy,
                              CASCADE,
                              related_name="fx_curve",
@@ -397,7 +406,7 @@ class IRTermStructure(models.Model):
                              null=True,
                              blank=True)
     ref_ccy = ForeignKey(Ccy, CASCADE, null=True, blank=True)
-    ref_curve = models.CharField(max_length=16, null=True, blank=True)
+    ref_curve = CharField(max_length=16, null=True, blank=True)
 
     # ref_curve: only curve name, e.g. OIS
 
@@ -407,9 +416,7 @@ class IRTermStructure(models.Model):
     def __init__(self, *args, **kwargs) -> None:
         self.yts = None
         super().__init__(*args, **kwargs)
-        print(
-            f'Called __init__() of {self.name} {self.ref_date} {self.ccy} ({hex(id(self))})'
-        )
+        #print(f'Called __init__() of {str(self.name)} ({hex(id(self))})')
 
     def term_structure(self):
         if self.yts:
@@ -432,20 +439,31 @@ class IRTermStructure(models.Model):
         self.yts.enableExtrapolation()
         return self.yts
 
+    def quotes_dict(self):
+        quotes = []
+        for r in self.rates.all():
+            quotes.append({
+                'tenor': r.tenor,
+                'rate': r.rate * 100,
+                'instrument': r.instrument,
+                'day_counter': r.day_counter
+            })
+        return quotes
+
     def __str__(self):
         return f"{self.ccy} {self.name} as of {self.ref_date.strftime('%Y-%m-%d')}"
 
 
 class RateIndex(models.Model):
-    name = models.CharField(max_length=16, primary_key=True)
+    name = CharField(max_length=16, primary_key=True)
     ccy = ForeignKey(Ccy, CASCADE, related_name="rate_indexes")
-    #index = models.CharField(max_length=16)
-    tenor = models.CharField(max_length=16, validators=[validate_period])
-    day_counter = models.CharField(max_length=16,
-                                   choices=CHOICE_DAY_COUNTER.choices,
-                                   null=True,
-                                   blank=True)
-    yts = models.CharField(max_length=16, null=True, blank=True)
+    #index = CharField(max_length=16)
+    tenor = CharField(max_length=16, validators=[validate_period])
+    day_counter = CharField(max_length=16,
+                            choices=CHOICE_DAY_COUNTER.choices,
+                            null=True,
+                            blank=True)
+    yts = CharField(max_length=16, null=True, blank=True)
 
     class Meta:
         unique_together = ('name', 'tenor')
@@ -695,20 +713,20 @@ class FXVolatility(models.Model):
 
 class FXVolatilityQuote(models.Model):
     ref_date = models.DateField()
-    tenor = models.CharField(max_length=6)
+    tenor = CharField(max_length=6)
     delta = models.IntegerField(null=True, blank=True)
     value = models.FloatField(validators=[validate_positive])
-    surface = models.ForeignKey(FXVolatility, CASCADE, related_name='quotes')
-    delta_type = models.CharField(choices=CHOICE_DELTA_TYPE.choices,
-                                  max_length=8,
-                                  null=True,
-                                  blank=True)
+    surface = ForeignKey(FXVolatility, CASCADE, related_name='quotes')
+    delta_type = CharField(choices=CHOICE_DELTA_TYPE.choices,
+                           max_length=8,
+                           null=True,
+                           blank=True)
     maturity = models.DateField(null=True, blank=True)
     is_atm = models.BooleanField(default=True)
-    atm_type = models.CharField(choices=CHOICE_ATM_TYPE.choices,
-                                max_length=12,
-                                null=True,
-                                blank=True)
+    atm_type = CharField(choices=CHOICE_ATM_TYPE.choices,
+                         max_length=12,
+                         null=True,
+                         blank=True)
 
     def save(self, *args, **kwargs):
         cal = self.surface.ccy_pair.calendar()
@@ -747,27 +765,24 @@ class FXOManager(models.Manager):
 
 
 class Portfolio(models.Model):
-    name = models.CharField(max_length=16, primary_key=True)
+    name = CharField(max_length=16, primary_key=True)
 
     def __str__(self) -> str:
         return self.name
 
 
 class Book(models.Model):
-    name = models.CharField(max_length=16, primary_key=True)
-    portfolio = models.ForeignKey(Portfolio, DO_NOTHING, related_name="books")
-    owner = models.ForeignKey(User,
-                              DO_NOTHING,
-                              null=True,
-                              related_name="books")
+    name = CharField(max_length=16, primary_key=True)
+    portfolio = ForeignKey(Portfolio, DO_NOTHING, related_name="books")
+    owner = ForeignKey(User, DO_NOTHING, null=True, related_name="books")
 
     def __str__(self) -> str:
         return self.name
 
 
 class Counterparty(models.Model):
-    code = models.CharField(max_length=16, primary_key=True)
-    name = models.CharField(max_length=64)
+    code = CharField(max_length=16, primary_key=True)
+    name = CharField(max_length=64)
     is_internal = models.OneToOneField(Book,
                                        DO_NOTHING,
                                        null=True,
@@ -782,7 +797,7 @@ class Counterparty(models.Model):
 
 
 class TradeDetail(models.Model):
-    # trade = models.ForeignKey(FXO, CASCADE, related_name="detail")
+    # trade = ForeignKey(FXO, CASCADE, related_name="detail")
     # def __str__(self) -> str:
     #     return f"ID: {self.trade.id}"
     pass
@@ -790,10 +805,7 @@ class TradeDetail(models.Model):
 
 class TradeMarkToMarket(models.Model):
     as_of = models.DateField()
-    trade_d = models.ForeignKey(TradeDetail,
-                                CASCADE,
-                                null=True,
-                                related_name="mtms")
+    trade_d = ForeignKey(TradeDetail, CASCADE, null=True, related_name="mtms")
     npv = models.FloatField(null=True)
     delta = models.FloatField(null=True)
     gamma = models.FloatField(null=True)
@@ -860,7 +872,7 @@ class CashFlow(models.Model):
                                  null=True,
                                  blank=True)
     value_date = models.DateField(default=datetime.date.today)
-    cashflow_type = models.CharField(max_length=10, null=True, blank=True)
+    cashflow_type = CharField(max_length=10, null=True, blank=True)
 
     def __str__(self) -> str:
         return f"{self.trade.id}: {self.ccy} {self.amount} on {self.value_date}"
@@ -904,13 +916,13 @@ class FXOBarrierDetail(models.Model):
     barrier = models.FloatField(validators=[validate_positive],
                                 null=True,
                                 blank=True)
-    knock = models.CharField(max_length=3, choices=KIKO, blank=True)
+    knock = CharField(max_length=3, choices=KIKO, blank=True)
     rebate = models.DecimalField(max_digits=24, decimal_places=2, default=0.)
-    rebate_ccy = models.ForeignKey("Ccy",
-                                   CASCADE,
-                                   null=True,
-                                   blank=True,
-                                   related_name='+')
+    rebate_ccy = ForeignKey("Ccy",
+                            CASCADE,
+                            null=True,
+                            blank=True,
+                            related_name='+')
     rebate_at_hit = models.BooleanField(default=False)
     payoff_at_hit = models.BooleanField(default=False)
 
@@ -936,27 +948,27 @@ class FXOLowerBarrierDetail(FXOBarrierDetail):
 
 @with_mktdataset
 class FXO(Trade):
-    product_type = models.CharField(max_length=12, default="FXO")
+    product_type = CharField(max_length=12, default="FXO")
     maturity_date = models.DateField(null=False)
-    buy_sell = models.CharField(max_length=1, choices=BUY_SELL, default='B')
-    ccy_pair = models.ForeignKey(CcyPair,
-                                 models.DO_NOTHING,
-                                 null=False,
-                                 related_name='+')
+    buy_sell = CharField(max_length=1, choices=BUY_SELL, default='B')
+    ccy_pair = ForeignKey(CcyPair,
+                          models.DO_NOTHING,
+                          null=False,
+                          related_name='+')
     strike_price = models.FloatField(validators=[validate_positive])
     notional_1 = models.FloatField(default=1e6, validators=[validate_positive])
     notional_2 = models.FloatField(validators=[validate_positive])
-    payoff_type = models.CharField(max_length=5, choices=PAYOFF_TYPE)
-    exercise_type = models.CharField(max_length=5, choices=EXERCISE_TYPE)
+    payoff_type = CharField(max_length=5, choices=PAYOFF_TYPE)
+    exercise_type = CharField(max_length=5, choices=EXERCISE_TYPE)
     exercise_start = models.DateField(null=True, blank=True)
     exercise_end = models.DateField(null=True, blank=True)
-    cp = models.CharField(max_length=1, choices=FXO_CP)
+    cp = CharField(max_length=1, choices=FXO_CP)
     barrier = models.BooleanField(default=False)
-    subtype = models.CharField(max_length=8,
-                               editable=False,
-                               choices=FXO_SUBTYPE,
-                               blank=True,
-                               null=True)
+    subtype = CharField(max_length=8,
+                        editable=False,
+                        choices=FXO_SUBTYPE,
+                        blank=True,
+                        null=True)
     objects = FXOManager()
 
     def __str__(self):
@@ -1158,7 +1170,7 @@ class FXO(Trade):
 @with_mktdataset
 class VanillaSwap(Trade):
     # objects = SwapManager()
-    product_type = models.CharField(max_length=12, default="SWAP")
+    product_type = CharField(max_length=12, default="SWAP")
     start_date = models.DateField(null=True, blank=True)
     maturity_date = models.DateField(null=True, blank=True)
     notional = models.DecimalField(max_digits=24,
@@ -1184,7 +1196,7 @@ class VanillaSwap(Trade):
 @with_mktdataset
 class Swap(Trade):
     # objects = SwapManager()
-    product_type = models.CharField(max_length=12, default="SWAP")
+    product_type = CharField(max_length=12, default="SWAP")
     maturity_date = models.DateField(null=True, blank=True)
 
     def instrument(self, as_of):
@@ -1221,16 +1233,24 @@ class Swap(Trade):
         super().delete(*args, **kwargs)
 
 
+class SchedulePeriod(models.Model):
+    start = models.DateField()
+    end = models.DateField()
+
+    def __str__(self):
+        return f"{self.start}~{self.end}"
+
+
 class Schedule(models.Model):
     start_date = models.DateField()
     end_date = models.DateField(null=True, blank=True)
-    freq = models.CharField(max_length=16,
-                            validators=[validate_period],
-                            null=True,
-                            blank=True)
-    day_rule = models.CharField(max_length=24,
-                                choices=CHOICE_DAY_RULE.choices,
-                                default='ModifiedFollowing')
+    freq = CharField(max_length=16,
+                     validators=[validate_period],
+                     null=True,
+                     blank=True)
+    day_rule = CharField(max_length=24,
+                         choices=CHOICE_DAY_RULE.choices,
+                         default='ModifiedFollowing')
     calendar = ForeignKey(Calendar,
                           SET_NULL,
                           null=True,
@@ -1253,10 +1273,10 @@ class Schedule(models.Model):
 class SwapLeg(models.Model):
     trade = ForeignKey(Swap, CASCADE, related_name="legs")
     ccy = ForeignKey(Ccy, CASCADE, related_name='+')
-    tenor = models.CharField(max_length=8,
-                             null=True,
-                             blank=True,
-                             validators=[validate_period])
+    tenor = CharField(max_length=8,
+                      null=True,
+                      blank=True,
+                      validators=[validate_period])
     notional = DecimalField(max_digits=16,
                             decimal_places=2,
                             validators=[validate_positive])
@@ -1264,15 +1284,12 @@ class SwapLeg(models.Model):
     fixed_rate = DecimalField(max_digits=10, decimal_places=8, default=0.0)
     index = ForeignKey(RateIndex, SET_NULL, null=True)
     spread = DecimalField(max_digits=10, decimal_places=8, default=0.0)
-    day_counter = models.CharField(max_length=16,
-                                   choices=CHOICE_DAY_COUNTER.choices)
+    day_counter = CharField(max_length=16, choices=CHOICE_DAY_COUNTER.choices)
     schedule = ForeignKey(Schedule, CASCADE)
 
     def save(self, *args, **kwargs):
         if self.day_counter is None:
             self.day_counter = self.ccy.rate_day_counter
-        #if self.calendar is None:
-        #    self.calendar = self.ccy.cal
         super(SwapLeg, self).save(*args, **kwargs)
 
     def leg(self, as_of=None):  # need as_of??
@@ -1323,17 +1340,19 @@ class SwapLeg(models.Model):
     #         name=self.ccy.risk_free_curve).first().term_structure()
 
     def NPV(self, as_of, discounting_curve=None):
-        yts = discounting_curve if discounting_curve else self.discounting_curve(
-            as_of)
+        if discounting_curve:
+            yts = discounting_curve
+        else:
+            yts = self.discounting_curve(as_of)
         return ql.CashFlows.npv(self.leg(as_of),
                                 ql.YieldTermStructureHandle(yts))
 
 
 @with_mktdataset
 class Swaption(Trade):
-    product_type = models.CharField(max_length=12, default="SWAPTION")
+    product_type = CharField(max_length=12, default="SWAPTION")
     exercise_date = models.DateField(null=False)
-    buy_sell = models.CharField(max_length=1, choices=BUY_SELL, default='B')
+    buy_sell = CharField(max_length=1, choices=BUY_SELL, default='B')
 
 
 class MktDataSet:

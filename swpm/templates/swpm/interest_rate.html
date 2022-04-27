@@ -1,5 +1,7 @@
-{% extends "swpm/layout.html" %} {% load static %} {% load humanize %} {% block
-body %}
+{% extends "swpm/layout.html" %} 
+{% load static %}
+{% load humanize %} 
+{% block body %}
 <div>
   <fieldset>
     <legend>Trade List</legend>
@@ -19,7 +21,9 @@ body %}
     </table>
   </fieldset>
 </div>
-{% endblock %} {% block script %}
+{% endblock %}
+
+{% block script %}
 <script src="{% static 'swpm/index.js' %}"></script>
 <script src="{% static 'swpm/jquery-3.6.0.slim.min.js' %}"></script>
 

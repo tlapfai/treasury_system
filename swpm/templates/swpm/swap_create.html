@@ -1,0 +1,68 @@
+{% extends "swpm/layout.html" %}
+{% load static %}
+{% load humanize %} 
+{% debug %} 
+{% block body %}
+
+<div class="row trade-area container-fluid">
+  <div>
+    <form class="trade-form align-items-center">
+      {% csrf_token %}
+      <fieldset>
+        {% if valuation_message %}
+        <div class="callout"><span>{{ valuation_message }}</span></div>
+        {% endif %}
+        <div class="" id="terms" role="tabpanel" aria-labelledby="terms-tab">
+          <button type="submit" class="btn btn-primary" formaction="">Auto Fill</button>
+          <button type="submit" class="btn btn-primary">Price</button>
+          {% if user.is_authenticated %}
+            <button type="submit" class="btn btn-primary" formaction="" formmethod="POST">Do</button>
+          {% endif %}
+          <table style="width: 100%; border: solid 2px red">
+            <table style="width: 100%">
+              {{ trade_id_form.as_table }}
+            </table>
+            <table style="width: 100%">
+              {{ as_of_form.as_table }}
+            </table>
+            <table class="trade-form">
+              {{ trade_form }}
+            </table>
+            <table class="swap-legs" style="width: 100%">
+              <tbody>
+                <tr>
+                  <th>Leg 1</th>
+                  <th>Leg 2</th>
+                </tr>
+                <tr>
+                  {% for f in trade_forms %}
+                  <td>
+                    <table>
+                      {{ f.as_table }}
+                    </table>
+                  </td>
+                  {% endfor %}
+                  {{ trade_forms.management_form }}
+                </tr>
+              </tbody>
+            </table>
+            <input type="hidden" name="trade_type" value="{{ trade_type }}" />
+            <input type="hidden" name="origin_page" value="{{ request.path }}" />
+          </table>
+        </div>
+      </fieldset>
+    </form>
+  </div>
+  <!--End of class="trade-ticket">-->
+  <!-- end of class='valuation'-->
+</div>
+<!-- end of class="row"-->
+
+{% endblock %}
+{% block script %}
+
+<script src="{% static 'swpm/jquery-3.6.0.slim.min.js' %}"></script>
+<script src="https://unpkg.com/bootstrap-table@1.18.3/dist/bootstrap-table.min.js"></script>
+<script src="{% static 'swpm/index.js' %}"></script>
+
+{% endblock %}

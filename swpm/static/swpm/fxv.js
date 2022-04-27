@@ -1,17 +1,18 @@
 $(document).ready(function () {
+  const regex1 = /^(\d+[DWMYdwmy])+$/;
   const axios_cfg = { headers: { "X-CSRFToken": $.cookie("csrftoken") } };
 
   const fxvTable = new Handsontable($(".fxv-table")[0], {
-    startRows: 2,
+    startRows: 1,
     startCols: 6,
-    minSpareRows: 0,
+    minSpareRows: 1,
     contextMenu: true,
     readOnly: false,
     colHeaders: ["Tenor", "ATM", "10C", "25C", "25P", "10P"],
     data: [{ measure: "npv" }],
     // prettier-ignore
     columns: [
-            { data: "tenor", type: "text" },
+            { data: "tenor", type: "text", validator: regex1, allowInvalid: false },
             { data: "atm", type: "numeric", numericFormat: { pattern: "0,0.00" }, },
             { data: "90", type: "numeric", numericFormat: { pattern: "0,0.00" }, },
             { data: "75", type: "numeric", numericFormat: { pattern: "0,0.00" }, },
@@ -38,8 +39,6 @@ $(document).ready(function () {
   }
 
   async function save_fxv() {
-    console.log(fxvTable.getColHeader());
-    console.log(fxvTable.getData());
     const axios_cfg = { headers: { "X-CSRFToken": $.cookie("csrftoken") } };
     const data = {
       date: $("input#date").val(),
@@ -52,10 +51,10 @@ $(document).ready(function () {
   }
 
   $("#save").click(function () {
-    $(".message-area").text("");
+    $(".message-area").html("");
     save_fxv()
       .then(function (response) {
-        $(".message-area").text(`<div>${response.data.message}</div>`);
+        $(".message-area").html(`<div>${response.data.message}</div>`);
       })
       .catch(function (error) {
         var e = error.response.data.errors;

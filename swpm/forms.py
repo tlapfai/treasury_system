@@ -330,3 +330,7 @@ class FXVolatilitySettingForm(forms.Form):
     atm_type = forms.ChoiceField(label="ATM Type",
                                  choices=CHOICE_ATM_TYPE.choices)
     delta_type = forms.ChoiceField(choices=CHOICE_DELTA_TYPE.choices)
+
+
+class IRTermStructureSettingForm(forms.Form):
+    pass

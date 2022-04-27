@@ -10,6 +10,11 @@
 		<script src="{% static 'swpm/jquery-3.6.0.slim.min.js' %}"></script>
 		<script></script>
 		{% plotly_header %}
+		<style>
+			.form-check {
+				display: inline;
+			}
+		</style>
     </head>
     <body>
 	{% plotly_direct name="scn_plot" %}		

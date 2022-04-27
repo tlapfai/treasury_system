@@ -30,9 +30,9 @@
 						<tbody>
 							{% for r in search_result %}
 							<tr>
-								<td class='date'><a href="{% url 'yield_curve' ref_date=r.ref_date curve=r.name ccy=r.ccy_id %}">{{ r.ref_date |date:'Y-m-d' }}</a></td>
-								<td class='ccy'><a href="{% url 'yield_curve' ref_date=r.ref_date curve=r.name ccy=r.ccy_id %}">{{ r.ccy_id }}</a></td>
-								<td class='name'><a href="{% url 'yield_curve' ref_date=r.ref_date curve=r.name ccy=r.ccy_id %}">{{ r.name }}</a></td>
+								<td class='date'><a href="{% url 'mkt_curve_get' date=r.ref_date name=r.name ccy=r.ccy_id %}">{{ r.ref_date |date:'Y-m-d' }}</a></td>
+								<td class='ccy'><a href="{% url 'mkt_curve_get' date=r.ref_date name=r.name ccy=r.ccy_id %}">{{ r.ccy_id }}</a></td>
+								<td class='name'><a href="{% url 'mkt_curve_get' date=r.ref_date name=r.name ccy=r.ccy_id %}">{{ r.name }}</a></td>
 							</tr>
 							{% endfor %}
 						</tbody>

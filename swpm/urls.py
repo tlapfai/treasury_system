@@ -26,19 +26,23 @@ urlpatterns = [
     path('trade/fxo/create', views.FXOView.as_view(), name='fxo_create'),
     path('trade/fxo/<int:id>', views.FXOView.as_view(), name='fxo_update'),
     path('api/trade/fxo/price', views.fxo_price, name='fxo_price'),  # api
+    path('trade/swap/create', views.SwapView.as_view(), name='swap_create'),
     path('trade/fxo/scn', views.fxo_scn, name='fxo_scn'),
     path('mkt/fxv', views.FXVolView.as_view(), name='mkt_fxv'),
+    path('mkt/curve', views.YieldCurveView.as_view(), name='mkt_curve'),
     re_path(r'^mkt/fxv/(?P<ccy_pair>[A-Z]+)/(?P<date>\d{4}-\d{2}-\d{2})$',
             views.FXVolView.as_view(),
             name='mkt_fxv_get'),
-    re_path(
-        r'^api/mkt/fxv/atm/(?P<ccy_pair>[A-Z]+)/(?P<date>\d{4}-\d{2}-\d{2})$',
-        views.api_fxv),
     path('api/mkt/fxv', views.api_fxv),
+    re_path(
+        r'^mkt/curve/(?P<ccy>[A-Z]+)/(?P<name>[A-Z]+)/(?P<date>\d{4}-\d{2}-\d{2})$',
+        views.YieldCurveView.as_view(),
+        name='mkt_curve_get'),
+    path('api/mkt/curve', views.api_curve),
+    path('api/day_counters', views.api_day_counters),
     path('load_fxo_mkt', views.load_fxo_mkt, name='load_fxo_mkt'),  # api
     path('api/tenor2date', views.tenor2date, name='tenor2date'),  # api
     path('yield_curve/search', views.yield_curve, name='yield_curve_search'),
-    #re_path(r'^yield_curve/(?P<curve>[-\w\s]+)/(?P<ref_date>\d{4}-\d{2}-\d{2})$', views.yield_curve, name='yield_curve'),
     # \s is for whitespace
     re_path(
         r'^yield_curve/(?P<ccy>[-\w]+)/(?P<curve>[-\w]+)/(?P<ref_date>\d{4}-\d{2}-\d{2})$',
@@ -50,6 +54,5 @@ urlpatterns = [
          views.market_data_import,
          name='market_data_import'),
     path('load_market_data', views.load_market_data, name='load_market_data'),
-    re_path(r'api/', include(router.urls)),
     path('fxo_price', views.fxo_price, name='fxo_price'),
 ]

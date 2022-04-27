@@ -45,7 +45,7 @@ legend {
   vertical-align: middle;
 }
 
-div[class^="trade-ticket"] {
+div[class^="trade-ticket"], div[class$="-area"] {
   padding: 1em;
 }
 
