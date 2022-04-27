@@ -71,4 +71,44 @@ $(document).ready(function () {
   $("#ccy").change(function () {
     $("#ccy").val($("#ccy").val().toUpperCase());
   });
+
+  async function calc_curve() {
+    const date = $("input#date").val();
+    const ccy = $("input#ccy").val().trim();
+    const name = $("input#name").val().trim();
+    const data = { date: date, ccy: ccy, name: name };
+    return await axios.get("/api/mkt/curve/calc", { params: data }, axios_cfg);
+  }
+
+  $("#zero-calc").click(function () {
+    calc_curve().then(function (response) {
+      console.log(response.data.result);
+      var myChart = echarts.init(document.getElementById("plot"));
+      var option = {
+        title: { text: "Zero Rate Term Structure" },
+        tooltip: {},
+        legend: { data: ["Sold"] },
+        xAxis: {
+          type: "category",
+          boundaryGap: false,
+          data: response.data.result.dates,
+        },
+        yAxis: { type: "value" },
+        series: [
+          {
+            showSymbol: true,
+            type: "line",
+            data: response.data.result.zeroRates,
+          },
+        ],
+      };
+      myChart.setOption(option);
+    });
+  });
+
+  $("#test").click(function () {
+    calc_curve().then(function (response) {
+      console.log(response.data.result);
+    });
+  });
 });

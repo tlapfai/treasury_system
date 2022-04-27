@@ -587,10 +587,11 @@ def api_curve(request):
             yts = IRTermStructure.objects.filter(name=name,
                                                  ccy=ccy,
                                                  ref_date=date).first()
-            return JsonResponse({
-                'result': list(yts.rates.all().values()),
-            },
-                                safe=False)
+            return JsonResponse(
+                {
+                    'result': list(yts.rates.all().order_by('tenor').values()),
+                },
+                safe=False)
         except (RuntimeError, KeyError) as error:
             return JsonResponse({'errors': [error.args]}, status=500)
     elif request.method == 'POST':
@@ -631,6 +632,35 @@ def api_curve(request):
             else:
                 message = str(cv) + ' updated.'
             return JsonResponse({'message': message})
+        except (RuntimeError, KeyError) as error:
+            return JsonResponse({'errors': [error.args]}, status=500)
+
+
+def api_curve_calc(request):
+    if request.method == 'GET':
+        try:
+            date = request.GET.get('date')
+            ccy = request.GET.get('ccy')
+            name = request.GET.get('name')
+            yts = IRTermStructure.objects.filter(name=name,
+                                                 ccy=ccy,
+                                                 ref_date=date).first()
+            ytsObj = yts.term_structure()
+            dates = ytsObj.dates()
+            zeroRates = [
+                ytsObj.zeroRate(d, ql.Actual365Fixed(), ql.Continuous).rate()
+                for d in dates
+            ]
+            isoDates = [d.ISO() for d in dates]
+
+            return JsonResponse(
+                {
+                    'result': {
+                        'dates': isoDates,
+                        'zeroRates': zeroRates,
+                    },
+                },
+                safe=False)
         except (RuntimeError, KeyError) as error:
             return JsonResponse({'errors': [error.args]}, status=500)
 

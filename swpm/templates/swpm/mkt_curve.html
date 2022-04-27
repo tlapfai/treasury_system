@@ -31,8 +31,8 @@
 </div>
 <div class="action-area">
   <button type="button" class="btn btn-primary" id="save">Save</button>
-  <button type="button" class="btn btn-primary" id="calculate">Calculate</button>
-  <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#exampleModal">Launch demo modal</button>
+  <button type="button" class="btn btn-primary" id="zero-calc" data-bs-toggle="modal" data-bs-target="#plotModal">Zero Curve</button>
+  <button type="button" class="btn btn-primary" id="test">test</button>
 </div>
 <div class="data-area">
   <div>
@@ -44,21 +44,18 @@
 <div class="message-area"></div>
 
 
-
-<!-- Modal -->
-<div class="modal fade" id="exampleModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
+<div class="modal fade" id="plotModal" tabindex="-1" aria-labelledby="plotLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-xl">
+    <div class="modal-content" style="width: 960px">
       <div class="modal-header">
-        <h5 class="modal-title" id="exampleModalLabel">Zero Curve</h5>
+        <h5 class="modal-title" id="plotLabel">Zero Curve</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        ...
+        <div id="plot" style="width: 920px; height:480px; margin:auto;">Loading...</div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-        <button type="button" class="btn btn-primary">Save changes</button>
       </div>
     </div>
   </div>
@@ -66,6 +63,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.js"></script>
 <link rel="stylesheet" media="screen" href="http://handsontable.com/dist/jquery.handsontable.full.css">
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.3.2/dist/echarts.min.js"></script>
 <script src="{% static 'swpm/curve.js' %}"></script>
 
 {% endblock %}

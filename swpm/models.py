@@ -280,7 +280,7 @@ class InterestRateQuote(models.Model):
                      related_name="rates")
     rate = models.DecimalField(max_digits=12, decimal_places=8)
     tenor = CharField(max_length=5, validators=[validate_period])
-    instrument = CharField(max_length=5)
+    instrument = CharField(max_length=12)
     ccy = ForeignKey(Ccy, CASCADE, related_name="ir_quotes")
     day_counter = CharField(max_length=16,
                             choices=CHOICE_DAY_COUNTER.choices,
@@ -337,7 +337,8 @@ class InterestRateQuote(models.Model):
         elif self.instrument == "SOFRFUT":
             return ql.SofrFutureRateHelper(), q
         elif self.instrument == "SWAP":
-            if self.ccy.code == "USD":  # https://quant.stackexchange.com/questions/32345/quantlib-python-dual-curve-bootstrapping-example
+            if self.ccy.code == "USD":
+                # https://quant.stackexchange.com/questions/32345/quantlib-python-dual-curve-bootstrapping-example
                 swapIndex = ql.UsdLiborSwapIsdaFixAm(tenor_)
                 ref_curve = kwargs.get('ref_curve')  # is a handle
                 if ref_curve:
@@ -347,25 +348,29 @@ class InterestRateQuote(models.Model):
                     return ql.SwapRateHelper(q, swapIndex), q
         elif self.instrument in ["OIS", "SOFROIS"]:
             if self.instrument == "OIS":
-                overnight_index = ql.FedFunds()
+                idx = ql.FedFunds()
+                paymentLag_ = 2
+                settlementDays_ = 2
             else:
-                overnight_index = ql.Sofr()
+                idx = ql.Sofr()
+                paymentLag_ = 0
+                settlementDays_ = 0
 
-            if self.ccy.code == "USD":
+            if self.ccy_id == "USD":
+                cal_ = ql.UnitedStates()
                 if self.tenor == '1D':
-                    return ql.DepositRateHelper(q, tenor_, 0,
-                                                ql.UnitedStates(),
-                                                ql.Following, False,
-                                                ql.Actual360()), q
+                    #return ql.DepositRateHelper(q, tenor_, 0, cal_, ql.Following, False, ql.Actual360()), q
+                    return ql.DepositRateHelper(q, ql.Sofr()), q
                 else:
-                    settlementDays = 2
+                    # https://github.com/lballabio/QuantLib-SWIG/blob/a88a28b95e7abdacd1112f23864a63523433711b/SWIG/ratehelpers.i#L315
                     self.helper_obj = ql.OISRateHelper(
-                        2,
+                        settlementDays_,
                         tenor_,
                         q,
-                        overnight_index,
-                        paymentLag=0,
-                        paymentCalendar=ql.UnitedStates()), q
+                        idx,
+                        paymentLag=paymentLag_,
+                        paymentFrequency=ql.Annual,
+                        paymentCalendar=cal_), q
                     return self.helper_obj
         elif self.instrument == "FXSW":  # ql.FxSwapRateHelper(fwdPoint, spotFx, tenor, fixingDays, calendar, convention, endOfMonth, isFxBaseCurrencyCollateralCurrency, collateralCurve)
             if self.ccy_pair:
@@ -416,7 +421,6 @@ class IRTermStructure(models.Model):
     def __init__(self, *args, **kwargs) -> None:
         self.yts = None
         super().__init__(*args, **kwargs)
-        #print(f'Called __init__() of {str(self.name)} ({hex(id(self))})')
 
     def term_structure(self):
         if self.yts:
@@ -424,6 +428,8 @@ class IRTermStructure(models.Model):
 
         if self.mktdataset == None:
             self.mktdataset = MktDataSet(self.ref_date)
+
+        ql.Settings.instance().evaluationDate = qlDate(self.ref_date)
 
         ref_curve_ = None
         if self.ref_curve and self.ref_ccy:
