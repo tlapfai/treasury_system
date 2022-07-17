@@ -116,7 +116,6 @@ class FXOLowerBarrierDetailForm(ModelForm):
 
 
 class FXOForm(ModelForm):
-    #tenor = forms.CharField(required=False, help_text='Use D, W, M and Y')
     tenor = forms.CharField(required=False, validators=[validate_period])
 
     class Meta:
@@ -190,28 +189,47 @@ class FXOForm(ModelForm):
     #    self.fields['trade_date'].widget.attrs.update({'type': 'date'})
 
 
-class FXOValuationForm(forms.Form):
-    npv = forms.FloatField(label="NPV", disabled=True)
-    delta = forms.FloatField(label="Delta", disabled=True)
-    gamma = forms.FloatField(disabled=True)
-    vega = forms.FloatField(disabled=True)
-    theta = forms.FloatField(disabled=True)
-    dividendRho = forms.FloatField(disabled=True, label="Ccy1 Rho")
-    rho = forms.FloatField(disabled=True, label="Ccy2 Rho")
-    itmCashProbability = forms.FloatField(disabled=True,
-                                          label="ITM Cash Probability")
+# class FXOValuationForm(forms.Form):
+#     npv = forms.FloatField(label="NPV", disabled=True)
+#     delta = forms.FloatField(label="Delta", disabled=True)
+#     gamma = forms.FloatField(disabled=True)
+#     vega = forms.FloatField(disabled=True)
+#     theta = forms.FloatField(disabled=True)
+#     dividendRho = forms.FloatField(disabled=True, label="Ccy1 Rho")
+#     rho = forms.FloatField(disabled=True, label="Ccy2 Rho")
+#     itmCashProbability = forms.FloatField(disabled=True,
+#                                           label="ITM Cash Probability")
+
+
+class ScheduleForm(ModelForm):
+
+    class Meta:
+        model = Schedule
+        fields = [
+            'start_date', 'end_date', 'tenor', 'freq', 'day_rule', 'calendar'
+        ]
+        labels = {'freq': 'Frequency'}
+        widgets = {
+            'start_date': DateInput(attrs=date_attrs),
+            'end_date': DateInput(attrs=date_attrs),
+        }
 
 
 class SwapLegForm(ModelForm):
 
     class Meta:
         model = SwapLeg
-        fields = '__all__'
+        fields = [
+            'ccy', 'notional', 'pay_rec', 'gearing', 'index', 'spread',
+            'fixed_rate'
+        ]
         widgets = {
-            #'effective_date': DateInput(attrs={'type': 'date'}),
-            #'maturity_date': DateInput(attrs={'type': 'date'}),
+            'notional': TextInput(attrs=number_attrs),
+            'gearing': TextInput(attrs=number_attrs),
+            'spread': TextInput(attrs=number_attrs),
+            'fixed_rate': TextInput(attrs=number_attrs),
         }
-        #labels = {'pay_rec': 'Pay/Receive', 'calendar': 'Payment calendar'}
+        labels = {'pay_rec': 'Pay/Receive'}
 
     # def clean(self):
     #     cleaned_data = super().clean()
@@ -258,14 +276,6 @@ class SwapForm(ModelForm):
 #         unique_checks, date_checks = form.instance._get_unique_checks(exclude=exclude)
 #         all_unique_checks.update(unique_checks)
 #         all_date_checks.update(date_checks)
-
-
-class SwapValuationForm(forms.Form):
-    npv = forms.FloatField(label="NPV", disabled=True)
-    leg1npv = forms.FloatField(label="Leg 1 NPV", disabled=True)
-    leg2npv = forms.FloatField(label="Leg 2 NPV", disabled=True)
-    leg1bpv = forms.FloatField(label="Leg 1 BPV", disabled=True)
-    leg2bpv = forms.FloatField(label="Leg 2 BPV", disabled=True)
 
 
 class TradeDetailForm(ModelForm):

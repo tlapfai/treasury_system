@@ -10,6 +10,7 @@ from django.db.models.base import Model
 from django.db.models.deletion import CASCADE, DO_NOTHING, SET_NULL, SET_DEFAULT
 from django.db.models.fields.related import ForeignKey
 from django.db.models.fields import DecimalField, CharField
+from django.forms import DateField, IntegerField
 from django.utils import timezone
 from django.utils.translation import gettext as _
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
@@ -292,6 +293,7 @@ class InterestRateQuote(models.Model):
                        null=True,
                        blank=True,
                        related_name='quotes')
+    days_key = models.DateField(null=True, blank=True)
 
     class Meta:
         unique_together = ('name', 'ref_date')
@@ -299,6 +301,12 @@ class InterestRateQuote(models.Model):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.helper_obj = None
+
+    def save(self, *args, **kwargs) -> None:
+        self.days_key = ql.NullCalendar().advance(qlDate(self.ref_date),
+                                                  ql.Period(
+                                                      self.tenor)).to_date()
+        super().save(*args, **kwargs)
 
     def helper(self, **kwargs):
         if self.helper_obj:
@@ -337,7 +345,7 @@ class InterestRateQuote(models.Model):
         elif self.instrument == "SOFRFUT":
             return ql.SofrFutureRateHelper(), q
         elif self.instrument == "SWAP":
-            if self.ccy.code == "USD":
+            if self.ccy_id == "USD":
                 # https://quant.stackexchange.com/questions/32345/quantlib-python-dual-curve-bootstrapping-example
                 swapIndex = ql.UsdLiborSwapIsdaFixAm(tenor_)
                 ref_curve = kwargs.get('ref_curve')  # is a handle
@@ -460,10 +468,10 @@ class IRTermStructure(models.Model):
         return f"{self.ccy} {self.name} as of {self.ref_date.strftime('%Y-%m-%d')}"
 
 
+@with_mktdataset
 class RateIndex(models.Model):
     name = CharField(max_length=16, primary_key=True)
     ccy = ForeignKey(Ccy, CASCADE, related_name="rate_indexes")
-    #index = CharField(max_length=16)
     tenor = CharField(max_length=16, validators=[validate_period])
     day_counter = CharField(max_length=16,
                             choices=CHOICE_DAY_COUNTER.choices,
@@ -471,51 +479,39 @@ class RateIndex(models.Model):
                             blank=True)
     yts = CharField(max_length=16, null=True, blank=True)
 
+    # yts: only name, e.g. LIBOR
+
     class Meta:
         unique_together = ('name', 'tenor')
 
     def __str__(self):
         return self.name
 
-    def get_index(self, ref_date=None, eff_date=None):
-        if self.name == 'OIS':
-            idx_cls = ql.OvernightIndex
+    def index(self, ref_date=None, eff_date=None):
+        if self.mktdataset == None:
+            self.mktdataset = MktDataSet(ref_date)
+
+        yts = self.mktdataset.get_yts(self.ccy_id, self.yts)
+        ytsHandle = ql.YieldTermStructureHandle(yts)
+
+        if self.name == 'SOFR':
+            idxObj = ql.Sofr(ytsHandle)
         elif self.name == 'LIBOR' and self.ccy.code == 'USD':
-            idx_cls = ql.USDLibor
+            idxObj = ql.USDLibor(ql.Period(self.tenor), ytsHandle)
         elif self.name == 'OIS' and self.ccy.code == 'USD':
-            idx_cls = ql.OvernightIndex
-
-        if ref_date:
-            yts = IRTermStructure.objects.get(
-                name=self.yts, ccy=self.ccy,
-                ref_date=ref_date).term_structure()
-
-        if self.name == 'LIBOR' and self.ccy.code == 'USD':
-            if yts:
-                idx_obj = idx_cls(ql.Period(self.tenor),
-                                  ql.YieldTermStructureHandle(yts))
-            else:
-                idx_obj = idx_cls(ql.Period(self.tenor))
-        elif self.name == 'EFFR' and self.ccy.code == 'USD':
-            if yts:
-                idx_obj = idx_cls('USD EFFR', 1, ql.USDCurrency(),
-                                  ql.Actual360(),
-                                  ql.YieldTermStructureHandle(yts))
-            else:
-                idx_obj = idx_cls('USD EFFR', 1, ql.USDCurrency(),
-                                  ql.Actual360())
+            idxObj = ql.OvernightIndex('USD EFFR', 1, ql.USDCurrency(),
+                                       ql.Actual360(), ytsHandle)
 
         if eff_date:
-            first_fixing_date = idx_obj.fixingDate(qlDate(eff_date))
-            for f in self.fixings.filter(
-                    ref_date__gte=first_fixing_date.ISO()):
-                idx_obj.addFixings([qlDate(f.ref_date)], [f.value])
+            firstFixingDate = idxObj.fixingDate(qlDate(eff_date))
+            for f in self.fixings.filter(ref_date__gte=firstFixingDate.ISO()):
+                idxObj.addFixing(qlDate(f.ref_date), float(f.value))
 
-        return idx_obj
+        return idxObj
 
 
 class RateIndexFixing(models.Model):
-    value = models.FloatField()
+    value = models.DecimalField(max_digits=12, decimal_places=8)
     index = ForeignKey(RateIndex, CASCADE, related_name="fixings")
     ref_date = models.DateField()
 
@@ -663,18 +659,6 @@ class FXVolatility(models.Model):
             self.mktdataset = MktDataSet(self.ref_date)
 
         volatilities = []
-        """solver = ql.Brent()
-        accuracy = 1e-8
-        step = 1e-6
-        if kwargs.get('maturity'):
-            mat = kwargs.get('maturity')
-            ii = []
-            ii.append(max([j for j, m in maturities if m <= qlDate(mat)]))
-            ii.append(min([j for j, m in maturities if m >= qlDate(mat)]))
-            surf_vol = [surf_vol[i_] for i_ in ii if i_]
-            surf_delta = [surf_delta[i_] for i_ in ii if i_]
-            surf_delta_type = [surf_delta_type[i_] for i_ in ii if i_]
-            maturities = [maturities[i_] for i_ in ii if i_]"""
 
         if self.spot == None:
             self.spot = self.mktdataset.get_fxspot(self.ccy_pair.name)
@@ -753,21 +737,6 @@ class FXVolatilityQuote(models.Model):
             return f'{self.surface}, {self.tenor}, ATM, {self.atm_type}'
         else:
             return f'{self.surface}, {self.tenor}, {self.delta}, {self.delta_type}'
-
-
-class FXOManager(models.Manager):
-
-    def create_fxo(self, trade_date, maturity_date, ccy_pair, strike_price,
-                   type, cp, notional_1):
-        fxo = self.create(trade_date=trade_date,
-                          maturity_date=maturity_date,
-                          ccy_pair=ccy_pair,
-                          strike_price=strike_price,
-                          type=type,
-                          cp=cp,
-                          notional_1=notional_1,
-                          notional_2=notional_1 * strike_price)
-        return fxo
 
 
 class Portfolio(models.Model):
@@ -975,7 +944,6 @@ class FXO(Trade):
                         choices=FXO_SUBTYPE,
                         blank=True,
                         null=True)
-    objects = FXOManager()
 
     def __str__(self):
         return f"FXO ID: {self.id}, {self.ccy_pair}, Notional={self.notional_1:.0f}, K={self.strike_price}, {self.cp}"
@@ -1201,35 +1169,27 @@ class VanillaSwap(Trade):
 
 @with_mktdataset
 class Swap(Trade):
-    # objects = SwapManager()
     product_type = CharField(max_length=12, default="SWAP")
     maturity_date = models.DateField(null=True, blank=True)
 
-    def instrument(self, as_of):
-        # maybe need to use x.leg(as_of=xxxxx)
-        legs = [x.leg(as_of=as_of) for x in self.legs.all()]
+    def instrument(self):
+        legs = [x.leg() for x in self.legs.all()]
         is_pay = [leg.pay_rec > 0 for leg in self.legs.all()]
         return ql.Swap(legs, is_pay)
 
-    # def make_pricing_engine(self, as_of):
-    #     leg = self.legs.get(pay_rec=-1)
-    #     yts1 = leg.ccy.rf_curve.filter(ref_date=as_of).first().term_structure()
-    #     return ql.DiscountingSwapEngine(ql.YieldTermStructureHandle(yts1))
-
     def make_pricing_engine(self):
         if self.mktdataset:
-            ccy = self.ccy.code
+            ccy = self.legs.values('ccy')[0]['ccy']
             name = self.mktdataset.get_rfyts_name(ccy)
             yts = self.mktdataset.get_yts(ccy, name)
-        ytsh = ql.YieldTermStructureHandle
-        return ql.DiscountingSwapEngine(ytsh(yts))
+        return ql.DiscountingSwapEngine(ql.YieldTermStructureHandle(yts))
 
     def self_inst(self):
         self.inst = self.instrument()
         self.inst.setPricingEngine(self.make_pricing_engine())
 
-    #def __str__(self):
-    #    return f"Swap ID: {self.id}, Notional={self.legs.first().notional:.0f} {self.legs.first().ccy} vs {self.legs.last().notional:.0f} {self.legs.last().ccy}"
+    def __str__(self):
+        return f"Swap ID: {self.id}"
 
     def delete(self, *args, **kwargs):
         if self.detail:
@@ -1250,6 +1210,10 @@ class SchedulePeriod(models.Model):
 class Schedule(models.Model):
     start_date = models.DateField()
     end_date = models.DateField(null=True, blank=True)
+    tenor = CharField(max_length=8,
+                      null=True,
+                      blank=True,
+                      validators=[validate_period])
     freq = CharField(max_length=16,
                      validators=[validate_period],
                      null=True,
@@ -1264,7 +1228,7 @@ class Schedule(models.Model):
                           default=None)
 
     def __str__(self):
-        return f"{self.start_date}~{self.end_date} {self.freq}"
+        return f"{self.start_date}~{self.end_date}"
 
     def schedule(self):
         cdr = self.calendar.calendar()
@@ -1279,16 +1243,17 @@ class Schedule(models.Model):
 class SwapLeg(models.Model):
     trade = ForeignKey(Swap, CASCADE, related_name="legs")
     ccy = ForeignKey(Ccy, CASCADE, related_name='+')
-    tenor = CharField(max_length=8,
-                      null=True,
-                      blank=True,
-                      validators=[validate_period])
     notional = DecimalField(max_digits=16,
                             decimal_places=2,
                             validators=[validate_positive])
     pay_rec = models.IntegerField(choices=SWAP_PAY_REC)
-    fixed_rate = DecimalField(max_digits=10, decimal_places=8, default=0.0)
-    index = ForeignKey(RateIndex, SET_NULL, null=True)
+    gearing = DecimalField(default=1., max_digits=8, decimal_places=4)
+    fixed_rate = DecimalField(max_digits=10, decimal_places=8, blank=True)
+    index = ForeignKey(RateIndex,
+                       SET_NULL,
+                       blank=True,
+                       null=True,
+                       related_name='+')
     spread = DecimalField(max_digits=10, decimal_places=8, default=0.0)
     day_counter = CharField(max_length=16, choices=CHOICE_DAY_COUNTER.choices)
     schedule = ForeignKey(Schedule, CASCADE)
@@ -1298,14 +1263,13 @@ class SwapLeg(models.Model):
             self.day_counter = self.ccy.rate_day_counter
         super(SwapLeg, self).save(*args, **kwargs)
 
-    def leg(self, as_of=None):  # need as_of??
+    def leg(self):  # need as_of??
         schd = self.schedule.schedule()
         dc = QL_DAY_COUNTER[self.day_counter]
         ntl = float(self.notional)
-        # day_rule = QL_DAY_RULE[self.day_rule]
         if self.index:
-            leg_idx = self.index.get_index(
-                ref_date=as_of, eff_date=self.effective_date)  # need to fix
+            legIndex = self.mktdataset.get_irindex(self.index_id)
+            return ql.IborLeg(schd, legIndex).withNotionals(ntl)
             if 'IBOR' in self.index.name:
                 leg = ql.IborLeg([self.notional],
                                  schd,
@@ -1393,6 +1357,7 @@ class MktDataSet:
         self.ytss = dict()
         self.spots = dict()  # FxSpotRateQuote
         self.fxvols = dict()
+        self.irindexs = dict()
         if kwargs:
             self.add_ccy_pair_with_args(**kwargs)
 
@@ -1483,6 +1448,16 @@ class MktDataSet:
             'qts': self.get_yts(ccy1, self.get_fxyts_name(ccy1)),
             'rts': self.get_yts(ccy2, self.get_fxyts_name(ccy2))
         }
+
+    def get_irindex(self, name):
+        try:
+            irindex = self.irindexs.get(name)
+            if irindex == None:
+                irindex = RateIndex.objects.get(name=name)
+                self.irindexs[name] = irindex
+            return irindex.index(ref_date=self.date, eff_date=self.date)
+        except RuntimeError as error:
+            raise error
 
     def add_yts(self, ccy, name, yts):
         self.ytss[ccy + " " + name] = yts

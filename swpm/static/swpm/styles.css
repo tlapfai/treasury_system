@@ -1,7 +1,3 @@
-* {
-  font-size: smaller;
-}
-
 legend {
   font-size: 0.75rem;
 }
@@ -10,15 +6,21 @@ legend {
   color: red;
 }
 
-/* .valuation-table, .valuation-table td , .trade-list td, .trade-list th{
-  border: 1px solid black;
-  border-collapse: collapse;
-  padding: 4px;
-  text-align: right;
-} */
+[class^="pg-"] {
+  margin: auto;
+}
 
 .pg-body {
-  padding: 10px;
+  padding: 1em;
+}
+
+.row .card {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+table.leg-table th {
+  min-width: 120px;
 }
 
 .main-body {
@@ -50,7 +52,6 @@ div[class^="trade-ticket"], div[class$="-area"] {
 }
 
 .val-result-block {
-  padding: 1em;
   float: left;
   width: auto;
 }
@@ -67,7 +68,6 @@ nav.navbar li a {
 }
 
 .flex-item {
-  padding: 10px;
   margin-top: 10px;
   border: solid rgba(52, 122, 250, 0.699);
 }
@@ -189,9 +189,14 @@ table.valuation td {
   text-align: right;
 }
 
-li.nav-item {
-  width: auto;
-}
 a.nav-link {
   text-align: center;
 }
+
+[class^="bi-"] {
+  font-size: 1rem; 
+}
+
+.card-body {
+  padding: 0;
+} 

@@ -6,48 +6,145 @@
 
 <div class="trade-area container-fluid">
   <form class="trade-form align-items-center">
-    {% csrf_token %}
+    
     <input type="hidden" name="trade_type" value="{{ trade_type }}" />
     <input type="hidden" name="origin_page" value="{{ request.path }}" />
+    {% csrf_token %}
 
-    <input type="date" class="as_of" name="as_of" required id="id_as_of">
-    <span id="trade-id">ID: {{ trade_id }}</span>
+    <div class="row justify-content-between" style="padding: 0.5em">
+      <div class="col-2" id="trade-id" style="display: inline-block">
+        ID: {{ trade_id }}
+      </div>
+      <div class="col-2" style="display: inline-block; text-align: right;">
+        <input type="date" class="as_of" name="as_of" required id="id_as_of">
+      </div>
+    </div>
+
+    <div class="invisible" id="form-alert"></div>
     {% if valuation_message %}
       <div class="callout"><span>{{ valuation_message }}</span></div>
     {% endif %}
+
     <div class="btn-list">
       <button id="btn-mkt" class="btn btn-primary">Load Market Data</button>
       <button id="btn-auto-fill" class="btn btn-primary" formaction="">Auto Fill</button>
       <button id="btn-std-fill" class="btn btn-secondary" formaction="">Standard Trade</button>
       <button id="btn-price" class="btn btn-primary">Price</button>
-      <button id="btn-scn" type="submit" formaction="{% url 'fxo_scn' %}" class="btn btn-primary" formmethod="POST" formtarget="scn_window">Scenario</button>
+      {% comment %} <button id="btn-scn" type="submit" formaction="{% url 'fxo_scn' %}" class="btn btn-primary" formmethod="POST" formtarget="scn_window">Scenario</button> {% endcomment %}
+      <button id="btn-scn-pop" type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#plot-scn">Scn Pop</button>
       {% if user.is_authenticated %}
         <button type="submit" class="btn btn-primary" formaction="{% url 'fxo_create' %}" formmethod="POST">Do</button>
       {% endif %}
     </div>
-    <div id="form-alert"></div>
-    {% include 'swpm/includes/fxo_form.html' with form=form %}
-    <div class="trade-ticket-permium row g-2" style="vertical-align: middle;">
-      <div class="subset-header col-lg-1">Premium: </div>
-      {% include 'swpm/includes/cashflow_form.html' with form=cashflowform %}
+
+    <div class="card">
+      <div class="card-header">
+        Deal Term
+      </div>
+      <div class="card-body">
+          
+          {% include 'swpm/includes/fxo_form.html' with form=form %}
+          <div class="trade-ticket-permium row g-2" style="vertical-align: middle;">
+            <div class="subset-header col-lg-1">Premium: </div>
+            {% include 'swpm/includes/cashflow_form.html' with form=cashflowform %}
+          </div>
+          <div class="trade-ticket-bar-up row g-2" style="display: none;">{% include 'swpm/includes/barrier_form.html' with form=lower_barrier_detail_form %}</div>
+          <div class="trade-ticket-bar-dn row g-2" style="display: none;">{% include 'swpm/includes/barrier_form.html' with form=upper_barrier_detail_form %}</div>
+        
+      </div>
     </div>
-    <div class="trade-ticket-bar-up row g-2" style="display: none;">{% include 'swpm/includes/barrier_form.html' with form=lower_barrier_detail_form %}</div>
-    <div class="trade-ticket-bar-dn row g-2" style="display: none;">{% include 'swpm/includes/barrier_form.html' with form=upper_barrier_detail_form %}</div>
   </form>
 </div>
+
 <div class="val-result container-fluid">
-  <div class="val-result-block" style="min-width: 216px; height: 235px;">
-    <h4>Parameter</h4>
-    <div id="mkt-table"></div>
+  <div class="card val-result-block" style="min-width: 180px; min-height: 200px;">
+    <div class="card-header">Parameter</div>
+    <div class="card-body" style="padding: 0"><div id="mkt-table"></div></div>
   </div>
-  <div class="val-result-block" style="min-width: 516px; height: 235px;">
-    <h4>Valuation</h4>
-    <div id="valuation-table"></div>
+  <div class="card val-result-block" style="min-width: 460px; min-height: 200px;">
+    <div class="card-header">Valuation</div>
+    <div class="card-body" style="padding: 0"><div id="valuation-table"></div></div>
+  </div>
+</div>
+
+<div class="modal fade" id="plot-scn" tabindex="-1" aria-labelledby="plotLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-xl">
+    <div class="modal-content" style="width: 960px; margin: auto;">
+      <div class="modal-header">
+        <h5 class="modal-title" id="plotLabel">Scenario Analysis</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="plot-body-scn" style="width: 920px; height:480px; margin:auto;">Loading...</div>
+          <form id="scn-form">
+            <div id="plot-ctrl-bar" class="row">
+              <div class="col-2">
+                <fieldset>
+                  <legend>Value</legend>
+                  <div class="form-check">
+                    <input type="radio" class="form-check-input" name="scn-measure" id="measure-npv" value="NPV" checked>
+                    <label class="form-check-label" for="measure-npv">NPV</label>
+                  </div>
+                  <div class="form-check">
+                    <input type="radio" class="form-check-input" name="scn-measure" id="measure-delta" value="Delta">
+                    <label class="form-check-label" for="measure-delta">Delta</label>
+                  </div>
+                  <div class="form-check">
+                    <input type="radio" class="form-check-input" name="scn-measure" id="measure-gamma" value="Gamma">
+                    <label class="form-check-label" for="measure-gamma">Gamma</label>
+                  </div>
+                  <div class="form-check">
+                    <input type="radio" class="form-check-input" name="scn-measure" id="measure-vega" value="Vega">
+                    <label class="form-check-label" for="measure-vega">Vega</label>
+                  </div>
+                </fieldset>
+              </div>
+            <div class="col-2">
+              <fieldset>
+                <legend>Unit</legend>
+                <div class="form-check">
+                  <input type="radio" class="form-check-input" name="scn-unit" id="unit-ccy1" value="Ccy1">
+                  <label class="form-check-label" for="unit-ccy1">Ccy1</label>
+                </div>
+                <div class="form-check">
+                  <input type="radio" class="form-check-input" name="scn-unit" id="unit-ccy2" value="Ccy2" checked>
+                  <label class="form-check-label" for="unit-ccy2">Ccy2</label>
+                </div>
+                <div class="form-check">
+                  <input type="radio" class="form-check-input" name="scn-unit" id="unit-ccy1pct" value="Ccy1%">
+                  <label class="form-check-label" for="unit-ccy1pct">Ccy1%</label>
+                </div>
+                <div class="form-check">
+                  <input type="radio" class="form-check-input" name="scn-unit" id="unit-ccy2pct" value="Ccy2%">
+                  <label class="form-check-label" for="unit-ccy2pct">Ccy2%</label>
+                </div>
+              </fieldset>
+            </div>
+            <div class="col-2">
+              <legend>Range<legend>
+              <label for="scn-lo">From</label>
+              <input type="text" class="form-control" style="text-align: right" id="scn-lo">
+              <label for="scn-up">To</label>
+              <input type="text" class="form-control" style="text-align: right" id="scn-up">
+            </div>
+            <div class="col-2">
+            </div>
+            <div class="col-2" style="text-align: right;">
+              <button type="button" class="btn btn-primary" id="btn-scn-calc">Calculate</button>
+            </div>
+          </form>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.js"></script>
 <link rel="stylesheet" media="screen" href="http://handsontable.com/dist/jquery.handsontable.full.css">
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.3.2/dist/echarts.min.js"></script>
 <script src="{% static 'swpm/fxo.js' %}"></script>
 
 {% endblock %}

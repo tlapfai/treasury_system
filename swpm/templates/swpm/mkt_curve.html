@@ -4,49 +4,66 @@
 {% debug %} 
 {% block body %}
 
-<div class="selection-area">
-  <form action="{% url 'mkt_curve' %}" method="GET">
-    <label for="date">Date: </label>
-    {% if date %}
-      <input type="date" id="date" name="date" value='{{ date }}'/>
-    {% else %}
-      <input type="date" id="date" name="date"/>
-    {% endif %}
-    <label for="ccy">Currency: </label>
-    {% if ccy %}
-      <input type="text" id="ccy" name="ccy" value='{{ ccy }}'/>
-    {% else %}
-      <input type="text" id="ccy" name="ccy"/>
-    {% endif %}
-    <label for="name">Name: </label>
-    {% if name %}
-      <input type="text" id="name" name="name" value='{{ name }}'/>
-    {% else %}
-      <input type="text" id="name" name="name"/>
-    {% endif %}
-    <input type="submit" value="Choose"/>
-  </form>
-</div>
-<div class="def-area">
-</div>
-<div class="action-area">
-  <button type="button" class="btn btn-primary" id="save">Save</button>
-  <button type="button" class="btn btn-primary" id="zero-calc" data-bs-toggle="modal" data-bs-target="#plotModal">Zero Curve</button>
-  <button type="button" class="btn btn-primary" id="test">test</button>
-</div>
-<div class="data-area">
-  <div>
-    {{ curve_setting.as_p }}
-  </div>
-  <div class="curve-table">
-  </div>
-</div>
-<div class="message-area"></div>
+<div class="row">
 
+  <div class="selection-area card col-12">
+    <div class="card-header">
+      Search
+    </div>
+    <div class="card-body">
+      <form action="{% url 'mkt_curve' %}" method="GET">
+        <label for="date">Date: </label>
+        <input type="date" id="date" name="date" value='{{ date| default_if_none:"" }}'/>
+        <label for="ccy">Currency: </label>
+        <input type="text" id="ccy" name="ccy" value='{{ ccy| default_if_none:"" }}'/>
+        <label for="name">Name: </label>
+        <input type="text" id="name" name="name" value='{{ name| default_if_none:"" }}'/>
+        <input type="submit" value="Choose"/>
+      </form>
+    </div>
+  </div>
 
-<div class="modal fade" id="plotModal" tabindex="-1" aria-labelledby="plotLabel" aria-hidden="true">
+  <div class="def-area" style="display: none;"></div>
+  <div class="message-area visually-hidden"></div>
+
+  <div class="action-area">
+    <button type="button" class="btn btn-primary" id="save">Save</button>
+    <button type="button" class="btn btn-primary" id="btn-plot" data-bs-toggle="modal" data-bs-target="#plot-curve">Plot</button>
+    <button type="button" class="btn btn-primary" id="btn-zero-calc">Zero Rates</button>
+  </div>
+
+  <div class="mkt-rate-card card col-6">
+    <div class="card-header">
+      Rates
+    </div>
+    <div class="card-body">
+      <div class="data-area">
+        <div style="display: none;">
+          {{ curve_setting.as_p }}
+        </div>
+        <div class="curve-table">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="zero-rate-card card col-6 visually-hidden">
+    <div class="card-header">
+      Zero Rates
+    </div>
+    <div class="card-body">
+      <div class="area-zero-rate">
+        <div class="zero-rate-table">
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="modal fade" id="plot-curve" tabindex="-1" aria-labelledby="plotLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-xl">
-    <div class="modal-content" style="width: 960px">
+    <div class="modal-content" style="width: 960px; margin:auto;">
       <div class="modal-header">
         <h5 class="modal-title" id="plotLabel">Zero Curve</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>

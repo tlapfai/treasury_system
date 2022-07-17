@@ -2,8 +2,8 @@
 {% load widget_tweaks %}
 
     {% for field in form.visible_fields %}
-        {% if field.widget_type == 'checkbox' %}
-            <div class="form-group col-lg-1">
+        {% if field.widget_type == 'text' %}
+            <div class="form-group col-lg-3">
         {% else %}
             <div class="form-group col-lg-2">
         {% endif %}

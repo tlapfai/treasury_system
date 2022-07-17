@@ -8,7 +8,8 @@ router.register(r'calendar', views.CalendarViewSet)
 router.register(r'fxo', views.FXOViewSet)
 
 urlpatterns = [
-    path("", views.index, name="index"),
+    #path("", views.index, name="index"),
+    path('', views.FXOView.as_view(), name='fxo_create'),
     path("login", views.login_view, name="login"),
     path("logout", views.logout_view, name="logout"),
     path("register", views.register, name="register"),
@@ -23,7 +24,11 @@ urlpatterns = [
     path('fxodetail', views.fxo_detail, name='fxodetail'),
     path('trade/fxo/create', views.FXOView.as_view(), name='fxo_create'),
     path('trade/fxo/<int:id>', views.FXOView.as_view(), name='fxo_update'),
-    path('api/trade/fxo/price', views.fxo_price, name='fxo_price'),  # api
+    path('api/trade/fxo/price', views.api_fxo_price),  # api
+    path('api/trade/fxo/scn', views.api_fxo_scn),
+    path('api/trade/swap/price',
+         views.api_swap_price,
+         name='api_trade_swap_price'),  # api
     path('trade/swap/create', views.SwapView.as_view(), name='swap_create'),
     path('trade/fxo/scn', views.fxo_scn, name='fxo_scn'),
     path('mkt/fxv', views.FXVolView.as_view(), name='mkt_fxv'),
@@ -52,6 +57,6 @@ urlpatterns = [
     path('market_data_import',
          views.market_data_import,
          name='market_data_import'),
-    path('load_market_data', views.load_market_data, name='load_market_data'),
-    path('fxo_price', views.fxo_price, name='fxo_price'),
+    #path('load_market_data', views.load_market_data, name='load_market_data'),
+    #path('fxo_price', views.fxo_price, name='fxo_price'),
 ]

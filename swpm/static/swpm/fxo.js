@@ -267,21 +267,33 @@ $(document).ready(function () {
     });
   }
 
-  async function price_fxo2() {
+  async function price_fxo2(path, scn = false) {
     if (
       $("#id_up-bar-effect").prop("checked") == false &&
       $("#id_low-bar-effect").prop("checked") == false
     ) {
       $("#id_barrier").prop("checked", false);
     }
-    let form_data = new FormData($(".trade-form")[0]); // use [0] to convert jquery obj to DOM
+    let trade_form_data = new FormData($(".trade-form")[0]); // use [0] to convert jquery obj to DOM
     var form_alert = $("#form-alert");
     form_alert.html("");
     $("input, select").removeClass("is-invalid");
+    if (scn) {
+      trade_form_data.append(
+        "measure",
+        $("input[name=scn-measure]:checked", "#scn-form").val()
+      );
+      trade_form_data.append(
+        "unit",
+        $("input[name=scn-unit]:checked", "#scn-form").val()
+      );
+      trade_form_data.append("scnLo", $("#scn-lo").val());
+      trade_form_data.append("scnUp", $("#scn-up").val());
+    }
     return await axios({
       method: "post",
-      url: "/api/trade/fxo/price", // starting with slash will use the root of the site
-      data: form_data,
+      url: path, // starting with slash will use the root of the site
+      data: trade_form_data,
       headers: { "Content-Type": "multipart/form-data" },
     });
   }
@@ -289,7 +301,8 @@ $(document).ready(function () {
   function updateValuationTable(event) {
     event.preventDefault();
     updateMktTable();
-    price_fxo2()
+    let path = "/api/trade/fxo/price";
+    price_fxo2(path)
       .then((response) => {
         valuationTable.updateData(response.data.result.values);
         valuationTable.updateSettings({
@@ -308,9 +321,51 @@ $(document).ready(function () {
       });
   }
 
+  function calculateScn(event) {
+    event.preventDefault();
+    updateMktTable();
+    var scnChart = echarts.init(document.getElementById("plot-body-scn"));
+    scnChart.showLoading({
+      text: "Loading...",
+    });
+    let path = "/api/trade/fxo/scn";
+    price_fxo2(path, true).then((response) => {
+      console.log(response.data.result);
+      var para = response.data.parameters;
+      $("#scn-lo").val(para.range_lo);
+      $("#scn-up").val(para.range_up);
+      $("label[for='unit-ccy1']").html(para.ccy1);
+      $("label[for='unit-ccy2']").html(para.ccy2);
+      $("label[for='unit-ccy1pct']").html(para.ccy1 + "%");
+      $("label[for='unit-ccy2pct']").html(para.ccy2 + "%");
+      var dp = para.unit.slice(-1) == "%" ? 6 : 2;
+      var option = {
+        title: { text: para.measure },
+        tooltip: {
+          trigger: "axis",
+          valueFormatter: (value) => value.toFixed(dp),
+        },
+        legend: { data: ["Sold"] },
+        xAxis: { type: "value", name: "Spot", min: "dataMin", max: "dataMax" },
+        yAxis: { type: "value" },
+        series: [
+          {
+            showSymbol: true,
+            type: "line",
+            data: response.data.result,
+          },
+        ],
+      };
+      scnChart.hideLoading();
+      scnChart.setOption(option);
+    });
+  }
+
   $("#id_maturity_date, input#id_as_of").focusout(updateMktTable);
   $("#id_strike_price, #id_ccy_pair").change(updateMktTable);
   $("#btn-price").click(updateValuationTable);
+  $("#btn-scn-pop").click(calculateScn);
+  $("#btn-scn-calc").click(calculateScn);
 
   // https://studygyaan.com/django/render-html-as-you-type-with-django-and-ajax
 });

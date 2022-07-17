@@ -4,65 +4,99 @@
 {% debug %} 
 {% block body %}
 
-<div class="row trade-area container-fluid">
+{% if valuation_message %}
+  <div class="callout"><span>{{ valuation_message }}</span></div>
+{% endif %}
+<div class="trade-area container-fluid">
   <div>
     <form class="trade-form align-items-center">
+      <input type="hidden" name="trade_type" value="{{ trade_type }}" />
+      <input type="hidden" name="origin_page" value="{{ request.path }}" />
       {% csrf_token %}
       <fieldset>
-        {% if valuation_message %}
-        <div class="callout"><span>{{ valuation_message }}</span></div>
-        {% endif %}
-        <div class="" id="terms" role="tabpanel" aria-labelledby="terms-tab">
-          <button type="submit" class="btn btn-primary" formaction="">Auto Fill</button>
-          <button type="submit" class="btn btn-primary">Price</button>
+
+        <div class="row justify-content-between" style="padding: 0.5em">
+          <div class="col-2" id="trade-id" style="display: inline-block">
+            ID: {{ trade_id }}
+          </div>
+          <div class="col-2" style="display: inline-block; text-align: right;">
+            <input type="date" class="as_of" name="as_of" required id="id_as_of">
+          </div>
+        </div>
+
+        <div class="btn-list">
+          <button id="btn-std-fill" class="btn btn-secondary" formaction="">Standard Trade</button>
+          <button class="btn btn-primary" id="btn-price">Price</button>
           {% if user.is_authenticated %}
             <button type="submit" class="btn btn-primary" formaction="" formmethod="POST">Do</button>
           {% endif %}
-          <table style="width: 100%; border: solid 2px red">
-            <table style="width: 100%">
-              {{ trade_id_form.as_table }}
-            </table>
-            <table style="width: 100%">
-              {{ as_of_form.as_table }}
-            </table>
-            <table class="trade-form">
-              {{ trade_form }}
-            </table>
-            <table class="swap-legs" style="width: 100%">
-              <tbody>
-                <tr>
-                  <th>Leg 1</th>
-                  <th>Leg 2</th>
-                </tr>
-                <tr>
-                  {% for f in trade_forms %}
-                  <td>
-                    <table>
-                      {{ f.as_table }}
-                    </table>
-                  </td>
-                  {% endfor %}
-                  {{ trade_forms.management_form }}
-                </tr>
-              </tbody>
-            </table>
-            <input type="hidden" name="trade_type" value="{{ trade_type }}" />
-            <input type="hidden" name="origin_page" value="{{ request.path }}" />
-          </table>
         </div>
+
+        <div class="invisible" id="form-alert"></div>
+
+          <div class="card">
+            <div class="card-header">Deal Term</div>
+            <div class="card-body">
+              <table style="width: 100%;">
+                <table class="swap-legs" style="width: 100%">
+                  <tbody>
+                    <tr>
+                      <th>Leg 1</th>
+                      <th>Leg 2</th>
+                    </tr>
+                    <tr>
+                      {% for f in leg_forms %}
+                      <td style="width: 50%">
+                        <table class="leg-table">
+                          {{ f.as_table }}
+                        </table>
+                      </td>
+                      {% endfor %}
+                      {{ trade_forms.management_form }}
+                    </tr>
+                    <tr>
+                      {% for s in schedule_forms %}
+                      <td style="width: 50%">
+                        <table class="leg-table">
+                          {{ s.as_table }}
+                        </table>
+                      </td>
+                      {% endfor %}
+                      {{ schedule_forms.management_form }}
+                    </tr>
+                  </tbody>
+                </table>
+                <table>
+                  {{ trade_form.as_table }}
+                </table>
+                <input type="hidden" name="trade_type" value="{{ trade_type }}" />
+                <input type="hidden" name="origin_page" value="{{ request.path }}" />
+              </table>
+
+            </div>
+          </div>
       </fieldset>
     </form>
   </div>
   <!--End of class="trade-ticket">-->
   <!-- end of class='valuation'-->
 </div>
-<!-- end of class="row"-->
+<div class="val-result container-fluid">
+  <div class="card val-result-block" style="min-width: 216px; min-height: 235px;">
+    <div class="card-header">Parameter</div>
+    <div class="card-body"><div id="mkt-table"></div></div>
+  </div>
+  <div class="card val-result-block" style="min-width: 516px; min-height: 235px;">
+    <div class="card-header">Valuation</div>
+    <div class="card-body"><div id="valuation-table"></div></div>
+  </div>
+</div>
 
 {% endblock %}
 {% block script %}
 
-<script src="{% static 'swpm/jquery-3.6.0.slim.min.js' %}"></script>
-<script src="https://unpkg.com/bootstrap-table@1.18.3/dist/bootstrap-table.min.js"></script>
-<script src="{% static 'swpm/index.js' %}"></script>
+<script src="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.js"></script>
+<link rel="stylesheet" media="screen" href="http://handsontable.com/dist/jquery.handsontable.full.css">
+<script src="{% static 'swpm/swap.js' %}"></script>
 
 {% endblock %}

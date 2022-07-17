@@ -80,25 +80,22 @@ $(document).ready(function () {
     return await axios.get("/api/mkt/curve/calc", { params: data }, axios_cfg);
   }
 
-  $("#zero-calc").click(function () {
+  $("button#btn-plot").click(function () {
     calc_curve().then(function (response) {
-      console.log(response.data.result);
       var myChart = echarts.init(document.getElementById("plot"));
       var option = {
         title: { text: "Zero Rate Term Structure" },
-        tooltip: {},
-        legend: { data: ["Sold"] },
-        xAxis: {
-          type: "category",
-          boundaryGap: false,
-          data: response.data.result.dates,
+        tooltip: {
+          trigger: "axis",
         },
+        legend: { data: ["Sold"] },
+        xAxis: { type: "time" },
         yAxis: { type: "value" },
         series: [
           {
             showSymbol: true,
             type: "line",
-            data: response.data.result.zeroRates,
+            data: response.data.result,
           },
         ],
       };
@@ -106,9 +103,28 @@ $(document).ready(function () {
     });
   });
 
-  $("#test").click(function () {
+  $("#btn-zero-calc").click(function () {
+    $(".zero-rate-table").html("");
     calc_curve().then(function (response) {
-      console.log(response.data.result);
+      $(".zero-rate-card").removeClass("visually-hidden");
+      const zeroTable = new Handsontable($(".zero-rate-table")[0], {
+        data: response.data.result,
+        startRows: 1,
+        startCols: 2,
+        minSpareRows: 0,
+        contextMenu: true,
+        readOnly: true,
+        columns: [
+          { type: "date", dateFormat: "YYYY-MM-DD" },
+          {
+            type: "numeric",
+            numericFormat: { pattern: "0,0.00000000" },
+          },
+        ],
+        colHeaders: ["Date", "Zero Rate"],
+        colWidths: [140, 140],
+        licenseKey: "non-commercial-and-evaluation",
+      });
     });
   });
 });

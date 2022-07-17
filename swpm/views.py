@@ -1,3 +1,4 @@
+from msilib.schema import Error
 from os import times
 from re import template
 import re
@@ -228,7 +229,7 @@ class FXOView(View):  # in use
         pass
 
 
-class SwapView(View):  # will change to SwapView(View)
+class SwapView(View):  # was TradeView(View)
 
     def get(self, request, **kwargs):
         trade_id = kwargs.get('id')
@@ -248,11 +249,20 @@ class SwapView(View):  # will change to SwapView(View)
         else:
             trade_id_form = TradeIDForm()
             trade_form = SwapForm()
-            leg_form_set = modelformset_factory(SwapLeg, SwapLegForm, extra=2)
-            trade_forms = leg_form_set(queryset=SwapLeg.objects.none(),
-                                       initial=[])
+            LegFormSet = modelformset_factory(SwapLeg, SwapLegForm, extra=2)
+            leg_forms = LegFormSet(queryset=SwapLeg.objects.none(), initial=[])
+            ScheduleFormSet = modelformset_factory(Schedule,
+                                                   ScheduleForm,
+                                                   extra=2)
+            schedule_forms = ScheduleFormSet(queryset=Schedule.objects.none())
 
-        return render(request, "swpm/swap_create.html", locals())
+        return render(
+            request, "swpm/swap_create.html", {
+                'trade_id': trade_id,
+                'trade_form': trade_form,
+                'leg_forms': leg_forms,
+                'schedule_forms': schedule_forms,
+            })
 
 
 def new_trade(request):
@@ -388,47 +398,47 @@ def trade_list(request):
                       {'form': TradeSearchForm()})
 
 
-def load_market_data(request, pricing=False):
-    if request.method == 'POST':
-        as_of = request.POST['as_of']
-        trade_id_form = TradeIDForm(request.POST)
-        as_of_form = AsOfForm(request.POST)
-        ql.Settings.instance().evaluationDate = ql.Date(as_of, '%Y-%m-%d')
-        val_form = FXOValuationForm()
-        market_data = {}
-        if request.POST['trade_type'] == 'FX Option':
-            inst = 'fxo'
-            trade_form = FXOForm(request.POST, instance=FXO())
-            try:
-                ccy_pair = CcyPair.objects.get(
-                    name=trade_form.data['ccy_pair'])
-                fx_spot_quote = FxSpotRateQuote.objects.get(ref_date=as_of,
-                                                            ccy_pair=ccy_pair)
-            except AttributeError:
-                valuation_message = 'Cannot find market data'
-                if pricing:
-                    return None
-                else:
-                    return trade(request,
-                                 as_of_form=as_of_form,
-                                 inst=inst,
-                                 trade_form=trade_form,
-                                 trade_id_form=trade_id_form,
-                                 val_form=val_form,
-                                 valuation_message=valuation_message)
-            else:
-                market_data['fx_spot'] = FxSpotRateQuoteForm(
-                    instance=fx_spot_quote)
-        if pricing:
-            return market_data
-        else:
-            return trade(request,
-                         as_of_form=as_of_form,
-                         inst=inst,
-                         trade_form=trade_form,
-                         trade_id_form=trade_id_form,
-                         val_form=val_form,
-                         market_data_form=market_data)
+# def load_market_data(request, pricing=False):
+#     if request.method == 'POST':
+#         as_of = request.POST['as_of']
+#         trade_id_form = TradeIDForm(request.POST)
+#         as_of_form = AsOfForm(request.POST)
+#         ql.Settings.instance().evaluationDate = ql.Date(as_of, '%Y-%m-%d')
+#         val_form = FXOValuationForm()
+#         market_data = {}
+#         if request.POST['trade_type'] == 'FX Option':
+#             inst = 'fxo'
+#             trade_form = FXOForm(request.POST, instance=FXO())
+#             try:
+#                 ccy_pair = CcyPair.objects.get(
+#                     name=trade_form.data['ccy_pair'])
+#                 fx_spot_quote = FxSpotRateQuote.objects.get(ref_date=as_of,
+#                                                             ccy_pair=ccy_pair)
+#             except AttributeError:
+#                 valuation_message = 'Cannot find market data'
+#                 if pricing:
+#                     return None
+#                 else:
+#                     return trade(request,
+#                                  as_of_form=as_of_form,
+#                                  inst=inst,
+#                                  trade_form=trade_form,
+#                                  trade_id_form=trade_id_form,
+#                                  val_form=val_form,
+#                                  valuation_message=valuation_message)
+#             else:
+#                 market_data['fx_spot'] = FxSpotRateQuoteForm(
+#                     instance=fx_spot_quote)
+#         if pricing:
+#             return market_data
+#         else:
+#             return trade(request,
+#                          as_of_form=as_of_form,
+#                          inst=inst,
+#                          trade_form=trade_form,
+#                          trade_id_form=trade_id_form,
+#                          val_form=val_form,
+#                          market_data_form=market_data)
 
 
 def pricing(request, commit=False):
@@ -589,7 +599,8 @@ def api_curve(request):
                                                  ref_date=date).first()
             return JsonResponse(
                 {
-                    'result': list(yts.rates.all().order_by('tenor').values()),
+                    'result': list(
+                        yts.rates.all().order_by('days_key').values()),
                 },
                 safe=False)
         except (RuntimeError, KeyError) as error:
@@ -647,22 +658,17 @@ def api_curve_calc(request):
                                                  ref_date=date).first()
             ytsObj = yts.term_structure()
             dates = ytsObj.dates()
-            zeroRates = [
-                ytsObj.zeroRate(d, ql.Actual365Fixed(), ql.Continuous).rate()
-                for d in dates
-            ]
-            isoDates = [d.ISO() for d in dates]
+            result = [[
+                d.to_date(),
+                ytsObj.zeroRate(d, ql.Actual365Fixed(), ql.Continuous).rate() *
+                100
+            ] for d in dates]
 
-            return JsonResponse(
-                {
-                    'result': {
-                        'dates': isoDates,
-                        'zeroRates': zeroRates,
-                    },
-                },
-                safe=False)
+            return JsonResponse({'result': result}, safe=False)
         except (RuntimeError, KeyError) as error:
             return JsonResponse({'errors': [error.args]}, status=500)
+    else:
+        return JsonResponse({}, status=405)
 
 
 def api_fxv(request):
@@ -761,12 +767,12 @@ def fxo_scn(request):  # for API
             ql.Settings.instance().evaluationDate = qlDate(as_of)
             mkt = MktDataSet(as_of)
             fxo_form = FXOForm(request.POST, instance=FXO())
-            up_bar_form = FXOUpperBarrierDetailForm(request.POST)
-            low_bar_form = FXOLowerBarrierDetailForm(request.POST)
+            upBarForm = FXOUpperBarrierDetailForm(request.POST)
+            lowBarForm = FXOLowerBarrierDetailForm(request.POST)
             if fxo_form.is_valid():
                 tr = fxo_form.save(False)
                 if tr.barrier:
-                    for bar_form in [up_bar_form, low_bar_form]:
+                    for bar_form in [upBarForm, lowBarForm]:
                         if bar_form.is_valid(
                         ) and bar_form.cleaned_data['effect']:
                             bar = bar_form.save(False)
@@ -909,7 +915,97 @@ def fxo_scn(request):  # for API
             return JsonResponse({'errors': [error.args]}, status=500)
 
 
-def fxo_price(request):  # for API, now in use
+def api_fxo_scn(request):
+
+    def prmDelta():
+        return tr.delta() - tr.NPV()
+
+    def inCcy2(x, s):
+        return x
+
+    def inCcy2Pct(x, s):
+        return x / tr.notional_2
+
+    def inCcy1(x, s):
+        return x / s
+
+    def inCcy1Pct(x, s):
+        return x / s / tr.notional_1
+
+    if request.method == 'POST':
+        try:
+            as_of = request.POST['as_of']
+            ql.Settings.instance().evaluationDate = qlDate(as_of)
+            mkt = MktDataSet(as_of)
+            fxo_form = FXOForm(request.POST, instance=FXO())
+            upBarForm = FXOUpperBarrierDetailForm(request.POST)
+            lowBarForm = FXOLowerBarrierDetailForm(request.POST)
+            if fxo_form.is_valid():
+                tr = fxo_form.save(False)
+                if tr.barrier:
+                    for bar_form in [upBarForm, lowBarForm]:
+                        if bar_form.is_valid(
+                        ) and bar_form.cleaned_data['effect']:
+                            bar = bar_form.save(False)
+                            bar.trade = tr
+                tr.link_mktdataset(mkt)
+                tr.self_inst()
+            else:
+                return JsonResponse({'errors': fxo_form.errors}, status=500)
+
+            data = mkt.fxo_mkt_data(tr.ccy_pair_id)
+            ccy1, ccy2 = tr.ccy_pair_id.split('/')
+            s = data.get('spot')
+            sRate = s.rate
+            low = float(request.POST['scnLo']) if request.POST[
+                'scnLo'] else sRate * 0.9
+            up = float(request.POST['scnUp']) if request.POST['scnUp'] else sRate * 1.1
+            measure = request.POST['measure']
+            unit = request.POST['unit']
+            x_data = list(np.linspace(low, up, 25))
+            result = list()
+
+            measure_dict = {
+                'NPV': tr.NPV,
+                'Delta': tr.delta,
+                'Prm Delta': prmDelta,
+                'Gamma': tr.gamma,
+                'Vega': tr.vega
+            }
+            fun = measure_dict.get(measure)
+            unit_dict = {
+                'Ccy1': inCcy1,
+                'Ccy2': inCcy2,
+                'Ccy1%': inCcy1Pct,
+                'Ccy2%': inCcy2Pct,
+            }
+            unit_fun = unit_dict.get(unit)
+
+            for x in x_data:
+                s.setQuote(x)
+                tr.self_inst()
+                result.append([x, unit_fun(fun(), x)])
+            s.resetQuote()
+
+            return JsonResponse(
+                {
+                    'result': result,
+                    'parameters': {
+                        'measure': measure,
+                        'unit': unit,
+                        'range_lo': low,
+                        'range_up': up,
+                        'ccy1': ccy1,
+                        'ccy2': ccy2,
+                    }
+                },
+                safe=False)
+
+        except RuntimeError as error:
+            return JsonResponse({'errors': [error.args]}, status=500)
+
+
+def api_fxo_price(request):  # for API, now in use
     if request.method == 'POST':
         try:
             as_of = request.POST['as_of']
@@ -917,18 +1013,18 @@ def fxo_price(request):  # for API, now in use
             mkt = MktDataSet(as_of)
             message = None
             fxo_form = FXOForm(request.POST, instance=FXO())
-            up_bar_form = FXOUpperBarrierDetailForm(request.POST)
-            low_bar_form = FXOLowerBarrierDetailForm(request.POST)
+            upBarForm = FXOUpperBarrierDetailForm(request.POST)
+            lowBarForm = FXOLowerBarrierDetailForm(request.POST)
             if fxo_form.is_valid():
                 tr = fxo_form.save(commit=False)
                 if tr.barrier:
-                    if up_bar_form.is_valid(
-                    ) and up_bar_form.cleaned_data['effect']:
-                        up_bar = up_bar_form.save(False)
+                    if upBarForm.is_valid(
+                    ) and upBarForm.cleaned_data['effect']:
+                        up_bar = upBarForm.save(False)
                         up_bar.trade = tr
-                    if low_bar_form.is_valid(
-                    ) and low_bar_form.cleaned_data['effect']:
-                        low_bar = low_bar_form.save(False)
+                    if lowBarForm.is_valid(
+                    ) and lowBarForm.cleaned_data['effect']:
+                        low_bar = lowBarForm.save(False)
                         low_bar.trade = tr
                 tr.link_mktdataset(mkt)
                 tr.self_inst()
@@ -969,6 +1065,53 @@ def fxo_price(request):  # for API, now in use
                     'result': {
                         'headers':
                         ['Measure', ccy1, ccy2, ccy1 + "%", ccy2 + "%"],
+                        'values': result
+                    },
+                    'message': message
+                },
+                safe=False)
+        except RuntimeError as error:
+            return JsonResponse({'errors': [error.args]}, status=500)
+
+
+def api_swap_price(request):  # for API
+    if request.method == 'POST':
+        try:
+            as_of = request.POST['as_of']
+            ql.Settings.instance().evaluationDate = qlDate(as_of)
+            mkt = MktDataSet(as_of)
+            message = None
+            swapForm = SwapForm(request.POST, instance=Swap())
+            swapLegFormSetFactory = modelformset_factory(SwapLeg,
+                                                         SwapLegForm,
+                                                         extra=2)
+            swapLegFormSet = swapLegFormSetFactory(request.POST)
+            if swapForm.is_valid() and swapLegFormSet.is_valid():
+                tr = swapForm.save(commit=False)
+                legs = swapLegFormSet.save(commit=False)
+                for leg in legs:
+                    leg.trade = tr
+                tr.link_mktdataset(mkt)
+                tr.self_inst()
+            else:
+                return JsonResponse({'errors': swapLegFormSet.errors},
+                                    status=500)
+                # try try fxo_form.errors.as_json()
+            result2 = {
+                'npv': tr.NPV(),
+            }
+            result = []
+            for key, value in result2.items():
+                result.append({
+                    'measure': key,
+                    'value': round(value, 2),
+                })
+            return JsonResponse(
+                {
+                    'result': {
+                        'headers': [
+                            'NPV',
+                        ],
                         'values': result
                     },
                     'message': message
