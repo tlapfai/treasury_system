@@ -1,34 +1,76 @@
-
+legend {
+  font-size: 0.75rem;
+}
 
 .alert-danger {
   color: red;
 }
 
-/* .valuation-table, .valuation-table td , .trade-list td, .trade-list th{
-  border: 1px solid black;
-  border-collapse: collapse;
-  padding: 4px;
-  text-align: right;
-} */
+[class^="pg-"] {
+  margin: auto;
+}
+
+.pg-body {
+  padding: 1em;
+}
+
+.row .card {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+table.leg-table th {
+  min-width: 120px;
+}
 
 .main-body {
-	padding: 1px;
+  padding: 1px;
+}
+
+.btn-list {
+  padding: 1em;
+}
+
+.val-result,
+.trade-area {
+  padding: 1em;
+  margin: auto;
+}
+
+.subset-header {
+  display: flex;
+  align-items: center;
+  font-weight: bold;
+}
+
+[type="checkbox"] {
+  vertical-align: middle;
+}
+
+div[class^="trade-ticket"], div[class$="-area"] {
+  padding: 1em;
+}
+
+.val-result-block {
+  float: left;
+  width: auto;
+}
+
+nav.navbar li a {
+  font-size: smaller;
 }
 
 .flex-container {
-	display: flex;
-	flex-flow: row wrap;
-	column-gap: 2px;
-	justify-content: space-evenly
+  display: flex;
+  flex-flow: row wrap;
+  column-gap: 2px;
+  justify-content: space-evenly;
 }
 
 .flex-item {
-  padding: 10px;
   margin-top: 10px;
   border: solid rgba(52, 122, 250, 0.699);
 }
-
-
 
 .loader {
   border: 16px solid #f3f3f3; /* Light grey */
@@ -40,39 +82,45 @@
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .full-screen {
-    position: fixed;
-    top:0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 10;
-    background: rgba(0,0,0,0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
-.interest-rate-data, .search-result {
+.interest-rate-data,
+.search-result {
   font-size: x-small;
 }
 
 /* trade */
 .valuation-table + th {
-	text-align: left;
-	border: solid skyblue;
+  text-align: left;
+  border: solid skyblue;
 }
 
 .valuation-table + td {
-	text-align: right;
-	border: solid skyblue;
+  text-align: right;
+  border: solid skyblue;
 }
 
-input:invalid, select:invalid {
+input:invalid,
+select:invalid {
   border: 2px solid red;
 }
 
@@ -82,18 +130,73 @@ div#mktdata select#id_ccy_pair {
 
 table.cashflow {
   border: solid black 1px;
+  width: 100%;
+  border-spacing: 0;
+  border-collapse: collapse;
 }
 
 table.cashflow th {
   text-align: left;
   border: solid black;
-  border-collapse: collapse;
-  min-width: 100px;
+  font-size: x-small;
+  padding: 2px;
 }
 
-table.cashflow td {
+table.cashflow td,
+table.rate-list td {
   text-align: right;
-  border: solid black;
-  border-collapse: collapse;
-  min-width: 100px;
+  font-size: x-small;
+  padding: 2px;
 }
+
+table.trade-form th,
+table.trade-form td {
+  border: 1px solid black;
+  font-size: smaller;
+}
+
+table.trade-form {
+  width: 100%;
+  border: solid 2px orange;
+  font-size: smaller;
+}
+
+input.form-control {
+  width: auto;
+}
+
+table.fx-vol tr,
+table.fx-vol td {
+  text-align: right;
+}
+
+table.fx-vol thead th {
+  text-align: center;
+}
+
+table.parameters input {
+  text-align: right;
+  float: right;
+}
+
+table.valuation td {
+  text-align: right;
+}
+
+.valuation-table input {
+  float: right;
+  clear: both;
+  text-align: right;
+}
+
+a.nav-link {
+  text-align: center;
+}
+
+[class^="bi-"] {
+  font-size: 1rem; 
+}
+
+.card-body {
+  padding: 0;
+} 
