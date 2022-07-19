@@ -40,7 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.humanize',
     'django_plotly_dash.apps.DjangoPlotlyDashConfig',
-    'widget_tweaks',
+    #'widget_tweaks',
 ]
 
 MIDDLEWARE = [
