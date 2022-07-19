@@ -4,7 +4,7 @@ from .settings import *
 import django_heroku
 import dj_database_url
 
-DEBUG = False
+DEBUG = True
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', SECRET_KEY)
 # adjust to the URL of your Heroku app
 ALLOWED_HOSTS = ['treasury-system.herokuapp.com']
