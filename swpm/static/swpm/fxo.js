@@ -361,11 +361,23 @@ $(document).ready(function () {
     });
   }
 
+  function plugIframe() {
+    const date = $("#id_as_of").val();
+    const ccy_pair = $("#id_ccy_pair").val().replace("/", "");
+    var fxv = "/mkt/fxv/" + ccy_pair + "/" + date;
+    $("#modal-fxv .modal-body").html(
+      `<iframe src="` +
+        fxv +
+        `" style="width: 920px; height:480px; margin:auto;"></iframe>`
+    );
+  }
+
   $("#id_maturity_date, input#id_as_of").focusout(updateMktTable);
   $("#id_strike_price, #id_ccy_pair").change(updateMktTable);
   $("#btn-price").click(updateValuationTable);
   $("#btn-scn-pop").click(calculateScn);
   $("#btn-scn-calc").click(calculateScn);
+  $("#btn-mkt-pop").click(plugIframe);
 
   // https://studygyaan.com/django/render-html-as-you-type-with-django-and-ajax
 });
