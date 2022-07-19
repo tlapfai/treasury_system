@@ -1,7 +1,7 @@
 from concurrent.futures import process
 import datetime
 from operator import truediv
-from tkinter import N
+#from tkinter import N
 from QuantLib.QuantLib import PiecewiseLogLinearDiscount, RealTimeSeries
 from django.contrib.auth.models import AbstractUser
 from django.db import models

@@ -21,11 +21,11 @@ from django.views.generic.detail import DetailView
 from django.views.generic.edit import CreateView, UpdateView
 from django.views.generic.list import ListView
 
-from django_plotly_dash import DjangoDash
-import dash_core_components as dcc
-import dash_html_components as html
-from dash.dependencies import Input, Output
-import plotly.express as px
+# from django_plotly_dash import DjangoDash
+# import dash_core_components as dcc
+# import dash_html_components as html
+# from dash.dependencies import Input, Output
+# import plotly.express as px
 
 from django.shortcuts import get_object_or_404
 from rest_framework.renderers import TemplateHTMLRenderer
@@ -957,9 +957,10 @@ def api_fxo_scn(request):
             ccy1, ccy2 = tr.ccy_pair_id.split('/')
             s = data.get('spot')
             sRate = s.rate
-            low = float(request.POST['scnLo']) if request.POST[
-                'scnLo'] else sRate * 0.9
-            up = float(request.POST['scnUp']) if request.POST['scnUp'] else sRate * 1.1
+            low = float(request.POST['scnLo']
+                        ) if request.POST['scnLo'] else sRate * 0.9
+            up = float(request.POST['scnUp']
+                       ) if request.POST['scnUp'] else sRate * 1.1
             measure = request.POST['measure']
             unit = request.POST['unit']
             x_data = list(np.linspace(low, up, 25))
