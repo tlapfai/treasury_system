@@ -7,7 +7,7 @@ import dj_database_url
 DEBUG = True
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', SECRET_KEY)
 # adjust to the URL of your Heroku app
-ALLOWED_HOSTS = ['treasury-system.herokuapp.com']
+ALLOWED_HOSTS = ['*']
 
 # Activate Django-Heroku.
 django_heroku.settings(locals())
@@ -23,4 +23,4 @@ STATIC_ROOT = 'staticfiles'
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Turn off DEBUG mode.
-DEBUG = False
+DEBUG = True
