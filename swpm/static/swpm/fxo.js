@@ -147,16 +147,13 @@ $(document).ready(function () {
     licenseKey: "non-commercial-and-evaluation",
   });
 
-  $("#btn-std-fill").click(function (event) {
-    event.preventDefault();
+  function default_trade() {
     $("input#id_as_of, input#id_trade_date").val("2021-11-18");
     const effective_date = new Date();
     effective_date.setDate(effective_date.getDate() + 2);
     var oneyear = new Date();
     oneyear.setFullYear(oneyear.getFullYear() + 1);
     oneyear.setDate(oneyear.getDate() + 2);
-    $("#id_book").val("FXO1");
-    $("#id_counterparty").val("HSBC");
     $('[id*="effective_date"]').val(effective_date.toISOString().split("T")[0]);
     $('[id*="maturity_date"]').val(oneyear.toISOString().split("T")[0]);
     $('[id*="notional_1"]').val("1000000.00");
@@ -174,6 +171,11 @@ $(document).ready(function () {
     $("#id_cashflow-ccy").val("USD");
     $("#id_cashflow-amount").val(10000);
     $("#id_cashflow-value_date").val("2021-11-22");
+  }
+
+  $("#btn-std-fill").click(function (event) {
+    event.preventDefault();
+    default_trade();
   });
 
   function load_fxo_mkt() {
@@ -361,7 +363,7 @@ $(document).ready(function () {
     });
   }
 
-  function plugIframe() {
+  function volIframe() {
     const date = $("#id_as_of").val();
     const ccy_pair = $("#id_ccy_pair").val().replace("/", "");
     var fxv = "/mkt/fxv/" + ccy_pair + "/" + date;
@@ -372,12 +374,47 @@ $(document).ready(function () {
     );
   }
 
+  function ir1Iframe() {
+    const date = $("#id_as_of").val();
+    const ccy = $("#id_ccy_pair").val().slice(0, 3);
+    var fxv = "/mkt/curve/" + ccy + "/FOREX/" + date;
+    $("#modal-fxv .modal-body").html(
+      `<iframe src="` +
+        fxv +
+        `" style="width: 1200px; height:480px; margin:auto;"></iframe>`
+    );
+  }
+  function ir2Iframe() {
+    const date = $("#id_as_of").val();
+    const ccy = $("#id_ccy_pair").val().slice(4, 7);
+    var fxv = "/mkt/curve/" + ccy + "/OIS/" + date;
+    $("#modal-fxv .modal-body").html(
+      `<iframe src="` +
+        fxv +
+        `" style="width: 1200px; height:480px; margin:auto;"></iframe>`
+    );
+  }
+
+  $("input#id_as_of").change(() => {
+    $("input#id_as_of").val("2021-11-18");
+  });
+
+  function curveNameBtn() {
+    $("#btn-mkt-ir1").text($("#id_ccy_pair").val().slice(0, 3) + " Curve");
+    $("#btn-mkt-ir2").text($("#id_ccy_pair").val().slice(4, 7) + " Curve");
+  }
+
   $("#id_maturity_date, input#id_as_of").focusout(updateMktTable);
   $("#id_strike_price, #id_ccy_pair").change(updateMktTable);
   $("#btn-price").click(updateValuationTable);
   $("#btn-scn-pop").click(calculateScn);
   $("#btn-scn-calc").click(calculateScn);
-  $("#btn-mkt-pop").click(plugIframe);
+  $("#btn-mkt-pop").click(volIframe);
+  $("#btn-mkt-ir1").click(ir1Iframe);
+  $("#btn-mkt-ir2").click(ir2Iframe);
+  $("#id_ccy_pair").change(curveNameBtn);
+  default_trade();
+  curveNameBtn();
 
   // https://studygyaan.com/django/render-html-as-you-type-with-django-and-ajax
 });

@@ -21,7 +21,7 @@ $(document).ready(function () {
     columns: [
       { data: "tenor", type: "text", validator: regex1, allowInvalid: false, allowEmpty: false },
       { data: "instrument", type: "text", allowEmpty: false },
-      { data: "rate", type: "numeric", numericFormat: { pattern: "0,0.0000%" }, },
+      { data: "rate", type: "numeric", numericFormat: { pattern: "0,0.00000000" }, },
       { data: "day_counter", type: "dropdown", source: day_counters },
       { data: "ccy_pair_id", type: "text" },
     ],

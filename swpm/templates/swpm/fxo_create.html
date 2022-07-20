@@ -25,19 +25,6 @@
       <div class="callout"><span>{{ valuation_message }}</span></div>
     {% endif %}
 
-    <div class="btn-list">
-      {% comment %} <button id="btn-mkt" class="btn btn-primary">Load Market Data</button> {% endcomment %}
-      <button id="btn-mkt-pop" type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal-fxv">Volatility</button>
-      <button id="btn-auto-fill" class="btn btn-primary" formaction="">Auto Fill</button>
-      <button id="btn-std-fill" class="btn btn-secondary" formaction="">Standard Trade</button>
-      <button id="btn-price" class="btn btn-primary">Price</button>
-      {% comment %} <button id="btn-scn" type="submit" formaction="{% url 'fxo_scn' %}" class="btn btn-primary" formmethod="POST" formtarget="scn_window">Scenario</button> {% endcomment %}
-      <button id="btn-scn-pop" type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#plot-scn">Scenario Analysis</button>
-      {% if user.is_authenticated %}
-        <button type="submit" class="btn btn-primary" formaction="{% url 'fxo_create' %}" formmethod="POST">Do</button>
-      {% endif %}
-    </div>
-
     <div class="card">
       <div class="card-header">
         Deal Term
@@ -58,13 +45,31 @@
 </div>
 
 <div class="val-result container-fluid">
-  <div class="card val-result-block" style="min-width: 180px; min-height: 200px;">
+  <div class="card val-result-block" style="min-width: 180px; min-height: 230px;">
     <div class="card-header">Parameter</div>
     <div class="card-body" style="padding: 0"><div id="mkt-table"></div></div>
   </div>
-  <div class="card val-result-block" style="min-width: 460px; min-height: 200px;">
+  <div class="card val-result-block" style="min-width: 460px; min-height: 230px;">
     <div class="card-header">Valuation</div>
     <div class="card-body" style="padding: 0"><div id="valuation-table"></div></div>
+  </div>
+  <div class="card act-panel" style="min-width: 200px; min-height: 230px;">
+    <div class="card-header">Actions</div>
+    <div class="card-body" style="padding: 0">
+      <div id="act-panel">
+        {% comment %} <button id="btn-mkt" class="btn btn-primary">Load Market Data</button> {% endcomment %}
+        <button id="btn-mkt-pop" type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal-fxv">Volatility</button>
+        <button id="btn-mkt-ir1" type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal-fxv">Ccy1 Curve</button>
+        <button id="btn-mkt-ir2" type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal-fxv">Ccy2 Curve</button>
+        {% comment %} <button id="btn-auto-fill" class="btn btn-primary" formaction="">Auto Fill</button> {% endcomment %}
+        <button id="btn-std-fill" class="btn btn-secondary" formaction="">Reset Default</button>
+        <button id="btn-price" class="btn btn-primary">Price</button>
+        <button id="btn-scn-pop" type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#plot-scn">Scenario Analysis</button>
+        {% if user.is_authenticated %}
+          <button type="submit" class="btn btn-primary" formaction="{% url 'fxo_create' %}" formmethod="POST">Do</button>
+        {% endif %}
+      </div>
+    </div>
   </div>
 </div>
 
@@ -142,9 +147,9 @@
 
 <div class="modal fade" id="modal-fxv" tabindex="-2" aria-labelledby="fxvLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-xl">
-    <div class="modal-content" style="width: 960px; margin: auto;">
+    <div class="modal-content" style="width: 1260px; margin: auto;">
       <div class="modal-header">
-        <h5 class="modal-title" id="fxvLabel">FX Volatility</h5>
+        <h5 class="modal-title" id="fxvLabel">Market Data</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
