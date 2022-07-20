@@ -96,6 +96,8 @@ QL_CALENDAR = {
 
 period_regex1 = re.compile(r"^(\d+[DMYdmy])+$")
 period_regex2 = re.compile(r"^(\d+[Ww])+$")
+period_regex3 = re.compile(r"^ON$")
+period_regex4 = re.compile(r"^TN$")
 
 
 def validate_positive(value):
@@ -104,7 +106,8 @@ def validate_positive(value):
 
 
 def validate_period(s):
-    if not period_regex1.match(s) and not period_regex2.match(s):
+    if not period_regex1.match(s) and not period_regex2.match(
+            s) and not period_regex3.match(s) and not period_regex4.match(s):
         raise ValidationError(_('Period is not correct'),
                               code='incorrect_period')
 
@@ -156,8 +159,8 @@ class Ccy(models.Model):
                                 null=True)  # free text
     foreign_exchange_curve = CharField(max_length=16, blank=True,
                                        null=True)  # free text
-    rate_day_counter = CharField(max_length=24, 
-                                 choices=CHOICE_DAY_COUNTER.choices, 
+    rate_day_counter = CharField(max_length=24,
+                                 choices=CHOICE_DAY_COUNTER.choices,
                                  blank=True,
                                  null=True,
                                  default=None)
@@ -226,7 +229,10 @@ class FxSpotRateQuote(models.Model):
         super().__init__(*args, **kwargs)
         self.rts = None
         self.qts = None
-        self.quote = None #ql.SimpleQuote(self.rate)
+        if self.rate:
+            self.quote = ql.SimpleQuote(self.rate)
+        else:
+            self.quote = None
 
     def set_yts(self, rts=None, qts=None):
         if rts:
@@ -304,9 +310,14 @@ class InterestRateQuote(models.Model):
         self.helper_obj = None
 
     def save(self, *args, **kwargs) -> None:
+        if self.tenor == "ON":
+            t = ql.Period("1D")
+        elif self.tenor == "TN":
+            t = ql.Period("2D")
+        else:
+            t = ql.Period(self.tenor)
         self.days_key = ql.NullCalendar().advance(qlDate(self.ref_date),
-                                                  ql.Period(
-                                                      self.tenor)).to_date()
+                                                  t).to_date()
         super().save(*args, **kwargs)
 
     def helper(self, **kwargs):

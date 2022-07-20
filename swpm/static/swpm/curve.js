@@ -19,12 +19,12 @@ $(document).ready(function () {
     colHeaders: ["Tenor", "Instrument", "Rate", "Day Counter", "Ccy Pair"],
     // prettier-ignore
     columns: [
-              { data: "tenor", type: "text", validator: regex1, allowInvalid: false, allowEmpty: false },
-              { data: "instrument", type: "text", allowEmpty: false},
-              { data: "rate", type: "numeric", numericFormat: { pattern: "0,0.0000%" }, },
-              { data: "day_counter", type: "dropdown", source: day_counters },
-              { data: "ccy_pair", type: "text" },
-          ],
+      { data: "tenor", type: "text", validator: regex1, allowInvalid: false, allowEmpty: false },
+      { data: "instrument", type: "text", allowEmpty: false },
+      { data: "rate", type: "numeric", numericFormat: { pattern: "0,0.0000%" }, },
+      { data: "day_counter", type: "dropdown", source: day_counters },
+      { data: "ccy_pair_id", type: "text" },
+    ],
     colWidths: [50, 100, 100, 120, 80],
     licenseKey: "non-commercial-and-evaluation",
   });
@@ -72,7 +72,7 @@ $(document).ready(function () {
   $("#ccy").change(function () {
     $("#ccy").val($("#ccy").val().toUpperCase());
   });
-  
+
   $("#name").change(function () {
     $("#name").val($("#name").val().toUpperCase());
   });
@@ -110,31 +110,33 @@ $(document).ready(function () {
 
   $("#btn-zero-calc").click(function () {
     $(".zero-rate-table").html("");
-    calc_curve().then(function (response) {
-      $(".zero-rate-card").removeClass("visually-hidden");
-      const zeroTable = new Handsontable($(".zero-rate-table")[0], {
-        data: response.data.result,
-        startRows: 1,
-        startCols: 2,
-        minSpareRows: 0,
-        contextMenu: true,
-        readOnly: true,
-        columns: [
-          { type: "date", dateFormat: "YYYY-MM-DD" },
-          {
-            type: "numeric",
-            numericFormat: { pattern: "0,0.00000000" },
-          },
-        ],
-        colHeaders: ["Date", "Zero Rate"],
-        colWidths: [140, 140],
-        licenseKey: "non-commercial-and-evaluation",
-      });
-    })
-    .catch(function (error) {
-      var e = error.response.data.errors;
-      $.each(e, function () {
-        $(".message-area").append(`<div>${this}</div>`);
+    calc_curve()
+      .then(function (response) {
+        $(".zero-rate-card").removeClass("visually-hidden");
+        const zeroTable = new Handsontable($(".zero-rate-table")[0], {
+          data: response.data.result,
+          startRows: 1,
+          startCols: 2,
+          minSpareRows: 0,
+          contextMenu: true,
+          readOnly: true,
+          columns: [
+            { type: "date", dateFormat: "YYYY-MM-DD" },
+            {
+              type: "numeric",
+              numericFormat: { pattern: "0,0.00000000" },
+            },
+          ],
+          colHeaders: ["Date", "Zero Rate"],
+          colWidths: [140, 140],
+          licenseKey: "non-commercial-and-evaluation",
+        });
+      })
+      .catch(function (error) {
+        var e = error.response.data.errors;
+        $.each(e, function () {
+          $(".message-area").append(`<div>${this}</div>`);
+        });
       });
   });
 });
