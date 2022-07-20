@@ -59,6 +59,7 @@ $(document).ready(function () {
     save_curve()
       .then(function (response) {
         $(".message-area").html(`<div>${response.data.message}</div>`);
+        $(".message-area").removeClass("visually-hidden");
       })
       .catch(function (error) {
         var e = error.response.data.errors;
@@ -70,6 +71,10 @@ $(document).ready(function () {
 
   $("#ccy").change(function () {
     $("#ccy").val($("#ccy").val().toUpperCase());
+  });
+  
+  $("#name").change(function () {
+    $("#name").val($("#name").val().toUpperCase());
   });
 
   async function calc_curve() {
@@ -125,6 +130,11 @@ $(document).ready(function () {
         colWidths: [140, 140],
         licenseKey: "non-commercial-and-evaluation",
       });
-    });
+    })
+    .catch(function (error) {
+      var e = error.response.data.errors;
+      $.each(e, function () {
+        $(".message-area").append(`<div>${this}</div>`);
+      });
   });
 });
