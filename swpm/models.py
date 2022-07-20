@@ -226,7 +226,7 @@ class FxSpotRateQuote(models.Model):
         super().__init__(*args, **kwargs)
         self.rts = None
         self.qts = None
-        self.quote = ql.SimpleQuote(self.rate)
+        self.quote = None #ql.SimpleQuote(self.rate)
 
     def set_yts(self, rts=None, qts=None):
         if rts:
