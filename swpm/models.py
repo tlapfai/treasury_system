@@ -156,10 +156,11 @@ class Ccy(models.Model):
                                 null=True)  # free text
     foreign_exchange_curve = CharField(max_length=16, blank=True,
                                        null=True)  # free text
-    rate_day_counter = CharField(max_length=24,
+    rate_day_counter = CharField(max_length=24, 
+                                 choices=CHOICE_DAY_COUNTER.choices, 
                                  blank=True,
                                  null=True,
-                                 default=None)  # free text
+                                 default=None)
 
     def __str__(self):
         return self.code
