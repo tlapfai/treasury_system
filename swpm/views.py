@@ -702,25 +702,26 @@ def api_fxv(request):
             fxvq = data.get('fxv')
             deltas = ['', '', 10, 25, 75, 90]
             for q in fxvq:
-                tn = q[0]
-                FXVolatilityQuote.objects.create(
-                    ref_date=ref_date,
-                    tenor=tn,
-                    is_atm=True,
-                    surface=fxv,
-                    atm_type=atm_type,
-                    value=float(q[1] * 0.01),
-                )
-                for i in range(2, 6):
+                if q[0]:
+                    tn = q[0]
                     FXVolatilityQuote.objects.create(
                         ref_date=ref_date,
                         tenor=tn,
-                        is_atm=False,
+                        is_atm=True,
                         surface=fxv,
-                        delta=deltas[i],
-                        delta_type=delta_type,
-                        value=float(q[i] * 0.01),
+                        atm_type=atm_type,
+                        value=float(q[1] * 0.01),
                     )
+                    for i in range(2, 6):
+                        FXVolatilityQuote.objects.create(
+                            ref_date=ref_date,
+                            tenor=tn,
+                            is_atm=False,
+                            surface=fxv,
+                            delta=deltas[i],
+                            delta_type=delta_type,
+                            value=float(q[i] * 0.01),
+                        )
             if fxvCtd:
                 message = str(fxv) + ' created.'
             else:

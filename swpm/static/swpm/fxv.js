@@ -51,16 +51,19 @@ $(document).ready(function () {
   }
 
   $("#save").click(function () {
+    $(".message-area").hide();
     $(".message-area").html("");
     save_fxv()
       .then(function (response) {
         $(".message-area").html(`<div>${response.data.message}</div>`);
+        $(".message-area").show();
       })
       .catch(function (error) {
         var e = error.response.data.errors;
         $.each(e, function () {
           $(".message-area").append(`<div>${this}</div>`);
         });
+        $(".message-area").show();
       });
   });
 

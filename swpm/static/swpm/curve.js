@@ -56,16 +56,18 @@ $(document).ready(function () {
 
   $("#save").click(function () {
     $(".message-area").html("");
+    $(".message-area").hide();
     save_curve()
       .then(function (response) {
         $(".message-area").html(`<div>${response.data.message}</div>`);
-        $(".message-area").removeClass("visually-hidden");
+        $(".message-area").show();
       })
       .catch(function (error) {
         var e = error.response.data.errors;
         $.each(e, function () {
           $(".message-area").append(`<div>${this}</div>`);
         });
+        $(".message-area").show();
       });
   });
 
@@ -109,6 +111,7 @@ $(document).ready(function () {
   });
 
   $("#btn-zero-calc").click(function () {
+    $(".message-area").hide();
     $(".zero-rate-table").html("");
     calc_curve()
       .then(function (response) {
@@ -137,6 +140,7 @@ $(document).ready(function () {
         $.each(e, function () {
           $(".message-area").append(`<div>${this}</div>`);
         });
+        $(".message-area").show();
       });
   });
 });
