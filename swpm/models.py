@@ -552,7 +552,7 @@ class FXVolatility(models.Model):
             else:
                 sd = math.sqrt(self.t) * vol
                 put = ql.Option.Put
-                calc = ql.BlackDeltaCalculator(put, self.delta_type, self.s0,
+                calc = ql.BlackDeltaCalculator(put, delta_type, self.s0,
                                                self.rDcf, self.qDcf, sd)
                 k = calc.strikeFromDelta(delta)
                 calc = ql.BlackDeltaCalculator(put, ql.DeltaVolQuote.Spot,
