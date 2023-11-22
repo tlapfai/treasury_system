@@ -599,7 +599,7 @@ class FXVolatility(models.Model):
             d = calc.deltaFromStrike(self.strike)
             v = self.interp(d, allowExtrapolation=True)
             if abs(v - v0) > 1e-8:
-                return self.__call__(v)
+                return self.__call__(0.5*(v + v0))
             else:
                 return v
 
